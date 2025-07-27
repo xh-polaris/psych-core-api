@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"github.com/hertz-contrib/websocket"
-	"github.com/xh-polaris/psych-pkg/biz/domain/engine"
+	"github.com/xh-polaris/psych-core-api/biz/domain/engine"
 )
 
 // ChatHandler 处理长对话

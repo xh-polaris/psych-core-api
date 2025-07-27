@@ -1,9 +1,9 @@
 package engine
 
 import (
+	"github.com/xh-polaris/psych-core-api/biz/infra/consts"
+	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
 	"github.com/xh-polaris/psych-idl/kitex_gen/user"
-	"github.com/xh-polaris/psych-pkg/biz/infra/consts"
-	"github.com/xh-polaris/psych-pkg/biz/infra/rpc"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
 )

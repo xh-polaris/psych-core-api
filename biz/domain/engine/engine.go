@@ -28,10 +28,10 @@ type Engine struct {
 	heartbeatTicker *time.Ticker
 
 	// AI Apps
-	chat     app.ChatApp
-	tts      app.TTSApp
-	asr      app.ASRApp
-	workflow core.WorkFlow
+	chat app.ChatApp
+	tts  app.TTSApp
+	asr  app.ASRApp
+	core core.WorkFlow
 
 	// uSession 对话标识
 	uSession string

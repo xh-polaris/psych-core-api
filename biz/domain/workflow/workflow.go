@@ -1,13 +1,11 @@
-package core
+package workflow
 
-import (
-	"github.com/xh-polaris/psych-pkg/biz/domain/engine"
-)
+import "github.com/xh-polaris/psych-pkg/core"
 
 // WorkFlow 工作流编排
 type WorkFlow struct {
 	// 引擎的指针, 因为会用到一部分的字段
-	*engine.Engine
+	core.Engine
 }
 
 // Run 启动工作流

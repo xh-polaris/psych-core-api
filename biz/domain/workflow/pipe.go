@@ -1,4 +1,4 @@
-package core
+package workflow
 
 // ASRBiPipe 处理ASR的Pipe
 type ASRBiPipe struct {

@@ -2,8 +2,8 @@ package rpc
 
 import (
 	"github.com/google/wire"
+	"github.com/xh-polaris/psych-core-api/biz/infra/config"
 	user "github.com/xh-polaris/psych-idl/kitex_gen/user/psychuserservice"
-	"github.com/xh-polaris/psych-pkg/biz/infra/config"
 	"sync"
 )
 
