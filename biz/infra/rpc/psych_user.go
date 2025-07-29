@@ -2,13 +2,14 @@ package rpc
 
 import (
 	"github.com/google/wire"
+	"github.com/xh-polaris/gopkg/kitex/client"
 	"github.com/xh-polaris/psych-core-api/biz/infra/config"
 	user "github.com/xh-polaris/psych-idl/kitex_gen/user/psychuserservice"
 	"sync"
 )
 
-var once sync.Once
-var client user.Client
+var puOnce sync.Once
+var puClnt user.Client
 
 type IPsychUser interface {
 	user.Client
@@ -25,12 +26,17 @@ var PsychUserSet = wire.NewSet(
 )
 
 func NewPsychUser(config *config.Config) user.Client {
-	once.Do(func() {
-		client = client.NewClient(config.Name, "psych.user", user.NewClient)
+	puOnce.Do(func() {
+		puClnt = client.NewClient(config.Name, "psych.user", user.NewClient)
 	})
-	return client
+	return puClnt
 }
 
 func GetPsychUser() user.Client {
-	return client
+	if puClnt == nil {
+		puOnce.Do(func() {
+			puClnt = client.NewClient(config.GetConfig().Name, "psych.user", user.NewClient)
+		})
+	}
+	return puClnt
 }

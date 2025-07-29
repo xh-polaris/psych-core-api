@@ -18,23 +18,13 @@ type Auth struct {
 	AccessExpire int64
 }
 
-type Coze struct {
-	Key   string
-	BotId string
-}
-
 type Config struct {
 	service.ServiceConf
 	ListenOn string
 	State    string
 	Auth     Auth
-	Mongo    struct {
-		URL string
-		DB  string
-	}
-	Cache cache.CacheConf
-	Redis *redis.RedisConf
-	Coze  *Coze
+	Cache    cache.CacheConf
+	Redis    *redis.RedisConf
 }
 
 func NewConfig() (*Config, error) {

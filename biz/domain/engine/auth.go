@@ -26,19 +26,21 @@ func (e *Engine) auth(auth *core.Auth) bool {
 	}
 
 	if merr != nil {
-		e.mWrite(core.MErr, merr)
+		e.MWrite(core.MErr, merr)
 		return false
 	}
 	e.info = alreadyAuth.Info
-	e.mWrite(core.MAuth, alreadyAuth) // 前端收到Auth响应后, 需要显示配置中
+	e.MWrite(core.MAuth, alreadyAuth) // 前端收到Auth响应后, 需要显示配置中
 	return true
 }
 
 // 已登录
 func (e *Engine) already(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err) {
+	alreadyAuth = &core.Auth{}
 	// TODO 校验JWT正确性
-	alreadyAuth.Info = auth.Info
 	merr = consts.Err(consts.InvalidAuth)
+	alreadyAuth.Info = auth.Info
+	e.info = alreadyAuth.Info
 	return alreadyAuth, merr
 }
 
@@ -46,13 +48,12 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 	var err error
 	var signResp *user.UserSignInResp
 	var getResp *user.UserGetInfoResp
-	pu := rpc.GetPsychUser()
-
+	pu, alreadyAuth := rpc.GetPsychUser(), &core.Auth{}
 	// 用户登录
-	sign := &user.UserSignInReq{UnitId: auth.Info["unit_id"],
+	sign := &user.UserSignInReq{UnitId: auth.Info[consts.UnitId],
 		AuthType: auth.AuthType, AuthId: auth.AuthID, VerifyCode: auth.VerifyCode}
 	if signResp, err = pu.UserSignIn(e.ctx, sign); err != nil {
-		logx.Error("[engine] [auth] UserSignIn err: %v", err)
+		logx.Error("[engine] [%s] UserSignIn err: %v", core.AAuth, err)
 		merr = consts.Err(consts.InvalidAuth)
 		return
 	}
@@ -60,10 +61,11 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 	// 获取用户信息
 	get := &user.UserGetInfoReq{UserId: signResp.UserId, UnitId: &signResp.UnitId}
 	if getResp, err = pu.UserGetInfo(e.ctx, get); err != nil {
-		logx.Error("[engine] [auth] UserGetInfo err: %v", err)
+		logx.Error("[engine] [%s] UserGetInfo err: %v", core.AAuth, err)
 		merr = consts.Err(consts.InvalidAuth)
 		return
 	}
 	alreadyAuth.Info = getResp.Form
+	e.info = alreadyAuth.Info
 	return
 }

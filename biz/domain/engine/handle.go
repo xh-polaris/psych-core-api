@@ -15,7 +15,6 @@ var meta = &core.Meta{
 func buildHandle(e *Engine) {
 	e.meta = meta
 	e.messageCh = core.NewChannel[[]byte](3, e.close)
-	e.broadcast = append(e.broadcast, e.messageCh)
 	go e.handle()
 }
 
@@ -31,13 +30,13 @@ func (e *Engine) handle() {
 
 	for data = range e.messageCh.C {
 		if msg, err = core.MUnmarshal(data, e.meta.Compression, e.meta.Serialization); err != nil { // 消息反序列化失败
-			action = core.UMMsg
+			action = core.AUMMsg
 			break
 		}
 		// 解码消息
 		if payload, err = core.DecodeMessage(msg); err != nil {
-			action = core.DMsg
-			e.write(core.DecodeMsgErr) // 解码失败要告知客户端错误消息
+			action = core.ADMsg
+			e.Write(core.DecodeMsgErr) // 解码失败要告知客户端错误消息
 			break
 		}
 
@@ -53,7 +52,7 @@ func (e *Engine) handle() {
 				e.cmdCh.Send(cmd)
 			}
 		default: // 不支持的消息
-			e.write(core.UnSupportErr)
+			e.Write(core.UnSupportErr)
 		}
 	}
 	logx.CondError(!wsx.IsNormal(err), "[engine] %s error %s", action, err)

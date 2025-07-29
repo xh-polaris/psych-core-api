@@ -13,7 +13,6 @@ var heartbeatTimeout = time.Second * 30
 func buildHeartbeat(e *Engine) {
 	e.heartbeatTicker = time.NewTicker(heartbeatTimeout)
 	e.heartbeatCh = core.NewChannel[struct{}](3, e.close)
-	e.broadcast = append(e.broadcast, e.heartbeatCh)
 	go e.heartbeat()
 }
 
@@ -33,7 +32,7 @@ func (e *Engine) heartbeat() {
 			}
 			e.heartbeatTicker.Reset(heartbeatTimeout)
 			if err = e.wsx.Pong(); err != nil {
-				logx.CondError(!wsx.IsNormal(err), "[engine] %s error %s", core.Pong, err)
+				logx.CondError(!wsx.IsNormal(err), "[engine] %s error %s", core.APong, err)
 			}
 		}
 	}

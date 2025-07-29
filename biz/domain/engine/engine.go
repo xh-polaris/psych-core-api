@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"github.com/hertz-contrib/websocket"
-	"github.com/xh-polaris/psych-pkg/app"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util"
 	"github.com/xh-polaris/psych-pkg/util/logx"
@@ -22,22 +21,19 @@ type Engine struct {
 	cancel context.CancelFunc
 	once   sync.Once
 	close  chan struct{}
+
 	// ws 与前端的websocket链接
 	wsx             *wsx.HZWSClient
 	meta            *core.Meta
 	heartbeatTicker *time.Ticker
 
-	// AI Apps
-	chat app.ChatApp
-	tts  app.TTSApp
-	asr  app.ASRApp
-	core core.WorkFlow
+	// 工作流
+	workflow core.WorkFlow
 
 	// uSession 对话标识
 	uSession string
 
 	// 消息派发
-	broadcast   []core.CloseChannel
 	heartbeatCh *core.Channel[struct{}]
 	messageCh   *core.Channel[[]byte]
 	cmdCh       *core.Channel[*core.Cmd]
@@ -51,7 +47,7 @@ type Engine struct {
 func NewEngine(ctx context.Context, conn *websocket.Conn) *Engine {
 	ctx, cancel := util.NNCtxWithCancel(ctx)
 	e := &Engine{ctx: ctx, cancel: cancel, wsx: wsx.NewHZWSClient(conn), uSession: util.NewUID(), start: time.Now()}
-	e.broadcast, e.close = make([]core.CloseChannel, 0, 3), make(chan struct{})
+	e.close = make(chan struct{})
 	buildHeartbeat(e)
 	buildHandle(e)
 	return e
@@ -74,7 +70,7 @@ func (e *Engine) Run() {
 			return
 		default:
 			// 从客户端读取信息
-			if mt, data, err = e.read(); err != nil {
+			if mt, data, err = e.Read(); err != nil {
 				return
 			}
 			switch mt {
@@ -84,7 +80,9 @@ func (e *Engine) Run() {
 				logx.Info("[engine] receive text message:", string(data)) // 正常情况下不应该收到文本消息
 			case websocket.BinaryMessage: // 二进制消息
 				e.messageCh.Send(data)
-			case websocket.CloseMessage: // TODO 关闭消息
+			case websocket.CloseMessage:
+				_ = e.Close()
+				return
 			}
 		}
 	}
@@ -98,16 +96,16 @@ func (e *Engine) init() (err error) {
 	return err
 }
 
-// read 读取输入并适时地记录日志
-func (e *Engine) read() (mt int, data []byte, err error) {
+// Read 读取输入并适时地记录日志
+func (e *Engine) Read() (mt int, data []byte, err error) {
 	if mt, data, err = e.wsx.Read(); err != nil {
-		logx.CondError(!wsx.IsNormal(err), "[engine] %s error %s", core.Read, err)
+		logx.CondError(!wsx.IsNormal(err), "[engine] %s error %s", core.ARead, err)
 	}
 	return
 }
 
-// write 写入编码后响应并适时地记录日志
-func (e *Engine) write(msg []byte) {
+// Write 写入编码后响应并适时地记录日志
+func (e *Engine) Write(msg []byte) {
 	var err error
 	if err = e.wsx.WriteBytes(msg); err != nil {
 		logx.CondError(!wsx.IsNormal(err), "[engine] WriteBytes error: %s", err)
@@ -115,33 +113,38 @@ func (e *Engine) write(msg []byte) {
 	return
 }
 
-// mWrite 编码消息并写入响应
-func (e *Engine) mWrite(t core.MType, payload any) {
+// MWrite 编码消息并写入响应
+func (e *Engine) MWrite(t core.MType, payload any) {
 	var err error
 	var data []byte
 	var m *core.Message
 
 	if m, err = core.EncodeMessage(t, payload); err != nil {
 		logx.Error("[engine] encode message error: %s", err)
-		e.write(core.EncodeMsgErr)
+		e.Write(core.EncodeMsgErr)
 		return
 	}
 	if data, err = core.MMarshal(m, e.meta.Compression, e.meta.Serialization); err != nil {
 		logx.Info("[engine] Marshal message error: %s", err)
-		e.write(core.EncodeMsgErr)
+		e.Write(core.EncodeMsgErr)
 		return
 	}
-	e.write(data)
+	e.Write(data)
 }
 
 // Close 释放engine的资源
 func (e *Engine) Close() (err error) {
 	e.once.Do(func() {
-		close(e.close)                   // 关闭channel, 避免再有消息写入
-		for _, ch := range e.broadcast { // 关闭所有channel
-			ch.Close()
-		}
+		close(e.close) // 关闭channel, 避免再有消息写入
 		e.cancel()
 	})
 	return err
+}
+
+func (e *Engine) GetClose() chan struct{} {
+	return e.close
+}
+
+func (e *Engine) Session() string {
+	return e.uSession
 }
