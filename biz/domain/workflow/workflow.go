@@ -38,7 +38,7 @@ func (w *WorkFlow) Orchestrate(conf *core.WorkFlowConfig) (err error) {
 	}
 	// 编排
 	out := core.NewChannel[*core.Resp](3, w.close)
-	w.history = NewHistoryPipe(w.close)
+	w.history = NewHistoryPipe(w.close, w.en.Session())
 	w.asr = NewASRPipe(w.ctx, w.close, w.asrApp)
 	w.tts = NewTTSPipe(w.ctx, w.close, w.ttsApp, out)
 	w.chat = NewChatPipe(w.ctx, w.close, w.chatApp, w.en.Session(), w.history.in, w.tts.in, out)
