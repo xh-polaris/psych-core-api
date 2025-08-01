@@ -10,7 +10,7 @@ import (
 
 // buildAuth
 func buildAuth(e *Engine) {
-	e.info = make(map[string]string)
+	e.info = make(map[string]any)
 }
 
 // auth 验证用户信息, 串行
@@ -65,6 +65,10 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 		merr = consts.Err(consts.InvalidAuth)
 		return
 	}
+	alreadyAuth.Info[consts.UnitId] = signResp.UnitId
+	alreadyAuth.Info[consts.UserId] = signResp.UserId
+	alreadyAuth.Info[consts.StudentId] = *signResp.StudentId
+	alreadyAuth.Info[consts.Strong] = signResp.Strong
 	alreadyAuth.Info = getResp.Form
 	e.info = alreadyAuth.Info
 	return

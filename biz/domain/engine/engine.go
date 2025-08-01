@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"github.com/hertz-contrib/websocket"
+	"github.com/xh-polaris/psych-core-api/biz/domain/mq"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util"
 	"github.com/xh-polaris/psych-pkg/util/logx"
@@ -40,8 +41,8 @@ type Engine struct {
 	cmdCh       *core.Channel[*core.Cmd]
 
 	// 记录
-	start time.Time         // 开始时间
-	info  map[string]string // 基本信息
+	start time.Time      // 开始时间
+	info  map[string]any // 基本信息
 }
 
 // NewEngine 创建一个新的对话引擎
@@ -51,6 +52,8 @@ func NewEngine(ctx context.Context, conn *websocket.Conn) *Engine {
 	e.close = make(chan struct{})
 	buildHeartbeat(e)
 	buildHandle(e)
+	buildAuth(e)
+	buildCmd(e)
 	return e
 }
 
@@ -136,12 +139,16 @@ func (e *Engine) MWrite(t core.MType, payload any) {
 // Close 释放engine的资源
 func (e *Engine) Close() (err error) {
 	e.once.Do(func() {
-		close(e.close)                   // 关闭channel, 避免再有消息写入
-		for _, ch := range e.broadcast { // 关闭子channel, 虽然这里send时也会自动关闭, 但是为了避免ch中无消息时一直空闲导致goroutine泄露, 还是手动关闭一次
-			ch.Close()
+		close(e.close) // 关闭channel, 避免再有消息写入
+		for _, ch := range e.broadcast {
+			ch.Close() // 关闭子channel, 虽然这里send时也会自动关闭, 但是为了避免ch中无消息时一直空闲导致goroutine泄露, 还是手动关闭一次
 		}
 		e.cancel()
 		e.workflow.Close() // 关闭workflow
+		if err = mq.GetHistoryProducer().Produce(e.ctx, e.uSession, e.info, e.start, time.Now()); err != nil {
+			logx.Error("[engine] produce notify error: %s with such state: session:%s start: %d end:%d info:\n%+v", err, e.uSession, e.start, time.Now(), e.info)
+			return
+		}
 	})
 	return err
 }

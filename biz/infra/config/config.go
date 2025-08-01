@@ -18,6 +18,10 @@ type Auth struct {
 	AccessExpire int64
 }
 
+type RabbitMQ struct {
+	Url string
+}
+
 type Config struct {
 	service.ServiceConf
 	ListenOn string
@@ -25,6 +29,7 @@ type Config struct {
 	Auth     Auth
 	Cache    cache.CacheConf
 	Redis    *redis.RedisConf
+	RabbitMQ RabbitMQ
 }
 
 func NewConfig() (*Config, error) {
