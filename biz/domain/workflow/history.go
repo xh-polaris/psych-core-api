@@ -33,6 +33,7 @@ func NewHistoryPipe(close chan struct{}, session string) *HistoryPipe {
 	}
 }
 
+// In 添加历史记录, 由in关闭
 func (p *HistoryPipe) In() {
 	var err error
 	for entry := range p.in.C {
@@ -44,6 +45,10 @@ func (p *HistoryPipe) In() {
 
 func (p *HistoryPipe) Run() {
 	go p.In()
+}
+
+func (p *HistoryPipe) Close() {
+	p.in.Close()
 }
 
 var (

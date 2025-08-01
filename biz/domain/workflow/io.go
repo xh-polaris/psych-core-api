@@ -10,12 +10,12 @@ type IOPipe struct {
 	engine  core.Engine
 	in      *core.Channel[*core.Cmd]  // in 输入
 	out     *core.Channel[*core.Resp] // out 输出
-	asr     *core.Channel[[]byte]     // asr 输入
+	asr     *core.Channel[*core.Cmd]  // asr 输入
 	chat    *core.Channel[*core.Cmd]  // chat 输入
 	history *core.Channel[*HisEntry]  // 历史记录输入
 }
 
-func NewIOPipe(close chan struct{}, in *core.Channel[*core.Cmd], asr *core.Channel[[]byte], chat *core.Channel[*core.Cmd], history *core.Channel[*HisEntry], out *core.Channel[*core.Resp]) *IOPipe {
+func NewIOPipe(close chan struct{}, in *core.Channel[*core.Cmd], asr *core.Channel[*core.Cmd], chat *core.Channel[*core.Cmd], history *core.Channel[*HisEntry], out *core.Channel[*core.Resp]) *IOPipe {
 	return &IOPipe{
 		in:      in,
 		out:     out,
@@ -39,12 +39,13 @@ func (p *IOPipe) In() {
 				Timestamp: time.Now(),
 			})
 		case core.CUserAudioASR: // 待识别音频
-			p.asr.Send(cmd.Content.([]byte))
+			p.asr.Send(cmd)
 		case core.CUserAudio: // 暂不支持
 		}
 	}
 }
 
+// Out 写出resp, 由out关闭
 func (p *IOPipe) Out() {
 	for resp := range p.out.C {
 		p.engine.MWrite(core.MResp, resp)
@@ -54,4 +55,8 @@ func (p *IOPipe) Out() {
 func (p *IOPipe) Run() {
 	go p.In()
 	go p.Out()
+}
+
+func (p *IOPipe) Close() {
+	p.out.Close()
 }

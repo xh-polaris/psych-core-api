@@ -34,6 +34,7 @@ type Engine struct {
 	uSession string
 
 	// 消息派发
+	broadcast   []core.CloseChannel
 	heartbeatCh *core.Channel[struct{}]
 	messageCh   *core.Channel[[]byte]
 	cmdCh       *core.Channel[*core.Cmd]
@@ -135,8 +136,12 @@ func (e *Engine) MWrite(t core.MType, payload any) {
 // Close 释放engine的资源
 func (e *Engine) Close() (err error) {
 	e.once.Do(func() {
-		close(e.close) // 关闭channel, 避免再有消息写入
+		close(e.close)                   // 关闭channel, 避免再有消息写入
+		for _, ch := range e.broadcast { // 关闭子channel, 虽然这里send时也会自动关闭, 但是为了避免ch中无消息时一直空闲导致goroutine泄露, 还是手动关闭一次
+			ch.Close()
+		}
 		e.cancel()
+		e.workflow.Close() // 关闭workflow
 	})
 	return err
 }

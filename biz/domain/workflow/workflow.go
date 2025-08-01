@@ -20,11 +20,12 @@ type WorkFlow struct {
 	asrApp    app.ASRApp
 	reportApp app.ReportApp
 
-	history *HistoryPipe
-	asr     *ASRPipe
-	tts     *TTSPipe
-	chat    *ChatPipe
-	io      *IOPipe
+	broadcast []core.Pipe
+	history   *HistoryPipe
+	asr       *ASRPipe
+	tts       *TTSPipe
+	chat      *ChatPipe
+	io        *IOPipe
 
 	conf *core.WorkFlowConfig
 }
@@ -37,9 +38,9 @@ func (w *WorkFlow) Orchestrate(conf *core.WorkFlowConfig) (err error) {
 		return
 	}
 	// 编排
-	out := core.NewChannel[*core.Resp](3, w.close)
+	out := core.NewChannel[*core.Resp](5, w.close)
 	w.history = NewHistoryPipe(w.close, w.en.Session())
-	w.asr = NewASRPipe(w.ctx, w.close, w.asrApp)
+	w.asr = NewASRPipe(w.ctx, w.close, w.asrApp, out)
 	w.tts = NewTTSPipe(w.ctx, w.close, w.ttsApp, out)
 	w.chat = NewChatPipe(w.ctx, w.close, w.chatApp, w.en.Session(), w.history.in, w.tts.in, out)
 	w.io = NewIOPipe(w.close, w.in, w.asr.in, w.chat.in, w.history.in, out)
@@ -79,4 +80,12 @@ func (w *WorkFlow) WithContext(ctx context.Context) core.WorkFlow {
 func (w *WorkFlow) WithClose(close chan struct{}) core.WorkFlow {
 	w.close = close
 	return w
+}
+
+// Close 关闭workflow, 释放资源
+func (w *WorkFlow) Close() {
+	// 当engine close后, workflow中的ch大部分都会自动关闭, 为了避免泄露, 再次手动关闭
+	for _, pipe := range w.broadcast {
+		pipe.Close()
+	}
 }

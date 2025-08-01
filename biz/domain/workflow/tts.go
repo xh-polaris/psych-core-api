@@ -24,6 +24,7 @@ func NewTTSPipe(ctx context.Context, close chan struct{}, tts app.TTSApp, out *c
 	}
 }
 
+// In 上传text, 由in关闭
 func (p *TTSPipe) In() {
 	var err error
 	for cmd := range p.in.C {
@@ -34,6 +35,7 @@ func (p *TTSPipe) In() {
 	}
 }
 
+// Out 获取audio, 由out关闭
 func (p *TTSPipe) Out() {
 	var err error
 	var audio []byte
@@ -52,4 +54,8 @@ func (p *TTSPipe) Out() {
 func (p *TTSPipe) Run() {
 	go p.In()
 	go p.Out()
+}
+
+func (p *TTSPipe) Close() {
+	p.in.Close()
 }

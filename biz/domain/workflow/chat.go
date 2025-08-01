@@ -34,6 +34,7 @@ func NewChatPipe(ctx context.Context, close chan struct{}, chat app.ChatApp, ses
 	}
 }
 
+// In 由in关闭
 func (p *ChatPipe) In() {
 	var err error
 	var scanner app.ChatAppScanner
@@ -47,6 +48,7 @@ func (p *ChatPipe) In() {
 	}
 }
 
+// Out 由scanner关闭
 func (p *ChatPipe) Out() {
 	var err error
 	var frame *app.ChatFrame
@@ -56,12 +58,11 @@ func (p *ChatPipe) Out() {
 		p.tts.Send(cmd)
 		// 中间帧
 		for frame, err = scanner.Next(); err == nil; {
-			resp := &core.Resp{
+			p.out.Send(&core.Resp{
 				ID:      scanner.GetID(),
 				Type:    core.RModelText,
 				Content: frame,
-			}
-			p.out.Send(resp) // 写回前端
+			}) // 写回前端
 			cmd.Content = frame.Content
 			p.tts.Send(cmd)
 		}
@@ -79,4 +80,13 @@ func (p *ChatPipe) Out() {
 func (p *ChatPipe) Run() {
 	go p.In()
 	go p.Out()
+}
+
+func (p *ChatPipe) Close() {
+	var err error
+	p.in.Close()
+	p.scanner.Close()
+	if err = p.chat.Close(); err != nil {
+		logx.Error("[chat pipe] close err: %v", err)
+	}
 }
