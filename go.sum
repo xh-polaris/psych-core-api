@@ -414,6 +414,8 @@ github.com/xh-polaris/psych-idl v0.0.0-20250728082730-0d9bb0464f9f h1:9tCRICZelY
 github.com/xh-polaris/psych-idl v0.0.0-20250728082730-0d9bb0464f9f/go.mod h1:Mq9OKYzoq5fzibYWoxdO0xsybjShIVJ4XLKu/IpVWHw=
 github.com/xh-polaris/psych-pkg v0.0.0-20250729115820-9b942d723c38 h1:GFF5zGNpbJERSPhoM6EO5Zo2zglKMcFVaTYrkkUWbn0=
 github.com/xh-polaris/psych-pkg v0.0.0-20250729115820-9b942d723c38/go.mod h1:WkBI77PWtazvqFseyJI+xSsxPshYurmr7mVUEGUz+H8=
+github.com/xh-polaris/psych-pkg v0.0.0-20250803014947-b487544fc6c1 h1:jtWRB6o62Yk8U8G7V9i1ZVuFiKnZlvaN0aJb26tw4D4=
+github.com/xh-polaris/psych-pkg v0.0.0-20250803014947-b487544fc6c1/go.mod h1:RT3OO6lTk0XoXrUdtIPX3Ayl7Ctvzutjbl7wnAc6AQc=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

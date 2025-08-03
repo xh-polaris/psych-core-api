@@ -83,9 +83,10 @@ func (w *WorkFlow) WithClose(close chan struct{}) core.WorkFlow {
 }
 
 // Close 关闭workflow, 释放资源
-func (w *WorkFlow) Close() {
+func (w *WorkFlow) Close() (err error) {
 	// 当engine close后, workflow中的ch大部分都会自动关闭, 为了避免泄露, 再次手动关闭
 	for _, pipe := range w.broadcast {
 		pipe.Close()
 	}
+	return
 }

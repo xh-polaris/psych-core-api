@@ -66,6 +66,14 @@ func monitor() {
 var (
 	producer     *PostProducer
 	producerOnce sync.Once
+	producerOpts = []retry.Option{
+		retry.Attempts(uint(maxRetry)),      // 最大重试次数
+		retry.DelayType(retry.BackOffDelay), // 指数退避策略
+		retry.MaxDelay(16 * time.Second),    // 最大退避间隔
+		retry.OnRetry(func(n uint, err error) { // 重试日志
+			logx.Info("[mq produce] produce post msg retry #%d times with err:%v", n+1, err)
+		}),
+	}
 )
 
 // PostProducer 对话后处理
@@ -89,23 +97,25 @@ func GetHistoryProducer() *PostProducer {
 }
 
 // Produce 创建历史记录消息
-func (p *PostProducer) Produce(ctx context.Context, session string, info map[string]any, start, end time.Time) (err error) {
+func (p *PostProducer) Produce(ctx context.Context, session string, info map[string]any, start, end time.Time, conf *core.Config) (err error) {
 	var payload []byte
 	// 构造消息体
-	msg := &core.PostNotify{Session: session, Info: info, Start: start.Unix(), End: end.Unix()}
+	msg := &core.PostNotify{Session: session, Info: info, Start: start.Unix(), End: end.Unix(), Config: conf}
 	if payload, err = json.Marshal(msg); err != nil {
 		logx.Error("[mq producer] marshal post notify failed, err:%v", err.Error())
 		return err
 	}
 
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	operator := func() error {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		return p.channel.PublishWithContext(ctx, "psych_his", "psych_his.end", false, false,
+			amqp.Publishing{
+				DeliveryMode: amqp.Persistent,
+				ContentType:  "application/json",
+				Body:         payload,
+			})
+	}
 	// 发布持久化消息
-	err = p.channel.PublishWithContext(ctx, "psych_his", "psych_his.end", false, false,
-		amqp.Publishing{
-			DeliveryMode: amqp.Persistent,
-			ContentType:  "application/json",
-			Body:         payload,
-		})
-	return err
+	return retry.Do(operator, producerOpts...)
 }

@@ -43,6 +43,7 @@ type Engine struct {
 	// 记录
 	start time.Time      // 开始时间
 	info  map[string]any // 基本信息
+	conf  *core.Config
 }
 
 // NewEngine 创建一个新的对话引擎
@@ -144,9 +145,10 @@ func (e *Engine) Close() (err error) {
 			ch.Close() // 关闭子channel, 虽然这里send时也会自动关闭, 但是为了避免ch中无消息时一直空闲导致goroutine泄露, 还是手动关闭一次
 		}
 		e.cancel()
-		e.workflow.Close() // 关闭workflow
-		if err = mq.GetHistoryProducer().Produce(e.ctx, e.uSession, e.info, e.start, time.Now()); err != nil {
-			logx.Error("[engine] produce notify error: %s with such state: session:%s start: %d end:%d info:\n%+v", err, e.uSession, e.start, time.Now(), e.info)
+		_ = e.workflow.Close() // 关闭workflow
+		if err = mq.GetHistoryProducer().Produce(e.ctx, e.uSession, e.info, e.start, time.Now(), e.conf); err != nil {
+			// 发送失败需要详细记录日志, 以进行后续托底
+			logx.Error("[engine] produce notify error: %s with such state: session:%s start: %d end:%d info:%+v config:%+v", err, e.uSession, e.start, time.Now(), e.info, e.conf)
 			return
 		}
 	})
