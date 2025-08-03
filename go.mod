@@ -14,7 +14,7 @@ require (
 	github.com/hertz-contrib/websocket v0.2.0
 	github.com/xh-polaris/gopkg v0.0.0-20250312141711-7327267f4ea6
 	github.com/xh-polaris/psych-idl v0.0.0-20250728082730-0d9bb0464f9f
-	github.com/xh-polaris/psych-pkg v0.0.0-20250803014947-b487544fc6c1
+	github.com/xh-polaris/psych-pkg v0.0.0-20250803093725-36273e826fef
 	github.com/zeromicro/go-zero v1.8.3
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.62.0
 	go.opentelemetry.io/contrib/propagators/b3 v1.35.0
