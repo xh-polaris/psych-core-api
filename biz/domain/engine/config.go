@@ -45,6 +45,53 @@ func (e *Engine) buildConfig(resp *model.UnitAppConfigGetByUnitIdResp) (config *
 		ttsConf    core.TTSConfig
 	)
 	config.ModelName, config.ModelView = resp.UnitAppConfig.Name, resp.UnitAppConfig.Video
-	// TODO 实际配置字段映射
+	apps := resp.Apps
+	for _, app := range apps {
+		switch app.Type {
+		case consts.ChatApp:
+			chatApp := app.GetChatApp()
+			chatConf = core.ChatConfig{Id: chatApp.App.Id}
+		case consts.TtsApp:
+			ttsApp := app.GetTtsApp()
+			ttsConf = core.TTSConfig{
+				Id:     ttsApp.App.Id,
+				Format: ttsApp.AudioParams.Format,
+				// Codec:        ttsApp.A
+				Rate: int(ttsApp.AudioParams.Rate),
+				Bits: int(ttsApp.AudioParams.Bit),
+				// Channels:     ttsApp.AudioParams.,
+				// ResultType:   "",
+				SpeechRate:   float32(ttsApp.AudioParams.SpeechRate),
+				LoudnessRate: float32(ttsApp.AudioParams.LoudnessRate),
+				// PitchRate:    float32(ttsApp.AudioParams.),
+				Lang: ttsApp.AudioParams.Lang,
+			}
+		case consts.AsrApp:
+			asrApp := app.GetAsrApp()
+			asrConf = core.ASRConfig{
+				Id:         asrApp.App.Id,
+				Format:     asrApp.Format,
+				Codec:      asrApp.Codec,
+				Rate:       int(asrApp.Rate),
+				Bits:       int(asrApp.Bits),
+				Channels:   int(asrApp.Channels),
+				ResultType: asrApp.ResultType,
+			}
+		case consts.ReportApp:
+			reportApp := app.GetReportApp()
+			reportConf = core.ReportConfig{
+				Id: reportApp.App.Id,
+			}
+		}
+	}
+	config = &core.Config{
+		Id:           resp.UnitAppConfig.Id,
+		ModelName:    resp.UnitAppConfig.Name,
+		ModelView:    resp.UnitAppConfig.Video,
+		ChatConfig:   chatConf,
+		ASRConfig:    asrConf,
+		TTSConfig:    ttsConf,
+		ReportConfig: reportConf,
+	}
 	return
 }

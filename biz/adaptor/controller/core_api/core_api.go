@@ -7,6 +7,11 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	core_api "github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/biz/infra/config"
+	cst "github.com/xh-polaris/psych-core-api/biz/infra/consts"
+	rpc "github.com/xh-polaris/psych-core-api/biz/infra/rpc"
+	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
+	u "github.com/xh-polaris/psych-idl/kitex_gen/user"
 )
 
 // SignIn .
@@ -20,7 +25,32 @@ func SignIn(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.UserSignInResp)
+	// 调用接口
+	client := rpc.GetPsychUser()
+	userResp, err := client.UserSignIn(ctx, &u.UserSignInReq{
+		UnitId:     req.UnitId,
+		AuthType:   req.AuthType,
+		AuthId:     req.AuthId,
+		VerifyCode: req.VerifyCode,
+	})
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	jwt, err := utils.GenerateJwt(config.GetConfig().Auth.SecretKey, map[string]any{
+		cst.UnitId:    userResp.UnitId,
+		cst.UserId:    userResp.UserId,
+		cst.StudentId: userResp.StudentId,
+		cst.Strong:    userResp.Strong,
+	})
+	resp := &core_api.UserSignInResp{
+		UnitId:    userResp.UnitId,
+		UserId:    userResp.UserId,
+		StudentId: userResp.StudentId,
+		Strong:    userResp.Strong,
+		// VerifyCode: jwt,
+	}
 
 	c.JSON(consts.StatusOK, resp)
 }
