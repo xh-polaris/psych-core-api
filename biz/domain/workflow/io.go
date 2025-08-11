@@ -8,14 +8,14 @@ import (
 // IOPipe 负责处理直接输入, 将不同输入派发到不同的处理pipe中
 type IOPipe struct {
 	engine  core.Engine
-	in      *core.Channel[*core.Cmd]  // in 输入
-	out     *core.Channel[*core.Resp] // out 输出
-	asr     *core.Channel[*core.Cmd]  // asr 输入
-	chat    *core.Channel[*core.Cmd]  // chat 输入
-	history *core.Channel[*HisEntry]  // 历史记录输入
+	in      *core.Channel[*core.Cmd]      // in 输入
+	out     *core.Channel[*core.Resp]     // out 输出
+	asr     *core.Channel[*core.Cmd]      // asr 输入
+	chat    *core.Channel[*core.Cmd]      // chat 输入
+	history *core.Channel[*core.HisEntry] // 历史记录输入
 }
 
-func NewIOPipe(close chan struct{}, in *core.Channel[*core.Cmd], asr *core.Channel[*core.Cmd], chat *core.Channel[*core.Cmd], history *core.Channel[*HisEntry], out *core.Channel[*core.Resp]) *IOPipe {
+func NewIOPipe(close chan struct{}, in *core.Channel[*core.Cmd], asr *core.Channel[*core.Cmd], chat *core.Channel[*core.Cmd], history *core.Channel[*core.HisEntry], out *core.Channel[*core.Resp]) *IOPipe {
 	return &IOPipe{
 		in:      in,
 		out:     out,
@@ -33,7 +33,7 @@ func (p *IOPipe) In() {
 		case core.CUserText: // 常规文本
 			// 调用对话
 			p.chat.Send(cmd)
-			p.history.Send(&HisEntry{
+			p.history.Send(&core.HisEntry{
 				Role:      cmd.Role,
 				Content:   cmd.Content.(string),
 				Timestamp: time.Now(),

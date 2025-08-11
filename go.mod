@@ -13,8 +13,8 @@ require (
 	github.com/hertz-contrib/obs-opentelemetry/tracing v0.4.1
 	github.com/hertz-contrib/websocket v0.2.0
 	github.com/xh-polaris/gopkg v0.0.0-20250312141711-7327267f4ea6
-	github.com/xh-polaris/psych-idl v0.0.0-20250803122347-bc158ec7e460
-	github.com/xh-polaris/psych-pkg v0.0.0-20250803093725-36273e826fef
+	github.com/xh-polaris/psych-idl v0.0.0-20250806132718-90ae58702376
+	github.com/xh-polaris/psych-pkg v0.0.0-20250807081545-b8d4feaa0144
 	github.com/zeromicro/go-zero v1.8.3
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.62.0
 	go.opentelemetry.io/contrib/propagators/b3 v1.36.0

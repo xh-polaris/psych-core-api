@@ -44,7 +44,7 @@ func (e *Engine) buildConfig(resp *model.UnitAppConfigGetByUnitIdResp) (config *
 		asrConf    core.ASRConfig
 		ttsConf    core.TTSConfig
 	)
-	config.ModelName, config.ModelView = resp.UnitAppConfig.Name, resp.UnitAppConfig.Video
+	config.ModelName, config.ModelView = resp.UnitAppConfig.Name, resp.UnitAppConfig.View
 	apps := resp.Apps
 	for _, app := range apps {
 		switch app.Type {
@@ -54,17 +54,13 @@ func (e *Engine) buildConfig(resp *model.UnitAppConfigGetByUnitIdResp) (config *
 		case consts.TtsApp:
 			ttsApp := app.GetTtsApp()
 			ttsConf = core.TTSConfig{
-				Id:     ttsApp.App.Id,
-				Format: ttsApp.AudioParams.Format,
-				// Codec:        ttsApp.A
-				Rate: int(ttsApp.AudioParams.Rate),
-				Bits: int(ttsApp.AudioParams.Bit),
-				// Channels:     ttsApp.AudioParams.,
-				// ResultType:   "",
+				Id:           ttsApp.App.Id,
+				Format:       ttsApp.AudioParams.Format,
+				Rate:         int(ttsApp.AudioParams.Rate),
+				Bits:         int(ttsApp.AudioParams.Bit),
 				SpeechRate:   float32(ttsApp.AudioParams.SpeechRate),
 				LoudnessRate: float32(ttsApp.AudioParams.LoudnessRate),
-				// PitchRate:    float32(ttsApp.AudioParams.),
-				Lang: ttsApp.AudioParams.Lang,
+				Lang:         ttsApp.AudioParams.Lang,
 			}
 		case consts.AsrApp:
 			asrApp := app.GetAsrApp()
@@ -87,7 +83,7 @@ func (e *Engine) buildConfig(resp *model.UnitAppConfigGetByUnitIdResp) (config *
 	config = &core.Config{
 		Id:           resp.UnitAppConfig.Id,
 		ModelName:    resp.UnitAppConfig.Name,
-		ModelView:    resp.UnitAppConfig.Video,
+		ModelView:    resp.UnitAppConfig.View,
 		ChatConfig:   chatConf,
 		ASRConfig:    asrConf,
 		TTSConfig:    ttsConf,

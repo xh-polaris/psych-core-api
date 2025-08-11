@@ -16,12 +16,12 @@ type ChatPipe struct {
 	in      *core.Channel[*core.Cmd] // 命令输入
 	scanner *core.Channel[app.ChatAppScanner]
 
-	history *core.Channel[*HisEntry]  // 历史记录输入
-	tts     *core.Channel[*core.Cmd]  // tts输入
-	out     *core.Channel[*core.Resp] // 输出
+	history *core.Channel[*core.HisEntry] // 历史记录输入
+	tts     *core.Channel[*core.Cmd]      // tts输入
+	out     *core.Channel[*core.Resp]     // 输出
 }
 
-func NewChatPipe(ctx context.Context, close chan struct{}, chat app.ChatApp, session string, history *core.Channel[*HisEntry], tts *core.Channel[*core.Cmd], out *core.Channel[*core.Resp]) *ChatPipe {
+func NewChatPipe(ctx context.Context, close chan struct{}, chat app.ChatApp, session string, history *core.Channel[*core.HisEntry], tts *core.Channel[*core.Cmd], out *core.Channel[*core.Resp]) *ChatPipe {
 	return &ChatPipe{
 		ctx:     ctx,
 		chat:    chat,

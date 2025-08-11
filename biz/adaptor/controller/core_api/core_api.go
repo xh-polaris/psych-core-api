@@ -49,7 +49,7 @@ func SignIn(ctx context.Context, c *app.RequestContext) {
 		UserId:    userResp.UserId,
 		StudentId: userResp.StudentId,
 		Strong:    userResp.Strong,
-		// VerifyCode: jwt,
+		Token:     jwt,
 	}
 
 	c.JSON(consts.StatusOK, resp)
