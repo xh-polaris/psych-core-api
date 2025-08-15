@@ -79,9 +79,7 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 	alreadyAuth.Info[consts.UserId] = signResp.UserId
 	alreadyAuth.Info[consts.StudentId] = *signResp.StudentId
 	alreadyAuth.Info[consts.Strong] = signResp.Strong
-	for k, v := range getResp.Form {
-		alreadyAuth.Info[k] = v
-	}
+	alreadyAuth.Info[consts.Form] = getResp.Form
 	e.info = alreadyAuth.Info
 	return
 }

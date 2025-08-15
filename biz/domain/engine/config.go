@@ -56,8 +56,11 @@ func (e *Engine) buildConfig(resp *model.UnitAppConfigGetByUnitIdResp) (config *
 			ttsConf = core.TTSConfig{
 				Id:           ttsApp.App.Id,
 				Format:       ttsApp.AudioParams.Format,
+				Codec:        ttsApp.AudioParams.Codec,
 				Rate:         int(ttsApp.AudioParams.Rate),
-				Bits:         int(ttsApp.AudioParams.Bit),
+				Bits:         int(ttsApp.AudioParams.Bits),
+				Channels:     int(ttsApp.AudioParams.Channels),
+				ResultType:   ttsApp.AudioParams.ResultType,
 				SpeechRate:   float32(ttsApp.AudioParams.SpeechRate),
 				LoudnessRate: float32(ttsApp.AudioParams.LoudnessRate),
 				Lang:         ttsApp.AudioParams.Lang,

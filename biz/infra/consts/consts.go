@@ -5,6 +5,7 @@ const (
 	UserId    = "user_id"
 	StudentId = "student_id"
 	Strong    = "strong"
+	Form      = "form"
 )
 
 // app type
