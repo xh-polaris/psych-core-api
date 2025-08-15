@@ -75,11 +75,17 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 		merr = consts.Err(consts.InvalidAuth)
 		return
 	}
+	form, err := utils.FormGen2DB(getResp.Form)
+	if err != nil {
+		logx.Error("[engine] [%s] UserGetInfo err: %v", core.AAuth, err)
+		merr = consts.Err(consts.InvalidAuth)
+		return
+	}
+	alreadyAuth.Info = form
 	alreadyAuth.Info[consts.UnitId] = signResp.UnitId
 	alreadyAuth.Info[consts.UserId] = signResp.UserId
 	alreadyAuth.Info[consts.StudentId] = *signResp.StudentId
 	alreadyAuth.Info[consts.Strong] = signResp.Strong
-	alreadyAuth.Info[consts.Form] = getResp.Form
 	e.info = alreadyAuth.Info
 	return
 }
