@@ -1,8 +1,10 @@
 package engine
 
 import (
+	"github.com/xh-polaris/psych-core-api/biz/infra/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/consts"
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
+	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
 	"github.com/xh-polaris/psych-idl/kitex_gen/user"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
@@ -37,10 +39,18 @@ func (e *Engine) auth(auth *core.Auth) bool {
 // 已登录
 func (e *Engine) already(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err) {
 	alreadyAuth = &core.Auth{}
-	// TODO 校验JWT正确性
+	claims, err := utils.ParseJwt(config.GetConfig().Auth.SecretKey, auth.VerifyCode)
+	if err != nil {
+		return nil, consts.Err(consts.JwtAuthErr)
+	}
+	// 提取字段
 	merr = consts.Err(consts.InvalidAuth)
 	alreadyAuth.Info = auth.Info
 	e.info = alreadyAuth.Info
+	e.info[consts.UnitId] = claims[consts.UnitId].(string)
+	e.info[consts.UserId] = claims[consts.UserId].(string)
+	e.info[consts.StudentId] = claims[consts.StudentId].(string)
+	e.info[consts.Strong] = claims[consts.Strong].(bool)
 	return alreadyAuth, merr
 }
 
@@ -50,7 +60,7 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 	var getResp *user.UserGetInfoResp
 	pu, alreadyAuth := rpc.GetPsychUser(), &core.Auth{}
 	// 用户登录
-	sign := &user.UserSignInReq{UnitId: auth.Info[consts.UnitId],
+	sign := &user.UserSignInReq{UnitId: auth.Info[consts.UnitId].(string),
 		AuthType: auth.AuthType, AuthId: auth.AuthID, VerifyCode: auth.VerifyCode}
 	if signResp, err = pu.UserSignIn(e.ctx, sign); err != nil {
 		logx.Error("[engine] [%s] UserSignIn err: %v", core.AAuth, err)
@@ -65,11 +75,17 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 		merr = consts.Err(consts.InvalidAuth)
 		return
 	}
+	form, err := utils.FormGen2DB(getResp.Form)
+	if err != nil {
+		logx.Error("[engine] [%s] UserGetInfo err: %v", core.AAuth, err)
+		merr = consts.Err(consts.InvalidAuth)
+		return
+	}
+	alreadyAuth.Info = form
 	alreadyAuth.Info[consts.UnitId] = signResp.UnitId
 	alreadyAuth.Info[consts.UserId] = signResp.UserId
 	alreadyAuth.Info[consts.StudentId] = *signResp.StudentId
 	alreadyAuth.Info[consts.Strong] = signResp.Strong
-	alreadyAuth.Info = getResp.Form
 	e.info = alreadyAuth.Info
 	return
 }
