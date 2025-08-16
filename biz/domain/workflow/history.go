@@ -8,6 +8,7 @@ import (
 )
 
 type HistoryPipe struct {
+	// unexpected func() 历史记录出错不会结束, 保证最低可用性
 	session string
 	rs      *core.HisRedis
 	in      *core.Channel[*core.HisEntry]

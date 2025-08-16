@@ -40,9 +40,9 @@ func (w *WorkFlow) Orchestrate(conf *core.WorkFlowConfig) (err error) {
 	// 编排
 	out := core.NewChannel[*core.Resp](5, w.close)
 	w.history = NewHistoryPipe(w.close, w.en.Session())
-	w.asr = NewASRPipe(w.ctx, w.close, w.asrApp, out)
-	w.tts = NewTTSPipe(w.ctx, w.close, w.ttsApp, out)
-	w.chat = NewChatPipe(w.ctx, w.close, w.chatApp, w.en.Session(), w.history.in, w.tts.in, out)
+	w.asr = NewASRPipe(w.ctx, w.UnExpected, w.close, w.asrApp, out)
+	w.tts = NewTTSPipe(w.ctx, w.UnExpected, w.close, w.ttsApp, out)
+	w.chat = NewChatPipe(w.ctx, w.UnExpected, w.close, w.chatApp, w.en.Session(), w.history.in, w.tts.in, out)
 	w.io = NewIOPipe(w.close, w.in, w.asr.in, w.chat.in, w.history.in, out)
 	return
 }
@@ -89,4 +89,10 @@ func (w *WorkFlow) Close() (err error) {
 		pipe.Close()
 	}
 	return
+}
+
+// UnExpected 因错误结束
+func (w *WorkFlow) UnExpected() {
+	w.en.Write(core.EndErr)
+	_ = w.en.Close()
 }

@@ -11,9 +11,10 @@ import (
 )
 
 type ChatPipe struct {
-	ctx     context.Context
-	chat    app.ChatApp
-	session string
+	ctx        context.Context
+	unexpected func()
+	chat       app.ChatApp
+	session    string
 
 	in      *core.Channel[*core.Cmd] // 命令输入
 	scanner *core.Channel[app.ChatAppScanner]
@@ -23,16 +24,17 @@ type ChatPipe struct {
 	out     *core.Channel[*core.Resp]     // 输出
 }
 
-func NewChatPipe(ctx context.Context, close chan struct{}, chat app.ChatApp, session string, history *core.Channel[*core.HisEntry], tts *core.Channel[*core.Cmd], out *core.Channel[*core.Resp]) *ChatPipe {
+func NewChatPipe(ctx context.Context, unexpected func(), close chan struct{}, chat app.ChatApp, session string, history *core.Channel[*core.HisEntry], tts *core.Channel[*core.Cmd], out *core.Channel[*core.Resp]) *ChatPipe {
 	return &ChatPipe{
-		ctx:     ctx,
-		chat:    chat,
-		session: session,
-		in:      core.NewChannel[*core.Cmd](3, close),
-		scanner: core.NewChannel[app.ChatAppScanner](3, close),
-		history: history,
-		tts:     tts,
-		out:     out,
+		ctx:        ctx,
+		unexpected: unexpected,
+		chat:       chat,
+		session:    session,
+		in:         core.NewChannel[*core.Cmd](3, close),
+		scanner:    core.NewChannel[app.ChatAppScanner](3, close),
+		history:    history,
+		tts:        tts,
+		out:        out,
 	}
 }
 
@@ -43,6 +45,7 @@ func (p *ChatPipe) In() {
 	for cmd := range p.in.C {
 		if scanner, err = p.chat.StreamCall(p.ctx, cmd.Content.(string), p.session); err != nil {
 			logx.Error("[chat pipe] stream call err:%v", err)
+			p.unexpected()
 			return
 		}
 		scanner.WithID(cmd.ID)
@@ -84,6 +87,7 @@ func (p *ChatPipe) Out() {
 		})
 		if !errors.Is(err, app.End) {
 			logx.Error("[chat pipe] stream call err:%v", err)
+			p.unexpected()
 			return
 		}
 	}

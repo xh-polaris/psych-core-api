@@ -8,19 +8,21 @@ import (
 )
 
 type TTSPipe struct {
-	ctx context.Context
-	tts app.TTSApp
+	ctx        context.Context
+	unexpected func()
+	tts        app.TTSApp
 
 	in  *core.Channel[*core.Cmd]  // 命令输入
 	out *core.Channel[*core.Resp] // 输出
 }
 
-func NewTTSPipe(ctx context.Context, close chan struct{}, tts app.TTSApp, out *core.Channel[*core.Resp]) *TTSPipe {
+func NewTTSPipe(ctx context.Context, unexpected func(), close chan struct{}, tts app.TTSApp, out *core.Channel[*core.Resp]) *TTSPipe {
 	return &TTSPipe{
-		ctx: ctx,
-		tts: tts,
-		out: out,
-		in:  core.NewChannel[*core.Cmd](3, close),
+		ctx:        ctx,
+		unexpected: unexpected,
+		tts:        tts,
+		out:        out,
+		in:         core.NewChannel[*core.Cmd](3, close),
 	}
 }
 
@@ -30,6 +32,7 @@ func (p *TTSPipe) In() {
 	for cmd := range p.in.C {
 		if err = p.tts.Send(p.ctx, cmd.Content.(string)); err != nil {
 			logx.Error("[tts pipe] send err:%v", err)
+			p.unexpected()
 			return
 		}
 	}
@@ -49,6 +52,7 @@ func (p *TTSPipe) Out() {
 		p.out.Send(resp)
 	}
 	logx.Error("[tts pipe] receive err:%v]", err)
+	p.unexpected()
 }
 
 func (p *TTSPipe) Run() {
