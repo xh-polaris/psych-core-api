@@ -14,7 +14,7 @@ type WorkFlow struct {
 	close chan struct{}
 	ctx   context.Context
 	in    *core.Channel[*core.Cmd]
-
+	// optimize 应该允许没有tts或asr或report
 	chatApp   app.ChatApp
 	ttsApp    app.TTSApp
 	asrApp    app.ASRApp

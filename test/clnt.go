@@ -159,28 +159,28 @@ func sendAuthMessage(reader *bufio.Reader) {
 	//}
 	auth := core.Auth{
 		AuthType:   authType2Int32["StudentIdAndPwd"],
-		AuthID:     promptInput(reader, "请输入AuthID: "),
-		VerifyCode: promptInput(reader, "请输入VerifyCode: "),
-		Info:       make(map[string]string),
+		AuthID:     "hsdsfz2025",                                          //promptInput(reader, "请输入AuthID: "),
+		VerifyCode: "123456",                                              //promptInput(reader, "请输入VerifyCode: "),
+		Info:       map[string]any{"unit_id": "683beddbdcc71f894d67e3b3"}, //make(map[string]any),
 	}
 
 	// 交互式收集Info字段
-	fmt.Println("\n请输入Info键值对（输入格式：key value，单独输入done结束）:")
-	for {
-		input := promptInput(reader, "info> ")
-		if input == "done" {
-			break
-		}
-
-		parts := strings.SplitN(input, " ", 2)
-		if len(parts) != 2 {
-			fmt.Println("输入格式错误，请按 key value 格式输入")
-			continue
-		}
-
-		auth.Info[parts[0]] = parts[1]
-		fmt.Printf("已添加: %s = %s\n", parts[0], parts[1])
-	}
+	//fmt.Println("\n请输入Info键值对（输入格式：key value，单独输入done结束）:")
+	//for {
+	//	input := promptInput(reader, "info> ")
+	//	if input == "done" {
+	//		break
+	//	}
+	//
+	//	parts := strings.SplitN(input, " ", 2)
+	//	if len(parts) != 2 {
+	//		fmt.Println("输入格式错误，请按 key value 格式输入")
+	//		continue
+	//	}
+	//
+	//	auth.Info[parts[0]] = parts[1]
+	//	fmt.Printf("已添加: %s = %s\n", parts[0], parts[1])
+	//}
 
 	// 发送消息
 	if err := sendMessage(core.MAuth, &auth); err != nil {

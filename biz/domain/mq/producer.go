@@ -83,8 +83,8 @@ type PostProducer struct {
 	channel *amqp.Channel
 }
 
-// GetHistoryProducer 获取历史记录生产者
-func GetHistoryProducer() *PostProducer {
+// GetPostProducer 获取历史记录生产者
+func GetPostProducer() *PostProducer {
 	producerOnce.Do(func() {
 		var err error
 		producer = new(PostProducer)

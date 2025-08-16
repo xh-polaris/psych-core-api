@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/hertz-contrib/websocket"
 	"github.com/xh-polaris/psych-core-api/biz/domain/mq"
+	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util"
 	"github.com/xh-polaris/psych-pkg/util/logx"
@@ -55,6 +56,7 @@ func NewEngine(ctx context.Context, conn *websocket.Conn) *Engine {
 	buildHandle(e)
 	buildAuth(e)
 	buildCmd(e)
+	utils.DPrint("[engine] [new] with session %s\n", e.uSession) // debug
 	return e
 }
 
@@ -95,8 +97,9 @@ func (e *Engine) Run() {
 
 // init, 初始化, 主要与前端协商协议信息
 func (e *Engine) init() (err error) {
+	utils.DPrint("[engine] [init] meta: %+v", e.meta)
 	if err = e.wsx.WriteJSON(e.meta); err != nil {
-		logx.CondError(!wsx.IsNormal(err), "[engine] protocol init error: %s", err)
+		logx.CondError(!wsx.IsNormal(err), "[engine] protocol init error: %s\n", err) //debug
 	}
 	return err
 }
@@ -146,7 +149,7 @@ func (e *Engine) Close() (err error) {
 		}
 		e.cancel()
 		_ = e.workflow.Close() // 关闭workflow
-		if err = mq.GetHistoryProducer().Produce(e.ctx, e.uSession, e.info, e.start, time.Now(), e.conf); err != nil {
+		if err = mq.GetPostProducer().Produce(e.ctx, e.uSession, e.info, e.start, time.Now(), e.conf); err != nil {
 			// 发送失败需要详细记录日志, 以进行后续托底
 			logx.Error("[engine] produce notify error: %s with such state: session:%s start: %d end:%d info:%+v config:%+v", err, e.uSession, e.start, time.Now(), e.info, e.conf)
 			return

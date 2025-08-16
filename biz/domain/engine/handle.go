@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
 	"github.com/xh-polaris/psych-pkg/wsx"
@@ -39,7 +40,7 @@ func (e *Engine) handle() {
 			e.Write(core.DecodeMsgErr) // 解码失败要告知客户端错误消息
 			break
 		}
-
+		utils.DPrint("[engine] receive message: %+v\n", payload) // debug
 		switch msg.Type {
 		case core.MAuth: // 认证消息, auth 过程应该是串行的, auth结束前不应该执行其他操作
 			if auth, ok := payload.(*core.Auth); ok {

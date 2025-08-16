@@ -32,7 +32,8 @@ func (e *Engine) auth(auth *core.Auth) bool {
 		return false
 	}
 	e.info = alreadyAuth.Info
-	e.MWrite(core.MAuth, alreadyAuth) // 前端收到Auth响应后, 需要显示配置中
+	e.MWrite(core.MAuth, alreadyAuth)                                         // 前端收到Auth响应后, 需要显示配置中
+	utils.DPrint("[engine] [auth] info: %+v, merr: %+v\n", alreadyAuth, merr) // debug
 	return true
 }
 

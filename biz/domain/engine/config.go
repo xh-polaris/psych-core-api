@@ -3,6 +3,7 @@ package engine
 import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/consts"
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
+	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
 	"github.com/xh-polaris/psych-idl/kitex_gen/model"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
@@ -34,6 +35,7 @@ func (e *Engine) config() {
 	}
 	// 返回前端
 	e.MWrite(core.MConfig, conf)
+	utils.DPrint("[engine] [config] workflow config: %+v\n conf: %+v\n", conf)
 }
 
 // 构造返回给前端的配置
