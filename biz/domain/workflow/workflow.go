@@ -3,6 +3,8 @@ package workflow
 import (
 	"context"
 	"github.com/xh-polaris/psych-pkg/app"
+	_ "github.com/xh-polaris/psych-pkg/app/bailian"
+	_ "github.com/xh-polaris/psych-pkg/app/volc"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
 )
@@ -56,11 +58,11 @@ func (w *WorkFlow) config(conf *core.WorkFlowConfig) (err error) {
 		logx.Error("[workflow] [config] new chatApp err: %v", err)
 		return
 	}
-	if w.ttsApp, err = app.NewTTSApp(uSession, conf.TTSConfig); err != nil {
-		logx.Error("[workflow] [config] new ttsApp err: %v", err)
+	if w.asrApp, err = app.NewASRApp(uSession, conf.ASRConfig); err != nil {
+		logx.Error("[workflow] [config] new asrApp err: %v", err)
 		return
 	}
-	if w.asrApp, err = app.NewASRApp(uSession, conf.ASRConfig); err != nil {
+	if w.ttsApp, err = app.NewTTSApp(uSession, conf.TTSConfig); err != nil {
 		logx.Error("[workflow] [config] new asrApp err: %v", err)
 		return
 	}
@@ -82,6 +84,11 @@ func (w *WorkFlow) WithClose(close chan struct{}) core.WorkFlow {
 	return w
 }
 
+func (w *WorkFlow) WithEngine(e core.Engine) core.WorkFlow {
+	w.en = e
+	return w
+}
+
 // Close 关闭workflow, 释放资源
 func (w *WorkFlow) Close() (err error) {
 	// 当engine close后, workflow中的ch大部分都会自动关闭, 为了避免泄露, 再次手动关闭
@@ -94,5 +101,6 @@ func (w *WorkFlow) Close() (err error) {
 // UnExpected 因错误结束
 func (w *WorkFlow) UnExpected() {
 	w.en.Write(core.EndErr)
+	logx.Info("[engine] close by workflow error")
 	_ = w.en.Close()
 }

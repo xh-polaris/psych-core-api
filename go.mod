@@ -16,8 +16,8 @@ require (
 	github.com/hertz-contrib/websocket v0.2.0
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/xh-polaris/gopkg v0.0.0-20250312141711-7327267f4ea6
-	github.com/xh-polaris/psych-idl v0.0.0-20250815010256-68037a2ef1aa
-	github.com/xh-polaris/psych-pkg v0.0.0-20250816093925-dfb620ea670e
+	github.com/xh-polaris/psych-idl v0.0.0-20250816061259-6ee83a9abbbb
+	github.com/xh-polaris/psych-pkg v0.0.0-20250817095314-16e581d7932e
 	github.com/zeromicro/go-zero v1.8.3
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.62.0
 	go.opentelemetry.io/contrib/propagators/b3 v1.36.0
@@ -53,6 +53,7 @@ require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/golang/glog v1.2.5 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8 // indirect
 	github.com/google/uuid v1.6.0 // indirect

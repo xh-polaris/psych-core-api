@@ -65,25 +65,6 @@ func connectWebSocket() error {
 	return nil
 }
 
-func heartbeat() {
-	log.Println("start heartbeat")
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(10*time.Second)); err != nil {
-				log.Println("心跳发送失败:", err)
-				return
-			}
-			//log.Println("发送心跳")
-		case <-heartbeatDone:
-			return
-		}
-	}
-}
-
 func receiveMessages() {
 	for {
 		mt, data, err := conn.ReadMessage()
@@ -135,6 +116,10 @@ func handleUserInput() {
 		case "2":
 			sendCommandMessage(reader)
 		case "exit":
+			if err := conn.WriteControl(websocket.CloseMessage, nil, time.Now().Add(10*time.Second)); err != nil {
+				log.Println("Close发送失败:", err)
+				return
+			}
 			return
 		default:
 			fmt.Println("无效输入，请重新选择")
@@ -151,17 +136,11 @@ func printMenu() {
 }
 
 func sendAuthMessage(reader *bufio.Reader) {
-	//auth := core.Auth{
-	//	AuthType:   authType2Int32[promptInput(reader, "请输入AuthType: ")],
-	//	AuthID:     promptInput(reader, "请输入AuthID: "),
-	//	VerifyCode: promptInput(reader, "请输入VerifyCode: "),
-	//	Info:       make(map[string]string),
-	//}
 	auth := core.Auth{
-		AuthType:   authType2Int32["StudentIdAndPwd"],
+		AuthType:   authType2Int32["AuthStudentIdAndPwd"],
 		AuthID:     "hsdsfz2025",                                          //promptInput(reader, "请输入AuthID: "),
 		VerifyCode: "123456",                                              //promptInput(reader, "请输入VerifyCode: "),
-		Info:       map[string]any{"unit_id": "683beddbdcc71f894d67e3b3"}, //make(map[string]any),
+		Info:       map[string]any{"unit_id": "68a14236ef1dc2bc4149606c"}, //make(map[string]any),
 	}
 
 	// 交互式收集Info字段
@@ -225,6 +204,7 @@ func promptInput(reader *bufio.Reader, prompt string) string {
 }
 
 func sendMessage(mType core.MType, payload any) error {
+	fmt.Printf("[clnt] send message type %d\n %+v\n", mType, payload)
 	msg, err := core.EncodeMessage(mType, payload)
 	if err != nil {
 		return fmt.Errorf("编码消息失败: %w", err)

@@ -78,6 +78,7 @@ func (e *Engine) Run() {
 		default:
 			// 从客户端读取信息
 			if mt, data, err = e.Read(); err != nil {
+				logx.Info("[engine] close by read error")
 				return
 			}
 			switch mt {
@@ -88,7 +89,7 @@ func (e *Engine) Run() {
 			case websocket.BinaryMessage: // 二进制消息
 				e.messageCh.Send(data)
 			case websocket.CloseMessage:
-				_ = e.Close()
+				logx.Info("[engine] close by client")
 				return
 			}
 		}

@@ -48,7 +48,10 @@ func monitor() {
 
 	operation := func() (err error) {
 		if conn, err = amqp.Dial(url); err == nil {
-			logx.Info("[mq producer] reconnect")
+			_ = producer.channel.Close() // 关闭旧channel
+			if producer.channel, err = conn.Channel(); err == nil {
+				logx.Info("[mq producer] reconnect")
+			}
 		}
 		return err
 	}
@@ -104,6 +107,10 @@ func (p *PostProducer) Produce(ctx context.Context, session string, info map[str
 	if payload, err = json.Marshal(msg); err != nil {
 		logx.Error("[mq producer] marshal post notify failed, err:%v", err.Error())
 		return err
+	}
+	if config.GetConfig().State == "test" { // debug 测试时不实践发布消息
+		logx.Info("[mq producer] post notify %+v", string(payload))
+		return nil
 	}
 
 	operator := func() error {

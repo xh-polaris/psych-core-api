@@ -24,6 +24,7 @@ func (e *Engine) heartbeat() {
 		select {
 		case <-e.heartbeatTicker.C: // 心跳超时
 			e.heartbeatTicker.Stop()
+			logx.Info("[engine] close by heartbeat")
 			_ = e.Close()
 			return
 		case _, ok = <-e.heartbeatCh.C: // 收到心跳消息

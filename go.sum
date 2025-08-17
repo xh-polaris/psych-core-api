@@ -175,6 +175,8 @@ github.com/gogo/protobuf v1.3.2/go.mod h1:P1XiOD3dCwIKUDQYPy72D8LYyHL2YPYrpS2s69
 github.com/golang-jwt/jwt/v5 v5.3.0 h1:pv4AsKCKKZuqlgs5sUmn4x8UlGa0kEVt/puTpKx9vvo=
 github.com/golang-jwt/jwt/v5 v5.3.0/go.mod h1:fxCRLWMO43lRc8nhHWY6LGqRcf+1gQWArsqaEUEa5bE=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
+github.com/golang/glog v1.2.5 h1:DrW6hGnjIhtvhOIiAKT6Psh/Kd/ldepEa81DKeiRJ5I=
+github.com/golang/glog v1.2.5/go.mod h1:6AhwSGph0fcJtXVM/PEHPqZlFeoLxhs7/t5UDAwmO+w=
 github.com/golang/groupcache v0.0.0-20190702054246-869f871628b6/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
 github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
 github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
@@ -414,10 +416,10 @@ github.com/twitchyliquid64/golang-asm v0.15.1 h1:SU5vSMR7hnwNxj24w34ZyCi/FmDZTkS
 github.com/twitchyliquid64/golang-asm v0.15.1/go.mod h1:a1lVb/DtPvCB8fslRZhAngC2+aY1QWCk3Cedj/Gdt08=
 github.com/xh-polaris/gopkg v0.0.0-20250312141711-7327267f4ea6 h1:5LzTSKpK7rMv9Tg+/QNo0QtPpXf+5jitjSDV6KndKFA=
 github.com/xh-polaris/gopkg v0.0.0-20250312141711-7327267f4ea6/go.mod h1:C+TEAEky4WkrDpxzCDCxVi968lxZ15HwrdVxWrbL42Y=
-github.com/xh-polaris/psych-idl v0.0.0-20250815010256-68037a2ef1aa h1:EYEP9vhtGkL2H+uvrtRnbnnueeTMg35YRNS6uBrAeck=
-github.com/xh-polaris/psych-idl v0.0.0-20250815010256-68037a2ef1aa/go.mod h1:Mq9OKYzoq5fzibYWoxdO0xsybjShIVJ4XLKu/IpVWHw=
-github.com/xh-polaris/psych-pkg v0.0.0-20250816093925-dfb620ea670e h1:MYIiMJuMCMqkyAVkej37f8UDua8CkL9xucNN+CRZR88=
-github.com/xh-polaris/psych-pkg v0.0.0-20250816093925-dfb620ea670e/go.mod h1:RT3OO6lTk0XoXrUdtIPX3Ayl7Ctvzutjbl7wnAc6AQc=
+github.com/xh-polaris/psych-idl v0.0.0-20250816061259-6ee83a9abbbb h1:JbAbaOf7+p0KNJErRelM9b8bFKpE+S2q4AigEyw/EG4=
+github.com/xh-polaris/psych-idl v0.0.0-20250816061259-6ee83a9abbbb/go.mod h1:Mq9OKYzoq5fzibYWoxdO0xsybjShIVJ4XLKu/IpVWHw=
+github.com/xh-polaris/psych-pkg v0.0.0-20250817095314-16e581d7932e h1:BKN3dlkj67q3ocv5BKT7ERP3kKd+E4kOXGBXk7LK3ug=
+github.com/xh-polaris/psych-pkg v0.0.0-20250817095314-16e581d7932e/go.mod h1:RT3OO6lTk0XoXrUdtIPX3Ayl7Ctvzutjbl7wnAc6AQc=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
