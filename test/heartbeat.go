@@ -21,7 +21,7 @@ func heartbeat(ctx context.Context, conn *websocket.Conn) {
 				return
 			}
 			ticker.Reset(time.Second)
-			log.Println("heartbeat")
+			//log.Println("heartbeat")
 		}
 	}
 }

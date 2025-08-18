@@ -64,10 +64,14 @@ func (p *ChatPipe) Out() {
 		cmd := &core.Cmd{ID: scanner.GetID(), Role: "chat", Command: core.CModelText, Content: app.FirstTTS}
 		p.tts.Send(cmd) // optimize 可能没有tts
 
+		// TODO 改成用ctx关闭可以在scanner遍历过程中关掉
 		// 中间帧
-		for frame, err = scanner.Next(); err == nil; {
+		for {
+			frame, err = scanner.Next()
+			if err != nil {
+				break
+			}
 			modelText.WriteString(frame.Content)
-
 			p.out.Send(&core.Resp{
 				ID:      scanner.GetID(),
 				Type:    core.RModelText,

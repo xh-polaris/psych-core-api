@@ -39,7 +39,7 @@ func (e *Engine) config() {
 	}
 	// 返回前端
 	e.MWrite(core.MConfig, conf)
-	utils.DPrint("[engine] [config] workflow config: %+v\n conf: %+v\n", conf)
+	utils.DPrint("[engine] [config] workflow config: %+v\n conf: %+v\n", wfConf, conf)
 }
 
 // 构造配置

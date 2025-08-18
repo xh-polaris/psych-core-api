@@ -15,8 +15,9 @@ type IOPipe struct {
 	history *core.Channel[*core.HisEntry] // 历史记录输入
 }
 
-func NewIOPipe(close chan struct{}, in *core.Channel[*core.Cmd], asr *core.Channel[*core.Cmd], chat *core.Channel[*core.Cmd], history *core.Channel[*core.HisEntry], out *core.Channel[*core.Resp]) *IOPipe {
+func NewIOPipe(en core.Engine, in *core.Channel[*core.Cmd], asr *core.Channel[*core.Cmd], chat *core.Channel[*core.Cmd], history *core.Channel[*core.HisEntry], out *core.Channel[*core.Resp]) *IOPipe {
 	return &IOPipe{
+		engine:  en,
 		in:      in,
 		out:     out,
 		asr:     asr,

@@ -111,7 +111,6 @@ func (e *Engine) Read() (mt int, data []byte, err error) {
 	if mt, data, err = e.wsx.Read(); err != nil {
 		logx.CondError(!wsx.IsNormal(err), "[engine] %s error %s", core.ARead, err)
 	}
-	utils.DPrint("[engine] [read] mt %d\n", mt)
 	return
 }
 

@@ -45,7 +45,12 @@ func (w *WorkFlow) Orchestrate(conf *core.WorkFlowConfig) (err error) {
 	w.asr = NewASRPipe(w.ctx, w.UnExpected, w.close, w.asrApp, out)
 	w.tts = NewTTSPipe(w.ctx, w.UnExpected, w.close, w.ttsApp, out)
 	w.chat = NewChatPipe(w.ctx, w.UnExpected, w.close, w.chatApp, w.en.Session(), w.history.in, w.tts.in, out)
-	w.io = NewIOPipe(w.close, w.in, w.asr.in, w.chat.in, w.history.in, out)
+	w.io = NewIOPipe(w.en, w.in, w.asr.in, w.chat.in, w.history.in, out)
+	// 运行
+	w.broadcast = append(w.broadcast, w.io, w.chat, w.tts, w.asr, w.history)
+	for _, pipe := range w.broadcast {
+		pipe.Run()
+	}
 	return
 }
 

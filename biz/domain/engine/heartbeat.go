@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
 	"github.com/xh-polaris/psych-pkg/wsx"
@@ -13,7 +12,7 @@ var heartbeatTimeout = time.Second * 30
 // buildHeartbeat
 func buildHeartbeat(e *Engine) {
 	e.wsx.SetPingHandler(func(appData string) (err error) { // 收到心跳消息的处理
-		utils.DPrint("[engine] heartbeat\n") // Debug
+		//utils.DPrint("[engine] heartbeat\n") // Debug
 		if err = e.wsx.Pong(nil); err != nil {
 			logx.CondError(!wsx.IsNormal(err), "[engine] %s error %s", core.APong, err)
 		}
