@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,212 +14,98 @@ import (
 	"github.com/xh-polaris/psych-pkg/core"
 )
 
-var (
-	conn          *websocket.Conn
-	meta          *core.Meta
-	heartbeatDone = make(chan struct{})
-)
-
 var authType2Int32 = map[string]int32{
 	"Already":             -1,
 	"AuthStudentIdAndPwd": 1,
 }
 
 func main() {
-	// 连接WebSocket服务器
-	if err := connectWebSocket(); err != nil {
-		log.Fatal("连接失败:", err)
+	for start() {
 	}
-	defer conn.Close()
-
+}
+func start() bool {
+	var (
+		err         error
+		ctx, cancel = context.WithCancel(context.Background())
+		meta        *core.Meta
+		conn        *websocket.Conn
+	)
+	// 连接WebSocket服务器
+	if conn, meta, err = connectWebSocket(); err != nil {
+		log.Println("连接失败:", err)
+	}
+	defer func() { _ = conn.WriteControl(websocket.CloseMessage, []byte{}, time.Now().Add(time.Second)) }()
 	// 启动心跳协程
-	go heartbeat()
-	defer close(heartbeatDone)
-
+	go heartbeat(ctx, conn)
 	// 启动消息接收协程
-	go receiveMessages()
-
+	go receiveMessages(ctx, conn, meta)
 	// 主协程处理用户输入
-	handleUserInput()
+	return handleUserInput(cancel, conn, meta)
 }
 
-func connectWebSocket() error {
-	var err error
-	conn, _, err = websocket.DefaultDialer.Dial("ws://127.0.0.1:8080/chat", nil)
-	if err != nil {
-		return fmt.Errorf("连接服务器失败: %w", err)
+func connectWebSocket() (conn *websocket.Conn, meta *core.Meta, err error) {
+	var message []byte
+	if conn, _, err = websocket.DefaultDialer.Dial("ws://127.0.0.1:8080/chat", nil); err != nil {
+		return conn, meta, fmt.Errorf("连接服务器失败: %w", err)
 	}
-
 	// 读取元信息
-	_, message, err := conn.ReadMessage()
-	if err != nil {
-		return fmt.Errorf("读取元信息失败: %w", err)
+	if _, message, err = conn.ReadMessage(); err != nil {
+		return conn, meta, fmt.Errorf("读取元信息失败: %w", err)
 	}
-
 	meta = &core.Meta{}
-	if err := json.Unmarshal(message, meta); err != nil {
-		return fmt.Errorf("解析元信息失败: %w", err)
+	if err = json.Unmarshal(message, meta); err != nil {
+		return conn, meta, fmt.Errorf("解析元信息失败: %w", err)
 	}
-
 	log.Printf("连接成功，协议版本: %d (序列化: %d, 压缩: %d)",
 		meta.Version, meta.Serialization, meta.Compression)
-	return nil
+	return conn, meta, nil
 }
 
-func receiveMessages() {
-	for {
-		mt, data, err := conn.ReadMessage()
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
-				log.Println("连接异常关闭:", err)
-			}
-			return
-		}
-
-		switch {
-		case mt == websocket.PongMessage:
-			log.Println("[心跳] 收到Pong响应")
-		default:
-			processBinaryMessage(data)
-		}
-	}
-}
-
-func processBinaryMessage(data []byte) {
-	msg, err := core.MUnmarshal(data, meta.Compression, meta.Serialization)
-	if err != nil {
-		log.Println("消息解码失败:", err)
-		return
-	}
-
-	payload, err := core.DecodeMessage(msg)
-	if err != nil {
-		log.Println("消息解析失败:", err)
-		return
-	}
-
-	// 格式化输出
-	jsonData, _ := json.MarshalIndent(payload, "", "  ")
-	log.Printf("收到 %s 消息:\n%s\n", msg.Type, jsonData)
-}
-
-func handleUserInput() {
+// 处理用户输入
+func handleUserInput(cancel context.CancelFunc, conn *websocket.Conn, meta *core.Meta) (restart bool) {
 	reader := bufio.NewReader(os.Stdin)
-
 	for {
 		printMenu()
 		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(input)
 
 		switch input {
-		case "1":
-			sendAuthMessage(reader)
-		case "2":
-			sendCommandMessage(reader)
+		case "auth":
+			sendAuthMessage(conn, meta, reader)
+		case "cmd":
+			sendCommandMessage(conn, meta, reader)
 		case "exit":
-			if err := conn.WriteControl(websocket.CloseMessage, nil, time.Now().Add(10*time.Second)); err != nil {
-				log.Println("Close发送失败:", err)
-				return
-			}
-			return
+			cancel()
+			return false
+		case "restart":
+			cancel()
+			return true
 		default:
 			fmt.Println("无效输入，请重新选择")
 		}
 	}
 }
 
+// 菜单提示
 func printMenu() {
 	fmt.Println("\n请选择操作:")
-	fmt.Println("1. 发送认证消息")
-	fmt.Println("2. 发送命令消息")
+	fmt.Println("auth. 发送认证消息")
+	fmt.Println("cmd. 发送命令消息")
+	fmt.Println("restart. 重启程序")
 	fmt.Println("exit. 退出程序")
 	fmt.Print("请输入选项: ")
 }
 
-func sendAuthMessage(reader *bufio.Reader) {
-	auth := core.Auth{
-		AuthType:   authType2Int32["AuthStudentIdAndPwd"],
-		AuthID:     "hsdsfz2025",                                          //promptInput(reader, "请输入AuthID: "),
-		VerifyCode: "123456",                                              //promptInput(reader, "请输入VerifyCode: "),
-		Info:       map[string]any{"unit_id": "68a14236ef1dc2bc4149606c"}, //make(map[string]any),
-	}
-
-	// 交互式收集Info字段
-	//fmt.Println("\n请输入Info键值对（输入格式：key value，单独输入done结束）:")
-	//for {
-	//	input := promptInput(reader, "info> ")
-	//	if input == "done" {
-	//		break
-	//	}
-	//
-	//	parts := strings.SplitN(input, " ", 2)
-	//	if len(parts) != 2 {
-	//		fmt.Println("输入格式错误，请按 key value 格式输入")
-	//		continue
-	//	}
-	//
-	//	auth.Info[parts[0]] = parts[1]
-	//	fmt.Printf("已添加: %s = %s\n", parts[0], parts[1])
-	//}
-
-	// 发送消息
-	if err := sendMessage(core.MAuth, &auth); err != nil {
-		log.Println("发送认证消息失败:", err)
-	} else {
-		fmt.Println("认证消息发送成功")
-	}
-}
-
-func sendCommandMessage(reader *bufio.Reader) {
-	fmt.Println("\n请选择命令类型:")
-	fmt.Println("1. 文字输入")
-	fmt.Println("2. 音频输入")
-	fmt.Println("3. 音频识别")
-	choice := promptInput(reader, "请输入命令类型: ")
-
-	var cmdType core.CType
-	switch choice {
-	case "1":
-		cmdType = core.CUserText
-	case "2":
-		cmdType = core.CUserAudio
-	case "3":
-		cmdType = core.CUserAudioASR
-	default:
-		fmt.Println("无效的命令类型")
-		return
-	}
-
-	content := promptInput(reader, "请输入命令内容: ")
-	cmd := core.Cmd{Command: cmdType, Content: content}
-
-	if err := sendMessage(core.MCmd, &cmd); err != nil {
-		log.Println("发送命令失败:", err)
-	}
-}
-
+// 根据提示词获取输入
 func promptInput(reader *bufio.Reader, prompt string) string {
 	fmt.Print(prompt)
 	input, _ := reader.ReadString('\n')
 	return strings.TrimSpace(input)
 }
 
-func sendMessage(mType core.MType, payload any) error {
-	fmt.Printf("[clnt] send message type %d\n %+v\n", mType, payload)
-	msg, err := core.EncodeMessage(mType, payload)
-	if err != nil {
-		return fmt.Errorf("编码消息失败: %w", err)
-	}
-
-	data, err := core.MMarshal(msg, meta.Compression, meta.Serialization)
-	if err != nil {
-		return fmt.Errorf("序列化消息失败: %w", err)
-	}
-
-	if err := conn.WriteMessage(websocket.BinaryMessage, data); err != nil {
-		return fmt.Errorf("发送消息失败: %w", err)
-	}
-
-	log.Printf("已发送 %s 消息", msg.Type)
+// 根据提示词输入音频
+func promptInputAudio(reader *bufio.Reader, prompt string) []byte {
+	fmt.Print(prompt)
+	// TODO
 	return nil
 }

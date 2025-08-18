@@ -3,6 +3,7 @@ package workflow
 import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/redis"
+	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
 )
@@ -26,6 +27,7 @@ func NewHistoryPipe(close chan struct{}, session string) *HistoryPipe {
 func (p *HistoryPipe) In() {
 	var err error
 	for entry := range p.in.C {
+		utils.DPrint("[his] add the history entry: %+v\n", entry) //debug
 		if err = p.rs.Add(p.session, entry); err != nil {
 			logx.Error("[history pipe] add err:%v", err)
 		}

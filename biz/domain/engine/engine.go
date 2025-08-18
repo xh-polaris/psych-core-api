@@ -36,10 +36,9 @@ type Engine struct {
 	uSession string
 
 	// 消息派发
-	broadcast   []core.CloseChannel
-	heartbeatCh *core.Channel[struct{}]
-	messageCh   *core.Channel[[]byte]
-	cmdCh       *core.Channel[*core.Cmd]
+	broadcast []core.CloseChannel
+	messageCh *core.Channel[[]byte]
+	cmdCh     *core.Channel[*core.Cmd]
 
 	// 记录
 	start time.Time      // 开始时间
@@ -56,6 +55,12 @@ func NewEngine(ctx context.Context, conn *websocket.Conn) *Engine {
 	buildHandle(e)
 	buildAuth(e)
 	buildCmd(e)
+	e.wsx.SetCloseHandler(func(code int, text string) (err error) { // 处理close消息
+		if err = e.wsx.ControlClose(websocket.FormatCloseMessage(code, text)); err != nil { // 给客户端写回一个close消息
+			logx.Error("[engine] [close] err: %s", err)
+		}
+		return e.Close()
+	})
 	utils.DPrint("[engine] [new] with session %s\n", e.uSession) // debug
 	return e
 }
@@ -65,7 +70,6 @@ func (e *Engine) Run() {
 	var mt int      // 消息类型
 	var err error   // 错误
 	var data []byte // 前端传入数据
-	defer func() { _ = e.Close() }()
 
 	// 协议协商
 	if err = e.init(); err != nil {
@@ -82,15 +86,12 @@ func (e *Engine) Run() {
 				return
 			}
 			switch mt {
-			case websocket.PingMessage: // Ping消息
-				e.heartbeatCh.Send(struct{}{})
+			case websocket.PingMessage: // Ping消息会直接在heartbeatHandler种处理
 			case websocket.TextMessage: // 文本消息
 				logx.Info("[engine] receive text message:", string(data)) // 正常情况下不应该收到文本消息
 			case websocket.BinaryMessage: // 二进制消息
 				e.messageCh.Send(data)
-			case websocket.CloseMessage:
-				logx.Info("[engine] close by client")
-				return
+			case websocket.CloseMessage: // Close消息会直接在closeHandler中处理
 			}
 		}
 	}
@@ -98,7 +99,7 @@ func (e *Engine) Run() {
 
 // init, 初始化, 主要与前端协商协议信息
 func (e *Engine) init() (err error) {
-	utils.DPrint("[engine] [init] meta: %+v", e.meta)
+	utils.DPrint("[engine] [init] meta: %+v\n", e.meta) //debug
 	if err = e.wsx.WriteJSON(e.meta); err != nil {
 		logx.CondError(!wsx.IsNormal(err), "[engine] protocol init error: %s\n", err) //debug
 	}
@@ -110,6 +111,7 @@ func (e *Engine) Read() (mt int, data []byte, err error) {
 	if mt, data, err = e.wsx.Read(); err != nil {
 		logx.CondError(!wsx.IsNormal(err), "[engine] %s error %s", core.ARead, err)
 	}
+	utils.DPrint("[engine] [read] mt %d\n", mt)
 	return
 }
 
