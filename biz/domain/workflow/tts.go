@@ -5,18 +5,19 @@ import (
 	"github.com/xh-polaris/psych-pkg/app"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
+	"github.com/xh-polaris/psych-pkg/wsx"
 )
 
 type TTSPipe struct {
 	ctx        context.Context
-	unexpected func()
+	unexpected func(error)
 	tts        app.TTSApp
 
 	in  *core.Channel[*core.Cmd]  // 命令输入
 	out *core.Channel[*core.Resp] // 输出
 }
 
-func NewTTSPipe(ctx context.Context, unexpected func(), close chan struct{}, tts app.TTSApp, out *core.Channel[*core.Resp]) *TTSPipe {
+func NewTTSPipe(ctx context.Context, unexpected func(error), close chan struct{}, tts app.TTSApp, out *core.Channel[*core.Resp]) *TTSPipe {
 	return &TTSPipe{
 		ctx:        ctx,
 		unexpected: unexpected,
@@ -32,7 +33,7 @@ func (p *TTSPipe) In() {
 	for cmd := range p.in.C {
 		if err = p.tts.Send(p.ctx, cmd.Content.(string)); err != nil {
 			logx.Error("[tts pipe] send err:%v", err)
-			p.unexpected()
+			p.unexpected(err)
 			return
 		}
 	}
@@ -43,16 +44,26 @@ func (p *TTSPipe) Out() {
 	var err error
 	var audio []byte
 
-	for audio, err = p.tts.Receive(p.ctx); err == nil; {
-		resp := &core.Resp{
-			ID:      0, // Optimize tts输出应该也和cmd的ID对应上
-			Type:    core.RModelAudio,
-			Content: audio,
+	for {
+		audio, err = p.tts.Receive(p.ctx)
+		select {
+		case <-p.ctx.Done():
+			return
+		default:
+			if err == nil {
+				resp := &core.Resp{
+					ID:      0, // Optimize tts输出应该也和cmd的ID对应上
+					Type:    core.RModelAudio,
+					Content: audio,
+				}
+				p.out.Send(resp)
+			} else if !wsx.IsNormal(err) {
+				logx.Error("[tts pipe] receive err:%v]", err)
+				p.unexpected(err)
+				return
+			}
 		}
-		p.out.Send(resp)
 	}
-	logx.Error("[tts pipe] receive err:%v]", err)
-	p.unexpected()
 }
 
 func (p *TTSPipe) Run() {

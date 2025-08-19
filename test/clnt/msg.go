@@ -7,13 +7,24 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/xh-polaris/psych-pkg/core"
 	"log"
+	"os"
 )
+
+var modelVideo []byte
 
 // 接受消息
 func receiveMessages(ctx context.Context, conn *websocket.Conn, meta *core.Meta) {
 	for {
 		select {
 		case <-ctx.Done():
+			outputFile, err := os.Create("./output.pcm")
+			if err != nil {
+				log.Println("文件创建失败")
+				return
+			}
+			if _, err = outputFile.Write(modelVideo); err != nil {
+				log.Printf("音频写入失败:%s", err)
+			}
 			return
 		default:
 			mt, data, err := conn.ReadMessage()
@@ -46,10 +57,23 @@ func processBinaryMessage(data []byte, meta *core.Meta) {
 		log.Println("消息解析失败:", err)
 		return
 	}
+	switch msg.Type {
+	case core.MResp: // 响应消息
+		switch payload.(*core.Resp).Type {
+		case core.RModelAudio: // 模型音频
+			log.Printf("收到音频消息\n")
+			modelVideo = append(modelVideo, []byte(payload.(*core.Resp).Content.(string))...)
+		default:
+			// 格式化输出
+			jsonData, _ := json.MarshalIndent(payload, "", "  ")
+			log.Printf("收到 %d 消息:\n%s\n", msg.Type, jsonData)
+		}
+	default:
+		// 格式化输出
+		jsonData, _ := json.MarshalIndent(payload, "", "  ")
+		log.Printf("收到 %d 消息:\n%s\n", msg.Type, jsonData)
+	}
 
-	// 格式化输出
-	jsonData, _ := json.MarshalIndent(payload, "", "  ")
-	log.Printf("收到 %d 消息:\n%s\n", msg.Type, jsonData)
 }
 
 // 发送消息

@@ -71,9 +71,9 @@ func handleUserInput(cancel context.CancelFunc, conn *websocket.Conn, meta *core
 
 		switch input {
 		case "auth":
-			sendAuthMessage(conn, meta, reader)
+			SendAuthMessage(conn, meta, reader)
 		case "cmd":
-			sendCommandMessage(conn, meta, reader)
+			SendCommandMessage(conn, meta, reader)
 		case "exit":
 			cancel()
 			return false

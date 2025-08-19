@@ -8,7 +8,7 @@ import (
 	"log"
 )
 
-func sendCommandMessage(conn *websocket.Conn, meta *core.Meta, reader *bufio.Reader) {
+func SendCommandMessage(conn *websocket.Conn, meta *core.Meta, reader *bufio.Reader) {
 	fmt.Println("\n请选择命令类型:")
 	fmt.Println("1. 文字输入")
 	fmt.Println("2. 音频输入")

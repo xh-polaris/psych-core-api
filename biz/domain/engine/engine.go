@@ -82,7 +82,7 @@ func (e *Engine) Run() {
 		default:
 			// 从客户端读取信息
 			if mt, data, err = e.Read(); err != nil {
-				logx.Info("[engine] close by read error")
+				logx.CondError(!wsx.IsNormal(err), "[engine] close by read error %s", err)
 				return
 			}
 			switch mt {
@@ -118,7 +118,10 @@ func (e *Engine) Read() (mt int, data []byte, err error) {
 func (e *Engine) Write(msg []byte) {
 	var err error
 	if err = e.wsx.WriteBytes(msg); err != nil {
-		logx.CondError(!wsx.IsNormal(err), "[engine] WriteBytes error: %s", err)
+		if !wsx.IsNormal(err) {
+			logx.Info("[engine] close by write error: %s", err)
+			_ = e.Close()
+		}
 	}
 	return
 }
@@ -145,12 +148,13 @@ func (e *Engine) MWrite(t core.MType, payload any) {
 // Close 释放engine的资源
 func (e *Engine) Close() (err error) {
 	e.once.Do(func() {
+		e.cancel()
 		close(e.close) // 关闭channel, 避免再有消息写入
 		for _, ch := range e.broadcast {
 			ch.Close() // 关闭子channel, 虽然这里send时也会自动关闭, 但是为了避免ch中无消息时一直空闲导致goroutine泄露, 还是手动关闭一次
 		}
-		e.cancel()
 		_ = e.workflow.Close() // 关闭workflow
+		_ = e.wsx.Close()
 		if err = mq.GetPostProducer().Produce(e.ctx, e.uSession, e.info, e.start, time.Now(), e.conf); err != nil {
 			// 发送失败需要详细记录日志, 以进行后续托底
 			logx.Error("[engine] produce notify error: %s with such state: session:%s start: %d end:%d info:%+v config:%+v", err, e.uSession, e.start, time.Now(), e.info, e.conf)

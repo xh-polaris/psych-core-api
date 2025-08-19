@@ -104,8 +104,8 @@ func (w *WorkFlow) Close() (err error) {
 }
 
 // UnExpected 因错误结束
-func (w *WorkFlow) UnExpected() {
+func (w *WorkFlow) UnExpected(err error) {
 	w.en.Write(core.EndErr)
-	logx.Info("[engine] close by workflow error")
+	logx.Info("[engine] close by workflow error: %s", err.Error())
 	_ = w.en.Close()
 }

@@ -27,6 +27,8 @@ func buildHeartbeat(e *Engine) {
 func (e *Engine) heartbeat() {
 	for {
 		select {
+		case <-e.ctx.Done(): // 其他原因结束
+			return
 		case <-e.heartbeatTicker.C: // 心跳超时
 			e.heartbeatTicker.Stop()
 			logx.Info("[engine] close by heartbeat")

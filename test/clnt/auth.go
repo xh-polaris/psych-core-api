@@ -11,7 +11,7 @@ import (
 
 var customUser = false
 
-func sendAuthMessage(conn *websocket.Conn, meta *core.Meta, reader *bufio.Reader) {
+func SendAuthMessage(conn *websocket.Conn, meta *core.Meta, reader *bufio.Reader) {
 	var auth core.Auth
 	if !customUser {
 		auth = core.Auth{
