@@ -24,5 +24,5 @@ func SignIn(ctx context.Context, c *app.RequestContext) {
 
 	p := provider.Get()
 	resp, err := p.AuthService.SignIn(ctx, &req)
-	httpx.PostProcess(ctx, c, req, resp, err)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
