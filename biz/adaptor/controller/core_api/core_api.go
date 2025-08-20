@@ -8,6 +8,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	core_api "github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/provider"
+	"github.com/xh-polaris/psych-pkg/httpx"
 )
 
 // SignIn .
@@ -23,6 +24,5 @@ func SignIn(ctx context.Context, c *app.RequestContext) {
 
 	p := provider.Get()
 	resp, err := p.AuthService.SignIn(ctx, &req)
-
-	c.JSON(consts.StatusOK, resp)
+	httpx.PostProcess(ctx, c, req, resp, err)
 }
