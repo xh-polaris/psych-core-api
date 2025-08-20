@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"github.com/google/wire"
-	core_api "github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/infra/config"
 	cst "github.com/xh-polaris/psych-core-api/biz/infra/consts"
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
@@ -44,6 +44,8 @@ func (s AuthService) SignIn(ctx context.Context, req *core_api.UserSignInReq) (r
 	})
 
 	resp = &core_api.UserSignInResp{
+		Code:      0,
+		Msg:       "success",
 		UnitId:    userResp.UnitId,
 		UserId:    userResp.UserId,
 		StudentId: userResp.StudentId,

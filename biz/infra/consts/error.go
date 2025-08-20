@@ -7,7 +7,7 @@ import (
 
 // auth
 var (
-	InvalidAuth = errorx.New(1000, "验证失败, 请重试")
+	InvalidAuth = errorx.New(1000, "验证失败, 请检查账号密码是否正确")
 )
 
 // config
