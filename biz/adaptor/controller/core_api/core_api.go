@@ -11,9 +11,9 @@ import (
 	"github.com/xh-polaris/psych-pkg/httpx"
 )
 
-// SignIn .
+// UserSignIn .
 // @router /user/sign_in [POST]
-func SignIn(ctx context.Context, c *app.RequestContext) {
+func UserSignIn(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req core_api.UserSignInReq
 	err = c.BindAndValidate(&req)
@@ -23,6 +23,22 @@ func SignIn(ctx context.Context, c *app.RequestContext) {
 	}
 
 	p := provider.Get()
-	resp, err := p.AuthService.SignIn(ctx, &req)
+	resp, err := p.AuthService.UserSignIn(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// UserGetInfo .
+// @router /user/info [GET]
+func UserGetInfo(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.UserGetInfoReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.AuthService.UserGetInfo(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }

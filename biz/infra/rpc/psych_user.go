@@ -34,7 +34,7 @@ func NewPsychUser(config *config.Config) user.Client {
 
 func GetPsychUser() user.Client {
 	if puClnt == nil {
-		puOnce.Do(func() {
+		puOnce.Do(func() { // optimize 如果获取不到, 就会一直是空
 			puClnt = client.NewClient(config.GetConfig().Name, "psych.user", user.NewClient)
 		})
 	}

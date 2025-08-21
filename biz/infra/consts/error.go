@@ -8,6 +8,7 @@ import (
 // auth
 var (
 	InvalidAuth = errorx.New(1000, "验证失败, 请检查账号密码是否正确")
+	ExpireAuth  = errorx.New(1001, "身份认证失败, 请重新登录")
 )
 
 // config

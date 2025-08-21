@@ -15,7 +15,7 @@ FULL_MAIN_IDL_PATH := $(IDL_DIR)/$(MAIN_IDL_BASE)/$(MAIN_IDL_BASE).proto
 IDL_DIR := "$(IDL_DIR)"
 FULL_MAIN_IDL_PATH := "$(FULL_MAIN_IDL_PATH)"
 # 这里由于idl中未直接放置google相关文件, 所以必须把这个文件放置到下面这个文件夹中
-IDL_OPTIONS := -I $(IDL_DIR) /usr/include/google/protobuf --idl $(FULL_MAIN_IDL_PATH)
+IDL_OPTIONS := -I $(IDL_DIR) --idl $(FULL_MAIN_IDL_PATH)
 OUTPUT_OPTIONS := --handler_dir $(HANDLER_DIR) --model_dir $(MODEL_DIR) --router_dir $(ROUTER_DIR)
 EXTRA_OPTIONS := --pb_camel_json_tag=true --unset_omitempty=true
 
@@ -28,7 +28,7 @@ build_and_run:
 wire:
 	wire ./provider
 update:
-	hz update $(IDL_OPTIONS) --mod $(MODULE_NAME) $(EXTRA_OPTIONS)
+	hz --verbose update $(IDL_OPTIONS) --mod $(MODULE_NAME) $(EXTRA_OPTIONS)
 	@files=$$(find biz/application/dto -type f); \
 	for file in $$files; do \
   	  sed -i  -e 's/func init\(\).*//' $$file; \

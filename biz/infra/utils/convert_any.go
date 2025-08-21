@@ -6,7 +6,7 @@ import (
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
-func FormGen2DB(req map[string]*anypb.Any) (map[string]any, error) {
+func Anypb2Any(req map[string]*anypb.Any) (map[string]any, error) {
 	res := make(map[string]any)
 	for k, v := range req {
 		msg, err := v.UnmarshalNew()
@@ -32,30 +32,11 @@ func FormGen2DB(req map[string]*anypb.Any) (map[string]any, error) {
 	return res, nil
 }
 
-func FormDB2Gen(req map[string]any) (map[string]*anypb.Any, error) {
+func Any2Anypb(req map[string]any) (map[string]*anypb.Any, error) {
 	res := make(map[string]*anypb.Any)
 
 	for k, v := range req {
-		var msg proto.Message
-
-		switch val := v.(type) {
-		case string:
-			msg = wrapperspb.String(val)
-		case int:
-			msg = wrapperspb.Int64(int64(val))
-		case int32:
-			msg = wrapperspb.Int32(val)
-		case int64:
-			msg = wrapperspb.Int64(val)
-		case float32:
-			msg = wrapperspb.Float(val)
-		case float64:
-			msg = wrapperspb.Double(val)
-		case bool:
-			msg = wrapperspb.Bool(val)
-		}
-
-		anyVal, err := anypb.New(msg)
+		anyVal, err := Wrap(v)
 		if err != nil {
 			return nil, err
 		}
@@ -63,4 +44,25 @@ func FormDB2Gen(req map[string]any) (map[string]*anypb.Any, error) {
 	}
 
 	return res, nil
+}
+
+func Wrap(v any) (*anypb.Any, error) {
+	var msg proto.Message
+	switch val := v.(type) {
+	case string:
+		msg = wrapperspb.String(val)
+	case int:
+		msg = wrapperspb.Int64(int64(val))
+	case int32:
+		msg = wrapperspb.Int32(val)
+	case int64:
+		msg = wrapperspb.Int64(val)
+	case float32:
+		msg = wrapperspb.Float(val)
+	case float64:
+		msg = wrapperspb.Double(val)
+	case bool:
+		msg = wrapperspb.Bool(val)
+	}
+	return anypb.New(msg)
 }

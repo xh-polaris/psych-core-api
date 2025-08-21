@@ -4,11 +4,14 @@ import (
 	"context"
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
-	"github.com/xh-polaris/psych-core-api/biz/infra/config"
+	"github.com/xh-polaris/psych-core-api/biz/domain/usr"
 	cst "github.com/xh-polaris/psych-core-api/biz/infra/consts"
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
 	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
+	"github.com/xh-polaris/psych-idl/kitex_gen/user"
 	u "github.com/xh-polaris/psych-idl/kitex_gen/user"
+	"github.com/xh-polaris/psych-pkg/util/logx"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type IAuthService interface {
@@ -23,7 +26,7 @@ var AuthServiceSet = wire.NewSet(
 	wire.Bind(new(IAuthService), new(*AuthService)),
 )
 
-func (s AuthService) SignIn(ctx context.Context, req *core_api.UserSignInReq) (resp *core_api.UserSignInResp, err error) {
+func (s AuthService) UserSignIn(ctx context.Context, req *core_api.UserSignInReq) (resp *core_api.UserSignInResp, err error) {
 	// 调用接口
 	client := rpc.GetPsychUser()
 	userResp, err := client.UserSignIn(ctx, &u.UserSignInReq{
@@ -36,7 +39,7 @@ func (s AuthService) SignIn(ctx context.Context, req *core_api.UserSignInReq) (r
 		return nil, cst.InvalidAuth
 	}
 
-	jwt, err := utils.GenerateJwt(config.GetConfig().Auth.SecretKey, map[string]any{
+	jwt, err := utils.GenerateJwt(map[string]any{
 		cst.UnitId:    userResp.UnitId,
 		cst.UserId:    userResp.UserId,
 		cst.StudentId: userResp.StudentId,
@@ -54,4 +57,42 @@ func (s AuthService) SignIn(ctx context.Context, req *core_api.UserSignInReq) (r
 	}
 
 	return resp, nil
+}
+
+func (s AuthService) UserGetInfo(ctx context.Context, _ *core_api.UserGetInfoReq) (resp *core_api.UserGetInfoResp, err error) {
+	var meta *usr.Meta
+	if meta, err = utils.ExtraUserMeta(ctx); err != nil {
+		return nil, cst.ExpireAuth
+	}
+
+	// 获取用户信息
+	get := &user.UserGetInfoReq{UserId: meta.UserId, UnitId: &meta.UnitId}
+	getResp, err := rpc.GetPsychUser().UserGetInfo(ctx, get)
+	if err != nil {
+		logx.Error("[auth service] get user %s info err:", meta.UserId, err)
+		return nil, cst.ExpireAuth
+	}
+	// 构造响应
+	r := &core_api.UserGetInfoResp{
+		User: &core_api.User{
+			Id:         getResp.User.Id,
+			Phone:      getResp.User.Phone,
+			Name:       getResp.User.Name,
+			Birth:      getResp.User.Birth,
+			Gender:     getResp.User.Gender,
+			Status:     getResp.User.Status,
+			CreateTime: getResp.User.CreateTime,
+			UpdateTime: getResp.User.UpdateTime,
+		},
+		Code: 0,
+		Msg:  "success",
+	}
+	data, err := utils.Anypb2Any(getResp.Form)
+	if err != nil {
+		return nil, err
+	}
+	if r.Info, err = structpb.NewStruct(data); err != nil {
+		return nil, err
+	}
+	return r, nil
 }

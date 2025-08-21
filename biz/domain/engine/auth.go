@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"github.com/xh-polaris/psych-core-api/biz/infra/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/consts"
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
 	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
@@ -40,7 +39,7 @@ func (e *Engine) auth(auth *core.Auth) bool {
 // 已登录
 func (e *Engine) already(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err) {
 	alreadyAuth = &core.Auth{}
-	claims, err := utils.ParseJwt(config.GetConfig().Auth.SecretKey, auth.VerifyCode)
+	claims, err := utils.ParseJwt(auth.VerifyCode)
 	if err != nil {
 		return nil, consts.Err(consts.JwtAuthErr)
 	}
@@ -76,7 +75,7 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 		merr = consts.Err(consts.InvalidAuth)
 		return
 	}
-	form, err := utils.FormGen2DB(getResp.Form)
+	form, err := utils.Anypb2Any(getResp.Form)
 	if err != nil {
 		logx.Error("[engine] [%s] UserGetInfo err: %v", core.AAuth, err)
 		merr = consts.Err(consts.InvalidAuth)
