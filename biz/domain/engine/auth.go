@@ -44,14 +44,13 @@ func (e *Engine) already(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Er
 		return nil, consts.Err(consts.JwtAuthErr)
 	}
 	// 提取字段
-	merr = consts.Err(consts.InvalidAuth)
 	alreadyAuth.Info = auth.Info
 	e.info = alreadyAuth.Info
 	e.info[consts.UnitId] = claims[consts.UnitId].(string)
 	e.info[consts.UserId] = claims[consts.UserId].(string)
 	e.info[consts.StudentId] = claims[consts.StudentId].(string)
 	e.info[consts.Strong] = claims[consts.Strong].(bool)
-	return alreadyAuth, merr
+	return alreadyAuth, nil
 }
 
 func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err) {

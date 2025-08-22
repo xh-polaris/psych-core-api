@@ -19,7 +19,7 @@ var (
 // jwt
 var (
 	JwtParseErr = errorx.New(3000, "JWT解析失败")
-	JwtAuthErr  = errorx.New(3000, "JWT不匹配")
+	JwtAuthErr  = errorx.New(3000, "身份认证失败, 请重新登录")
 )
 
 func Err(err *errorx.Errorx) *core.Err {
