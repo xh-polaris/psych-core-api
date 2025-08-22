@@ -1,9 +1,9 @@
 package consts
 
 const (
-	UnitId    = "unit_id"
-	UserId    = "user_id"
-	StudentId = "student_id"
+	UnitId    = "unitId"
+	UserId    = "userId"
+	StudentId = "studentId"
 	Strong    = "strong"
 	Form      = "form"
 )
