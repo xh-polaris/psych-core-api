@@ -53,7 +53,7 @@ func (e *Engine) handle() {
 				e.cmdCh.Send(cmd)
 			}
 		case core.MPing: // Ping消息
-			e.mockHeartbeat(msg.Payload)
+			e.mockHeartbeat(payload.(*core.Ping))
 		default: // 不支持的消息
 			e.Write(core.UnSupportErr)
 		}
