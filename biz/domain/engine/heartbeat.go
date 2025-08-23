@@ -28,6 +28,7 @@ func (e *Engine) heartbeat() {
 	for {
 		select {
 		case <-e.ctx.Done(): // 其他原因结束
+			e.heartbeatTicker.Stop()
 			return
 		case <-e.heartbeatTicker.C: // 心跳超时
 			e.heartbeatTicker.Stop()
@@ -36,4 +37,15 @@ func (e *Engine) heartbeat() {
 			return
 		}
 	}
+}
+
+// 应用层模拟的心跳消息
+func (e *Engine) mockHeartbeat(payload []byte) {
+	if payload != nil && len(payload) > 0 {
+		logx.Info("[engine] mock heartbeat: %s", string(payload))
+	}
+	if err := e.wsx.Pong(nil); err != nil {
+		logx.CondError(!wsx.IsNormal(err), "[engine] %s error %s", core.APong, err)
+	}
+	e.heartbeatTicker.Reset(heartbeatTimeout)
 }

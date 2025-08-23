@@ -52,6 +52,8 @@ func (e *Engine) handle() {
 			if cmd, ok := payload.(*core.Cmd); ok {
 				e.cmdCh.Send(cmd)
 			}
+		case core.MPing: // Ping消息
+			e.mockHeartbeat(msg.Payload)
 		default: // 不支持的消息
 			e.Write(core.UnSupportErr)
 		}
