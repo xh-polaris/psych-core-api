@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/gorilla/websocket"
+	"github.com/xh-polaris/psych-pkg/app"
 	"github.com/xh-polaris/psych-pkg/core"
 	"log"
 )
@@ -26,6 +27,7 @@ func SendCommandMessage(conn *websocket.Conn, meta *core.Meta, reader *bufio.Rea
 		content = promptInputAudio(reader, "请输入音频")
 	case "3":
 		cmdType = core.CUserAudioASR
+		content = []byte{app.FirstASR}
 	default:
 		fmt.Println("无效的命令类型")
 		return

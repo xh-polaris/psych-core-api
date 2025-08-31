@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"encoding/base64"
 	"github.com/xh-polaris/psych-pkg/app"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
@@ -31,12 +32,19 @@ func NewASRPipe(ctx context.Context, unexpected func(error), close chan struct{}
 func (p *ASRPipe) In() {
 	var err error
 	var cmd *core.Cmd
+	var audio []byte
 
 	for cmd = range p.in.C {
-		if err = p.asr.Send(p.ctx, cmd.Content.([]byte)); err != nil {
-			logx.Error("[asr pipe] send err: %v", err)
-			p.unexpected(err)
-			return // Optimize 这里暂时就直接退出, 后续加强可靠性后应该要偶发性错误不影响使用
+		if cmd.Content != nil {
+			audio, err = base64.StdEncoding.DecodeString(cmd.Content.(string)) // json没有字节数组而是用base64编码, 所以需要解码
+			if err != nil {
+				continue
+			}
+			if err = p.asr.Send(p.ctx, audio); err != nil {
+				logx.Error("[asr pipe] send err: %v", err)
+				p.unexpected(err)
+				return // Optimize 这里暂时就直接退出, 后续加强可靠性后应该要偶发性错误不影响使用
+			}
 		}
 	}
 }
