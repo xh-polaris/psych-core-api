@@ -17,7 +17,7 @@ require (
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/xh-polaris/gopkg v0.0.0-20250312141711-7327267f4ea6
 	github.com/xh-polaris/psych-idl v0.0.0-20250820121225-16219b2584b0
-	github.com/xh-polaris/psych-pkg v0.0.0-20250823150655-bb8201b4e3a7
+	github.com/xh-polaris/psych-pkg v0.0.0-20250831075331-9241664bf2d0
 	github.com/zeromicro/go-zero v1.9.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.62.0
 	go.opentelemetry.io/contrib/propagators/b3 v1.37.0

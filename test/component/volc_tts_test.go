@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/xh-polaris/psych-pkg/app"
-	"github.com/xh-polaris/psych-pkg/app/volc"
+	"github.com/xh-polaris/psych-pkg/app/volc/tts"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
 	"math/rand"
@@ -111,7 +111,7 @@ func TestVolcTTSApp(t *testing.T) {
 }
 
 func GetVolcTTSApp() app.TTSApp {
-	return volc.NewVcMTTSApp("volc-test"+strconv.Itoa(rand.New(rand.NewSource(time.Now().Unix())).Int()), &app.TTSSetting{
+	return tts.NewVcMTTSApp("volc-test"+strconv.Itoa(rand.New(rand.NewSource(time.Now().Unix())).Int()), &app.TTSSetting{
 		Id:         GetTestConfig()["VCTTSAppId"].(string),
 		Provider:   GetTestConfig()["VCTTSAppProvider"].(string),
 		Url:        GetTestConfig()["VCTTSAppUrl"].(string),
