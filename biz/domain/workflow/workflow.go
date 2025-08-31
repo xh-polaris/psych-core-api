@@ -4,7 +4,8 @@ import (
 	"context"
 	"github.com/xh-polaris/psych-pkg/app"
 	_ "github.com/xh-polaris/psych-pkg/app/bailian"
-	_ "github.com/xh-polaris/psych-pkg/app/volc"
+	_ "github.com/xh-polaris/psych-pkg/app/volc/asr"
+	_ "github.com/xh-polaris/psych-pkg/app/volc/tts"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
 )
