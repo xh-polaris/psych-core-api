@@ -3,6 +3,7 @@ package workflow
 import (
 	"context"
 	"encoding/base64"
+
 	"github.com/xh-polaris/psych-pkg/app"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
@@ -47,7 +48,6 @@ func (p *ASRPipe) In() {
 					return // Optimize 这里暂时就直接退出, 后续加强可靠性后应该要偶发性错误不影响使用
 				}
 			}
-
 		}
 	}
 }
@@ -59,8 +59,8 @@ func (p *ASRPipe) Out() {
 
 	for {
 		// Optimize 这里会阻塞在ws上, 可能会出现下游ws关闭了才能重新进入select的问题导致阻塞实际过长
-		if text, err = p.asr.Receive(p.ctx); err != nil {
-			logx.CondError(!wsx.IsNormal(err), "[asr pipe] receive err: %v", err)
+		if text, err = p.asr.Receive(p.ctx); err != nil && !wsx.IsNormal(err) {
+			logx.Error("[asr pipe] receive err: %v", err)
 			p.unexpected(err)
 			return
 		}

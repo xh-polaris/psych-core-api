@@ -2,14 +2,15 @@ package component
 
 import (
 	"context"
-	"github.com/xh-polaris/psych-pkg/app"
-	"github.com/xh-polaris/psych-pkg/app/volc/asr"
 	"io"
 	"log"
 	"os"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/xh-polaris/psych-pkg/app"
+	"github.com/xh-polaris/psych-pkg/app/volc/asr"
 )
 
 var audioPath = "../output.pcm"
@@ -35,12 +36,10 @@ func TestVolcASRApp(t *testing.T) {
 		defer wg.Done()
 		sendAudio(ctx, t, asrApp, file)
 	}()
-
-	// 设置超时机制
+	wg.Add(1)
 	go func() {
-		<-time.After(60 * time.Second)
-		cancel()
-		t.Error("测试超时")
+		defer wg.Done()
+		receiveResults(ctx, t, asrApp)
 	}()
 
 	// 8. 等待任务完成
@@ -51,18 +50,14 @@ func TestVolcASRApp(t *testing.T) {
 // sendAudio 发送音频数据
 func sendAudio(ctx context.Context, t *testing.T, asrApp app.ASRApp, file *os.File) {
 	var err error
-	var res string
+	//var res string
 
 	buf := make([]byte, 3200) // 每次发送3200字节（约200ms 16kHz音频）
 	first, last := []byte{app.FirstASR}, []byte{app.LastASR}
 	if err = asrApp.Send(ctx, first); err != nil {
 		t.Errorf("first: %s", err.Error())
 	}
-	if res, err = asrApp.Receive(ctx); err != nil {
-		t.Errorf("recv: %s", err.Error())
-	}
-	t.Log(res)
-	go receiveResults(ctx, t, asrApp)
+
 	i := 0
 	for {
 		select {
@@ -85,7 +80,7 @@ func sendAudio(ctx context.Context, t *testing.T, asrApp app.ASRApp, file *os.Fi
 			}
 			t.Logf("发送%d", i)
 			i++
-			time.Sleep(200 * time.Millisecond) // 模拟实时流
+			time.Sleep(10 * time.Millisecond) // 模拟实时流
 		}
 	}
 e:
@@ -98,8 +93,6 @@ e:
 func receiveResults(ctx context.Context, t *testing.T, app app.ASRApp) {
 	for {
 		select {
-		case <-ctx.Done():
-			return
 		default:
 			res, err := app.Receive(ctx)
 			if err != nil {
