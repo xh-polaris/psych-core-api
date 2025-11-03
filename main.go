@@ -4,11 +4,14 @@ package main
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/middlewares/server/recovery"
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
+	prometheus "github.com/hertz-contrib/monitor-prometheus"
 	"github.com/hertz-contrib/obs-opentelemetry/tracing"
 	"github.com/xh-polaris/gopkg/hertz/middleware"
 	logx "github.com/xh-polaris/gopkg/util/log"
@@ -18,7 +21,6 @@ import (
 	"go.opentelemetry.io/contrib/propagators/b3"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
-	"net/http"
 )
 
 func Init() {
@@ -40,7 +42,7 @@ func main() {
 	// 创造hertz服务器实例
 	h := server.New(
 		server.WithHostPorts(c.ListenOn),
-		//server.WithTracer(prometheus.NewServerTracer(":9091", "/server/metrics")),
+		server.WithTracer(prometheus.NewServerTracer(":9091", "/server/metrics")),
 		tracer,
 	)
 

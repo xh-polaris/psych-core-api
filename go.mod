@@ -8,10 +8,10 @@ require (
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/cloudwego/hertz v0.10.2
 	github.com/cloudwego/kitex v0.14.1
-	github.com/cloudwego/prutal v0.1.2
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/wire v0.6.0
 	github.com/gorilla/websocket v1.5.3
+	github.com/hertz-contrib/monitor-prometheus v0.1.3
 	github.com/hertz-contrib/obs-opentelemetry/tracing v0.4.1
 	github.com/hertz-contrib/websocket v0.2.0
 	github.com/rabbitmq/amqp091-go v1.9.0
@@ -44,6 +44,7 @@ require (
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/cloudwego/localsession v0.1.2 // indirect
 	github.com/cloudwego/netpoll v0.7.1 // indirect
+	github.com/cloudwego/prutal v0.1.2 // indirect
 	github.com/cloudwego/runtimex v0.1.1 // indirect
 	github.com/cloudwego/thriftgo v0.4.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
