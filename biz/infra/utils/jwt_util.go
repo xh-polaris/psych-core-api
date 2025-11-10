@@ -5,7 +5,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/xh-polaris/psych-core-api/biz/domain/usr"
-	"github.com/xh-polaris/psych-core-api/biz/infra/config"
+	"github.com/xh-polaris/psych-core-api/biz/infra/conf"
 	"github.com/xh-polaris/psych-core-api/biz/infra/consts"
 	"github.com/xh-polaris/psych-pkg/httpx"
 )
@@ -16,7 +16,7 @@ func GenerateJwt(claims map[string]any) (string, error) {
 		mapClaims[k] = v
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodES256, mapClaims)
-	privateKey, err := jwt.ParseECPrivateKeyFromPEM([]byte(config.GetConfig().Auth.SecretKey))
+	privateKey, err := jwt.ParseECPrivateKeyFromPEM([]byte(conf.GetConfig().Auth.SecretKey))
 	if err != nil {
 		return "", err
 	}
@@ -25,7 +25,7 @@ func GenerateJwt(claims map[string]any) (string, error) {
 
 func ParseJwt(jwtStr string, options ...jwt.ParserOption) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(jwtStr, func(_ *jwt.Token) (interface{}, error) {
-		return jwt.ParseECPublicKeyFromPEM([]byte(config.GetConfig().Auth.PublicKey))
+		return jwt.ParseECPublicKeyFromPEM([]byte(conf.GetConfig().Auth.PublicKey))
 	}, options...)
 	if err != nil {
 		return nil, err

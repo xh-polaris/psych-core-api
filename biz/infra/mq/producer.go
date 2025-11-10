@@ -2,14 +2,15 @@ package mq
 
 import (
 	"encoding/json"
+	"sync"
+	"time"
+
 	"github.com/avast/retry-go"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"github.com/xh-polaris/psych-core-api/biz/infra/config"
+	"github.com/xh-polaris/psych-core-api/biz/infra/conf"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
 	"golang.org/x/net/context"
-	"sync"
-	"time"
 )
 
 // optimize 目前mq断连直接panic, 应该优化成降级本地缓存, 直至重连成功
@@ -26,7 +27,7 @@ var (
 func getConn() *amqp.Connection {
 	once.Do(func() {
 		var err error
-		url = config.GetConfig().RabbitMQ.Url
+		url = conf.GetConfig().RabbitMQ.Url
 		if conn, err = amqp.Dial(url); err != nil {
 			panic("[mq] connect failed:" + err.Error())
 		}
@@ -100,15 +101,15 @@ func GetPostProducer() *PostProducer {
 }
 
 // Produce 创建历史记录消息
-func (p *PostProducer) Produce(ctx context.Context, session string, info map[string]any, start, end time.Time, conf *core.Config) (err error) {
+func (p *PostProducer) Produce(ctx context.Context, session string, info map[string]any, start, end time.Time, config *core.Config) (err error) {
 	var payload []byte
 	// 构造消息体
-	msg := &core.PostNotify{Session: session, Info: info, Start: start.Unix(), End: end.Unix(), Config: conf}
+	msg := &core.PostNotify{Session: session, Info: info, Start: start.Unix(), End: end.Unix(), Config: config}
 	if payload, err = json.Marshal(msg); err != nil {
 		logx.Error("[mq producer] marshal post notify failed, err:%v", err.Error())
 		return err
 	}
-	if config.GetConfig().State == "test" { // debug 测试时不实践发布消息
+	if conf.GetConfig().State == "test" { // debug 测试时不实践发布消息
 		logx.Info("[mq producer] post notify %+v", string(payload))
 		return nil
 	}

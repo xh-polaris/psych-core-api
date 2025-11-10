@@ -30,16 +30,16 @@ func TestVolcASRApp(t *testing.T) {
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
 
+	err = asrApp.Dial(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// 发送协程
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		sendAudio(ctx, t, asrApp, file)
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		receiveResults(ctx, t, asrApp)
 	}()
 
 	// 8. 等待任务完成
@@ -49,14 +49,10 @@ func TestVolcASRApp(t *testing.T) {
 
 // sendAudio 发送音频数据
 func sendAudio(ctx context.Context, t *testing.T, asrApp app.ASRApp, file *os.File) {
-	var err error
 	//var res string
 
 	buf := make([]byte, 3200) // 每次发送3200字节（约200ms 16kHz音频）
-	first, last := []byte{app.FirstASR}, []byte{app.LastASR}
-	if err = asrApp.Send(ctx, first); err != nil {
-		t.Errorf("first: %s", err.Error())
-	}
+	last := []byte{app.LastASR}
 
 	i := 0
 	for {
@@ -94,7 +90,7 @@ func receiveResults(ctx context.Context, t *testing.T, app app.ASRApp) {
 	for {
 		select {
 		default:
-			res, err := app.Receive(ctx)
+			res, end, err := app.Receive(ctx)
 			if err != nil {
 				if err == io.EOF {
 					t.Log("连接正常关闭")
@@ -103,7 +99,10 @@ func receiveResults(ctx context.Context, t *testing.T, app app.ASRApp) {
 				t.Errorf("接收错误: %v", err)
 				return
 			}
-
+			if end {
+				t.Log("end")
+				return
+			}
 			if len(res) > 0 {
 				log.Printf("识别结果: %s", res)
 			}

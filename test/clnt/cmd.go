@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/xh-polaris/psych-pkg/app"
@@ -39,8 +40,8 @@ func SendCommandMessage(conn *websocket.Conn, meta *core.Meta, reader *bufio.Rea
 		if err != nil {
 			log.Fatalf("无法打开音频文件: %v", err)
 		}
-		buf := make([]byte, 12800) // 每次发送3200字节（约200ms 16kHz音频）
-		cmd.Content = first        // 首包
+		buf := make([]byte, 3200) // 每次发送3200字节（约200ms 16kHz音频）
+		cmd.Content = first       // 首包
 		if err = sendMessage(conn, meta, core.MCmd, &cmd); err != nil {
 			log.Println("发送命令失败:", err)
 		}
@@ -60,9 +61,7 @@ func SendCommandMessage(conn *websocket.Conn, meta *core.Meta, reader *bufio.Rea
 				log.Println("发送命令失败:", err)
 			}
 			i++
-			if i == 8 {
-				break
-			}
+			time.Sleep(100 * time.Millisecond)
 		}
 		cmd.Content = last // 尾包
 		if err = sendMessage(conn, meta, core.MCmd, &cmd); err != nil {

@@ -1,9 +1,15 @@
 package engine
 
 import (
+	_ "github.com/xh-polaris/psych-pkg/app/bailian"
+	_ "github.com/xh-polaris/psych-pkg/app/volc/asr"
+	_ "github.com/xh-polaris/psych-pkg/app/volc/tts"
+
 	"github.com/xh-polaris/psych-core-api/biz/infra/consts"
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
 	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
+	"github.com/xh-polaris/psych-core-api/pkg/errorx"
+	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-idl/kitex_gen/model"
 	"github.com/xh-polaris/psych-pkg/app"
 	"github.com/xh-polaris/psych-pkg/core"
@@ -11,7 +17,7 @@ import (
 )
 
 // config 配置app与workflow
-func (e *Engine) config() {
+func (e *Engine) config() error {
 	var err error
 	var conf *core.Config
 	var wfConf *core.WorkFlowConfig
@@ -22,30 +28,35 @@ func (e *Engine) config() {
 	req := &model.UnitAppConfigGetByUnitIdReq{UnitId: e.info[consts.UnitId].(string), Admin: true}
 	if configResp, err = pm.UnitAppConfigGetByUnitId(e.ctx, req); err != nil {
 		logx.Error("[engine] [%s] UnitAppConfigGetByUnitId err: %v", core.AConfig, err)
-		e.MWrite(core.MErr, consts.Err(consts.GetConfigFailed))
-		return
+		return e.MWrite(core.MErr, consts.Err(consts.GetConfigFailed))
 	}
 	// 构造配置
-	if conf, wfConf, err = e.buildConfig(configResp); err != nil {
-		logx.Error("[engine] [%s] buildConfig err: %v", core.AConfig, err)
-		e.MWrite(core.MErr, consts.Err(consts.GetConfigFailed))
-		return
+	conf, wfConf = e.buildConfig(configResp)
+
+	// 构造llm
+	if e.llm, err = app.NewChatApp(e.uSession, wfConf.ChatConfig); err != nil {
+		logx.Error("[workflow] [config] new chatApp err: %v", err)
+		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "llm"))
 	}
-	// 配置workflow
-	if err = e.workflow.Orchestrate(wfConf); err != nil {
-		logx.Error("[engine] [%s] workflow orchestrate err: %v", core.AConfig, err)
-		e.MWrite(core.MErr, consts.Err(consts.GetConfigFailed))
-		return
+	// 构造asr
+	if e.asr, err = app.NewASRApp(e.uSession, wfConf.ASRConfig); err != nil {
+		logx.Error("[workflow] [config] new asrApp err: %v", err)
+		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "asr"))
 	}
+	// 构造tts
+	if e.tts, err = app.NewTTSApp(e.uSession, wfConf.TTSConfig); err != nil {
+		logx.Error("[workflow] [config] new asrApp err: %v", err)
+		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "tts"))
+	}
+
 	// 返回前端
-	e.MWrite(core.MConfig, conf)
 	utils.DPrint("[engine] [config] workflow config: %+v\n conf: %+v\n", wfConf, conf)
+	return e.MWrite(core.MConfig, conf)
 }
 
 // 构造配置
-func (e *Engine) buildConfig(resp *model.UnitAppConfigGetByUnitIdResp) (*core.Config, *core.WorkFlowConfig, error) {
-	var err error
-	return buildClientConfig(resp), buildAppSetting(resp), err
+func (e *Engine) buildConfig(resp *model.UnitAppConfigGetByUnitIdResp) (*core.Config, *core.WorkFlowConfig) {
+	return buildClientConfig(resp), buildAppSetting(resp)
 }
 
 // 构造返回给客户端的配置

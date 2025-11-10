@@ -7,13 +7,13 @@
 package provider
 
 import (
-	"github.com/xh-polaris/psych-core-api/biz/infra/config"
+	"github.com/xh-polaris/psych-core-api/biz/infra/conf"
 )
 
 // Injectors from wire.go:
 
 func NewProvider() (*Provider, error) {
-	configConfig, err := config.NewConfig()
+	configConfig, err := conf.NewConfig()
 	if err != nil {
 		return nil, err
 	}

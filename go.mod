@@ -1,8 +1,6 @@
 module github.com/xh-polaris/psych-core-api
 
-go 1.24.0
-
-toolchain go1.24.4
+go 1.24.6
 
 require (
 	github.com/avast/retry-go v3.0.0+incompatible
@@ -17,15 +15,16 @@ require (
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/xh-polaris/gopkg v0.0.0-20250312141711-7327267f4ea6
 	github.com/xh-polaris/psych-idl v0.0.0-20250820121225-16219b2584b0
-	github.com/xh-polaris/psych-pkg v0.0.0-20250901111639-88875dceb125
+	github.com/xh-polaris/psych-pkg v0.0.0-20251110113018-e285dd2ea3ae
 	github.com/zeromicro/go-zero v1.9.0
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.62.0
 	go.opentelemetry.io/contrib/propagators/b3 v1.37.0
-	go.opentelemetry.io/otel v1.37.0
+	go.opentelemetry.io/otel v1.38.0
 	golang.org/x/net v0.43.0
 	google.golang.org/protobuf v1.36.7
 	gopkg.in/yaml.v3 v3.0.1
 )
+
+require go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -84,7 +83,7 @@ require (
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/redis/go-redis/v9 v9.12.1 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
-	github.com/stretchr/testify v1.10.0 // indirect
+	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
@@ -96,9 +95,9 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.24.0 // indirect
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.24.0 // indirect
 	go.opentelemetry.io/otel/exporters/zipkin v1.24.0 // indirect
-	go.opentelemetry.io/otel/metric v1.37.0 // indirect
-	go.opentelemetry.io/otel/sdk v1.37.0 // indirect
-	go.opentelemetry.io/otel/trace v1.37.0 // indirect
+	go.opentelemetry.io/otel/metric v1.38.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.38.0 // indirect
+	go.opentelemetry.io/otel/trace v1.38.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	golang.org/x/arch v0.20.0 // indirect

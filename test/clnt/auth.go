@@ -3,11 +3,12 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
+	"strings"
+
 	"github.com/gorilla/websocket"
 	"github.com/xh-polaris/psych-core-api/biz/infra/consts"
 	"github.com/xh-polaris/psych-pkg/core"
-	"log"
-	"strings"
 )
 
 var customUser = false
@@ -19,7 +20,7 @@ func SendAuthMessage(conn *websocket.Conn, meta *core.Meta, reader *bufio.Reader
 			AuthType:   authType2Int32["AuthStudentIdAndPwd"],
 			AuthID:     "hsdsfz2025",                                              //promptInput(reader, "请输入AuthID: "),
 			VerifyCode: "123456",                                                  //promptInput(reader, "请输入VerifyCode: "),
-			Info:       map[string]any{consts.UnitId: "68a14236ef1dc2bc4149606c"}, //make(map[string]any),
+			Info:       map[string]any{consts.UnitId: "683beddbdcc71f894d67e3b3"}, //make(map[string]any),
 		}
 	} else {
 		auth = core.Auth{

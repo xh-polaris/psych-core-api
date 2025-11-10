@@ -3,7 +3,7 @@ package rpc
 import (
 	"github.com/google/wire"
 	"github.com/xh-polaris/gopkg/kitex/client"
-	"github.com/xh-polaris/psych-core-api/biz/infra/config"
+	"github.com/xh-polaris/psych-core-api/biz/infra/conf"
 	model "github.com/xh-polaris/psych-idl/kitex_gen/model/psychmodelservice"
 	"sync"
 )
@@ -25,7 +25,7 @@ var PsychModelSet = wire.NewSet(
 	wire.Bind(new(IPsychModel), new(*PsychModel)),
 )
 
-func NewPsychModel(config *config.Config) model.Client {
+func NewPsychModel(config *conf.Config) model.Client {
 	pmOnce.Do(func() {
 		pmClnt = client.NewClient(config.Name, "psych.model", model.NewClient)
 	})
@@ -35,7 +35,7 @@ func NewPsychModel(config *config.Config) model.Client {
 func GetPsychModel() model.Client {
 	if pmClnt == nil {
 		pmOnce.Do(func() {
-			pmClnt = client.NewClient(config.GetConfig().Name, "psych.model", model.NewClient)
+			pmClnt = client.NewClient(conf.GetConfig().Name, "psych.model", model.NewClient)
 		})
 	}
 	return pmClnt

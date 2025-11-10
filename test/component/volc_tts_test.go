@@ -3,14 +3,15 @@ package component
 import (
 	"context"
 	"fmt"
-	"github.com/xh-polaris/psych-pkg/app"
-	"github.com/xh-polaris/psych-pkg/app/volc/tts"
-	"github.com/xh-polaris/psych-pkg/core"
-	"github.com/xh-polaris/psych-pkg/util/logx"
 	"math/rand"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/xh-polaris/psych-pkg/app"
+	"github.com/xh-polaris/psych-pkg/app/volc/tts"
+	"github.com/xh-polaris/psych-pkg/core"
+	"github.com/xh-polaris/psych-pkg/util/logx"
 )
 
 type TestTTSPipe struct {
@@ -88,12 +89,16 @@ func TestVolcTTSApp(t *testing.T) {
 			case <-closeCh:
 				return
 			default:
-				frame, err := tts.Receive(ctx)
+				frame, end, err := tts.Receive(ctx)
 				if err != nil {
 					t.Errorf("[tts app] receive err:%s", err)
 					return
 				}
 				fmt.Printf("[tts app] receive frame:%+v\n", frame)
+				if end {
+					t.Log("[tts app] end")
+					return
+				}
 			}
 		}
 	}()

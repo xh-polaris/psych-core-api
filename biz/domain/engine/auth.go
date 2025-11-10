@@ -9,13 +9,8 @@ import (
 	"github.com/xh-polaris/psych-pkg/util/logx"
 )
 
-// buildAuth
-func buildAuth(e *Engine) {
-	e.info = make(map[string]any)
-}
-
-// auth 验证用户信息, 串行
-func (e *Engine) auth(auth *core.Auth) bool {
+// auth 验证用户信息 [engine]
+func (e *Engine) auth(auth *core.Auth) (bool, error) {
 	var merr *core.Err
 	var alreadyAuth *core.Auth // 返回额外信息
 
@@ -27,13 +22,11 @@ func (e *Engine) auth(auth *core.Auth) bool {
 	}
 
 	if merr != nil {
-		e.MWrite(core.MErr, merr)
-		return false
+		return false, e.MWrite(core.MErr, merr)
 	}
 	e.info = alreadyAuth.Info
-	e.MWrite(core.MAuth, alreadyAuth)                                         // 前端收到Auth响应后, 需要显示配置中
 	utils.DPrint("[engine] [auth] info: %+v, merr: %+v\n", alreadyAuth, merr) // debug
-	return true
+	return true, e.MWrite(core.MAuth, alreadyAuth)                            // 前端收到Auth响应后, 需要显示配置中
 }
 
 // 已登录

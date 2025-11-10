@@ -56,13 +56,17 @@ func (p *ASRPipe) In() {
 func (p *ASRPipe) Out() {
 	var err error
 	var text string
+	var last bool
 
 	for {
 		// Optimize 这里会阻塞在ws上, 可能会出现下游ws关闭了才能重新进入select的问题导致阻塞实际过长
-		if text, err = p.asr.Receive(p.ctx); err != nil && !wsx.IsNormal(err) {
+		if text, last, err = p.asr.Receive(p.ctx); err != nil && !wsx.IsNormal(err) {
 			logx.Error("[asr pipe] receive err: %v", err)
 			p.unexpected(err)
 			return
+		}
+		if last {
+			break
 		}
 		select {
 		case <-p.ctx.Done():

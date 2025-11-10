@@ -1,9 +1,10 @@
-package config
+package conf
 
 import (
+	"os"
+
 	"github.com/zeromicro/go-zero/core/stores/cache"
 	"github.com/zeromicro/go-zero/core/stores/redis"
-	"os"
 
 	"github.com/zeromicro/go-zero/core/service"
 

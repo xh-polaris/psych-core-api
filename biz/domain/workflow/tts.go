@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+
 	"github.com/xh-polaris/psych-pkg/app"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
@@ -43,9 +44,9 @@ func (p *TTSPipe) In() {
 func (p *TTSPipe) Out() {
 	var err error
 	var audio []byte
-
+	var end bool
 	for {
-		audio, err = p.tts.Receive(p.ctx)
+		audio, end, err = p.tts.Receive(p.ctx)
 		select {
 		case <-p.ctx.Done():
 			return
@@ -60,6 +61,9 @@ func (p *TTSPipe) Out() {
 			} else if !wsx.IsNormal(err) {
 				logx.Error("[tts pipe] receive err:%v]", err)
 				p.unexpected(err)
+				return
+			}
+			if end {
 				return
 			}
 		}
