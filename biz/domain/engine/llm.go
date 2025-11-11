@@ -56,9 +56,9 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	// 返回给前端
 	go e.execLLMResponse(ctx, cmd.ID, ret, astMsg)
 	// 启用tts发送
-	go e.execTTS(ctx, tts)
+	go e.execTTS(ctx, cmd.ID, tts)
 	// 启用tts接收
-	go e.execTTSRecv(ctx)
+	go e.execTTSRecv(ctx, cmd.ID)
 	return err
 }
 
