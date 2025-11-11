@@ -1,4 +1,4 @@
-package utils
+package util
 
 import (
 	"google.golang.org/protobuf/proto"

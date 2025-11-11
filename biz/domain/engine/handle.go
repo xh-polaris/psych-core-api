@@ -1,7 +1,7 @@
 package engine
 
 import (
-	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-pkg/core"
@@ -26,9 +26,9 @@ func (e *Engine) handle(data []byte) (err error) {
 		return e.Write(core.DecodeMsgErr) // 解码失败要告知客户端错误消息
 	}
 
-	utils.DPrint("[engine] receive message: %+v\n", payload) // debug
+	util.DPrint("[engine] receive message: %+v\n", payload) // debug
 	if msg.Type == core.MAuth {
-		if auth, ok := utils.Convert[*core.Auth](payload); ok { // 认证消息
+		if auth, ok := util.Convert[*core.Auth](payload); ok { // 认证消息
 			if ok, err = e.auth(auth); err != nil {
 				e.unexpected(err, "auth")
 			} else if ok {

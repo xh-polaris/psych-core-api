@@ -10,7 +10,7 @@ import (
 	"github.com/hertz-contrib/websocket"
 	"github.com/xh-polaris/psych-core-api/biz/domain/his"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mq"
-	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-pkg/app"
 	"github.com/xh-polaris/psych-pkg/core"
@@ -64,7 +64,7 @@ func NewEngine(ctx context.Context, conn *websocket.Conn) *Engine {
 	//	}
 	//	return e.Close()
 	//})
-	utils.DPrint("[engine] [new] with session %s\n", e.uSession) // debug
+	util.DPrint("[engine] [new] with session %s\n", e.uSession) // debug
 	return e
 }
 
@@ -102,7 +102,7 @@ func (e *Engine) Run() {
 
 // init, 初始化, 主要与前端协商协议信息
 func (e *Engine) init() (err error) {
-	utils.DPrint("[engine] [init] meta: %+v\n", e.meta) //debug
+	util.DPrint("[engine] [init] meta: %+v\n", e.meta) //debug
 	if err = e.wsx.WriteJSON(e.meta); err != nil {
 		logx.CondError(!wsx.IsNormal(err), "[engine] protocol init error: %s\n", err) //debug
 	}
@@ -113,7 +113,7 @@ func (e *Engine) init() (err error) {
 func (e *Engine) unexpected(err error, cause string) {
 	var custom errorx.StatusError
 	if err != nil && (!errors.As(err, &custom) || custom.IsAffectStability()) && !wsx.IsNormal(err) { // 错误或影响稳定性
-		utils.DPrint("[engine] [unexpected] err: %s,cause: %s\n", err, cause)
+		util.DPrint("[engine] [unexpected] err: %s,cause: %s\n", err, cause)
 		_ = e.Close()
 	}
 	return

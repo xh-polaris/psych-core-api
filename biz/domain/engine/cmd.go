@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 
-	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-pkg/app"
@@ -28,7 +28,7 @@ func (e *Engine) execCmd(ctx context.Context, cmd *core.Cmd) (err error) {
 func (e *Engine) execASR(ctx context.Context, cmd *core.Cmd) (err error) {
 	// 解析命令内容
 	var audio []byte
-	if content, ok := utils.Convert[string](cmd.Content); !ok {
+	if content, ok := util.Convert[string](cmd.Content); !ok {
 		return errorx.New(errno.InvalidCmdContent)
 	} else if audio, err = base64.StdEncoding.DecodeString(content); err != nil {
 		return errorx.WrapByCode(err, errno.InvalidCmdContent)

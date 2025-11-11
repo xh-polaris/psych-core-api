@@ -3,12 +3,9 @@ package conf
 import (
 	"os"
 
-	"github.com/zeromicro/go-zero/core/stores/cache"
-	"github.com/zeromicro/go-zero/core/stores/redis"
-
-	"github.com/zeromicro/go-zero/core/service"
-
 	"github.com/zeromicro/go-zero/core/conf"
+	"github.com/zeromicro/go-zero/core/service"
+	"github.com/zeromicro/go-zero/core/stores/cache"
 )
 
 var config *Config
@@ -19,18 +16,29 @@ type Auth struct {
 	AccessExpire int64
 }
 
+type Cache struct {
+	Addr     string
+	Password string
+}
+
 type RabbitMQ struct {
-	Url string
+	URL string
+}
+
+type Mongo struct {
+	URL string
+	DB  string
 }
 
 type Config struct {
 	service.ServiceConf
-	ListenOn string
-	State    string
-	Auth     Auth
-	Cache    cache.CacheConf
-	Redis    *redis.RedisConf
-	RabbitMQ RabbitMQ
+	ListenOn  string
+	State     string
+	Auth      Auth
+	Cache     *Cache
+	CacheConf cache.CacheConf
+	RabbitMQ  *RabbitMQ
+	Mongo     *Mongo
 }
 
 func NewConfig() (*Config, error) {

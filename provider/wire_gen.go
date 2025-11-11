@@ -7,18 +7,24 @@
 package provider
 
 import (
-	"github.com/xh-polaris/psych-core-api/biz/infra/conf"
+	"github.com/xh-polaris/psych-core-api/biz/application/service"
+	"github.com/xh-polaris/psych-core-api/biz/conf"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 )
 
 // Injectors from wire.go:
 
 func NewProvider() (*Provider, error) {
-	configConfig, err := conf.NewConfig()
+	config, err := conf.NewConfig()
 	if err != nil {
 		return nil, err
 	}
+	authService := service.AuthService{}
+	mongoMapper := message.NewMessageMongoMapper(config)
 	providerProvider := &Provider{
-		Config: configConfig,
+		Config:        config,
+		AuthService:   authService,
+		MessageMapper: mongoMapper,
 	}
 	return providerProvider, nil
 }

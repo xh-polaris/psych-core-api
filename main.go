@@ -15,6 +15,7 @@ import (
 	"github.com/hertz-contrib/obs-opentelemetry/tracing"
 	"github.com/xh-polaris/gopkg/hertz/middleware"
 	logx "github.com/xh-polaris/gopkg/util/log"
+	"github.com/xh-polaris/psych-core-api/biz/application"
 	"github.com/xh-polaris/psych-core-api/provider"
 	"github.com/xh-polaris/psych-pkg/httpx"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -26,6 +27,7 @@ import (
 func Init() {
 	// 初始化依赖注入
 	provider.Init()
+	application.InitApplication()
 	// 初始化自定义日志
 	hlog.SetLogger(logx.NewHlogLogger())
 	// 设置openTelemetry的传播器，用于分布式追踪中传递上下文信息

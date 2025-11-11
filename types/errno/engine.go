@@ -11,6 +11,8 @@ const (
 	AppDialErr        = 999_001_002
 	AppSendErr        = 999_001_003
 	AppConfigErr      = 999_001_004
+
+	GetConfigErr = 999_002_001
 )
 
 func init() {
@@ -49,5 +51,10 @@ func init() {
 		AppConfigErr,
 		"{app}配置失败",
 		code.WithAffectStability(true),
+	)
+	code.Register(
+		GetConfigErr,
+		"获取模型配置失败",
+		code.WithAffectStability(false),
 	)
 }

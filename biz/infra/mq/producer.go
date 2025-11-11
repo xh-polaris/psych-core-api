@@ -7,7 +7,7 @@ import (
 
 	"github.com/avast/retry-go"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"github.com/xh-polaris/psych-core-api/biz/infra/conf"
+	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
 	"golang.org/x/net/context"
@@ -27,7 +27,7 @@ var (
 func getConn() *amqp.Connection {
 	once.Do(func() {
 		var err error
-		url = conf.GetConfig().RabbitMQ.Url
+		url = conf.GetConfig().RabbitMQ.URL
 		if conn, err = amqp.Dial(url); err != nil {
 			panic("[mq] connect failed:" + err.Error())
 		}

@@ -1,9 +1,11 @@
 package engine
 
 import (
-	"github.com/xh-polaris/psych-core-api/biz/infra/consts"
+	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
-	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
+	"github.com/xh-polaris/psych-core-api/pkg/errorx"
+	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-idl/kitex_gen/user"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
@@ -25,24 +27,24 @@ func (e *Engine) auth(auth *core.Auth) (bool, error) {
 		return false, e.MWrite(core.MErr, merr)
 	}
 	e.info = alreadyAuth.Info
-	utils.DPrint("[engine] [auth] info: %+v, merr: %+v\n", alreadyAuth, merr) // debug
-	return true, e.MWrite(core.MAuth, alreadyAuth)                            // 前端收到Auth响应后, 需要显示配置中
+	util.DPrint("[engine] [auth] info: %+v, merr: %+v\n", alreadyAuth, merr) // debug
+	return true, e.MWrite(core.MAuth, alreadyAuth)                           // 前端收到Auth响应后, 需要显示配置中
 }
 
 // 已登录
 func (e *Engine) already(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err) {
 	alreadyAuth = &core.Auth{}
-	claims, err := utils.ParseJwt(auth.VerifyCode)
+	claims, err := util.ParseJwt(auth.VerifyCode)
 	if err != nil {
-		return nil, consts.Err(consts.JwtAuthErr)
+		return nil, util.Err(errorx.WrapByCode(err, errno.InvalidAuth))
 	}
 	// 提取字段
 	alreadyAuth.Info = auth.Info
 	e.info = alreadyAuth.Info
-	e.info[consts.UnitId] = claims[consts.UnitId].(string)
-	e.info[consts.UserId] = claims[consts.UserId].(string)
-	e.info[consts.StudentId] = claims[consts.StudentId].(string)
-	e.info[consts.Strong] = claims[consts.Strong].(bool)
+	e.info[cst.JWTUnitId] = claims[cst.JWTUnitId].(string)
+	e.info[cst.UserId] = claims[cst.UserId].(string)
+	e.info[cst.StudentId] = claims[cst.StudentId].(string)
+	e.info[cst.Strong] = claims[cst.Strong].(bool)
 	return alreadyAuth, nil
 }
 
@@ -52,11 +54,11 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 	var getResp *user.UserGetInfoResp
 	pu, alreadyAuth := rpc.GetPsychUser(), &core.Auth{}
 	// 用户登录
-	sign := &user.UserSignInReq{UnitId: auth.Info[consts.UnitId].(string),
+	sign := &user.UserSignInReq{UnitId: auth.Info[cst.JWTUnitId].(string),
 		AuthType: auth.AuthType, AuthId: auth.AuthID, VerifyCode: auth.VerifyCode}
 	if signResp, err = pu.UserSignIn(e.ctx, sign); err != nil {
 		logx.Error("[engine] [%s] UserSignIn err: %v", core.AAuth, err)
-		merr = consts.Err(consts.InvalidAuth)
+		merr = util.Err(errorx.WrapByCode(err, errno.InvalidAuth))
 		return
 	}
 
@@ -64,20 +66,20 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 	get := &user.UserGetInfoReq{UserId: signResp.UserId, UnitId: &signResp.UnitId}
 	if getResp, err = pu.UserGetInfo(e.ctx, get); err != nil {
 		logx.Error("[engine] [%s] UserGetInfo err: %v", core.AAuth, err)
-		merr = consts.Err(consts.InvalidAuth)
+		merr = util.Err(errorx.WrapByCode(err, errno.InvalidAuth))
 		return
 	}
-	form, err := utils.Anypb2Any(getResp.Form)
+	form, err := util.Anypb2Any(getResp.Form)
 	if err != nil {
 		logx.Error("[engine] [%s] UserGetInfo err: %v", core.AAuth, err)
-		merr = consts.Err(consts.InvalidAuth)
+		merr = util.Err(errorx.WrapByCode(err, errno.InvalidAuth))
 		return
 	}
 	alreadyAuth.Info = form
-	alreadyAuth.Info[consts.UnitId] = signResp.UnitId
-	alreadyAuth.Info[consts.UserId] = signResp.UserId
-	alreadyAuth.Info[consts.StudentId] = *signResp.StudentId
-	alreadyAuth.Info[consts.Strong] = signResp.Strong
+	alreadyAuth.Info[cst.JWTUnitId] = signResp.UnitId
+	alreadyAuth.Info[cst.UserId] = signResp.UserId
+	alreadyAuth.Info[cst.StudentId] = *signResp.StudentId
+	alreadyAuth.Info[cst.Strong] = signResp.Strong
 	e.info = alreadyAuth.Info
 	return
 }

@@ -2,12 +2,15 @@ package service
 
 import (
 	"context"
+
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/domain/usr"
-	cst "github.com/xh-polaris/psych-core-api/biz/infra/consts"
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
-	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
+	"github.com/xh-polaris/psych-core-api/pkg/errorx"
+	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-idl/kitex_gen/user"
 	u "github.com/xh-polaris/psych-idl/kitex_gen/user"
 	"github.com/xh-polaris/psych-pkg/util/logx"
@@ -15,7 +18,8 @@ import (
 )
 
 type IAuthService interface {
-	SignIn(ctx context.Context, req *u.UserSignInReq) (resp *u.UserSignInResp, err error)
+	UserSignIn(ctx context.Context, req *core_api.UserSignInReq) (resp *core_api.UserSignInResp, err error)
+	UserGetInfo(ctx context.Context, _ *core_api.UserGetInfoReq) (resp *core_api.UserGetInfoResp, err error)
 }
 
 type AuthService struct {
@@ -36,14 +40,13 @@ func (s AuthService) UserSignIn(ctx context.Context, req *core_api.UserSignInReq
 		VerifyCode: req.VerifyCode,
 	})
 	if err != nil {
-		return nil, cst.InvalidAuth
+		return nil, errorx.New(errno.InvalidAuth)
 	}
 
-	jwt, err := utils.GenerateJwt(map[string]any{
-		cst.UnitId:    userResp.UnitId,
-		cst.UserId:    userResp.UserId,
-		cst.StudentId: userResp.StudentId,
-		cst.Strong:    userResp.Strong,
+	jwt, err := util.GenerateJwt(map[string]any{
+		cst.JWTUnitId:    userResp.UnitId,
+		cst.JWTUserId:    userResp.UserId,
+		cst.JWTStudentId: userResp.StudentId,
 	})
 
 	resp = &core_api.UserSignInResp{
@@ -61,8 +64,8 @@ func (s AuthService) UserSignIn(ctx context.Context, req *core_api.UserSignInReq
 
 func (s AuthService) UserGetInfo(ctx context.Context, _ *core_api.UserGetInfoReq) (resp *core_api.UserGetInfoResp, err error) {
 	var meta *usr.Meta
-	if meta, err = utils.ExtraUserMeta(ctx); err != nil {
-		return nil, cst.ExpireAuth
+	if meta, err = util.ExtraUserMeta(ctx); err != nil {
+		return nil, errorx.WrapByCode(err, errno.ExpireAuth)
 	}
 
 	// 获取用户信息
@@ -70,7 +73,7 @@ func (s AuthService) UserGetInfo(ctx context.Context, _ *core_api.UserGetInfoReq
 	getResp, err := rpc.GetPsychUser().UserGetInfo(ctx, get)
 	if err != nil {
 		logx.Error("[auth service] get user %s info err:", meta.UserId, err)
-		return nil, cst.ExpireAuth
+		return nil, errorx.WrapByCode(err, errno.ExpireAuth)
 	}
 	// 构造响应
 	r := &core_api.UserGetInfoResp{
@@ -87,7 +90,7 @@ func (s AuthService) UserGetInfo(ctx context.Context, _ *core_api.UserGetInfoReq
 		Code: 0,
 		Msg:  "success",
 	}
-	data, err := utils.Anypb2Any(getResp.Form)
+	data, err := util.Anypb2Any(getResp.Form)
 	if err != nil {
 		return nil, err
 	}
