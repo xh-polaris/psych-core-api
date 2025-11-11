@@ -70,7 +70,7 @@ func (e *Engine) execASRRecv(ctx context.Context) {
 	}
 }
 
-// TODO execLLM
 func (e *Engine) execLLM() {
+	// 获取历史记录
 
 }

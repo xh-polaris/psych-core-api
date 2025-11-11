@@ -52,7 +52,7 @@ func ExtraUserMeta(ctx context.Context) (m *usr.Meta, err error) {
 	}
 	meta.UserId = claims[cst.UserId].(string)
 	meta.UnitId = claims[cst.JWTUnitId].(string)
-	meta.StudentId = claims[cst.StudentId].(string)
+	meta.StudentId = claims[cst.JWTStudentId].(string)
 	meta.Strong = claims[cst.Strong].(bool)
 	return &meta, nil
 }

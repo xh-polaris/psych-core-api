@@ -1,8 +1,6 @@
 package workflow
 
 import (
-	"github.com/xh-polaris/psych-core-api/biz/conf"
-	"github.com/xh-polaris/psych-core-api/biz/infra/redis"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
@@ -18,8 +16,8 @@ type HistoryPipe struct {
 func NewHistoryPipe(close chan struct{}, session string) *HistoryPipe {
 	return &HistoryPipe{
 		session: session,
-		rs:      core.GetHisRedis(redis.NewRedis(conf.GetConfig())),
-		in:      core.NewChannel[*core.HisEntry](3, close),
+		//rs:      core.GetHisRedis(redis.NewRedis(conf.GetConfig())),
+		in: core.NewChannel[*core.HisEntry](3, close),
 	}
 }
 

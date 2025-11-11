@@ -39,6 +39,7 @@ type Config struct {
 	CacheConf cache.CacheConf
 	RabbitMQ  *RabbitMQ
 	Mongo     *Mongo
+	Coze      *Coze
 }
 
 func NewConfig() (*Config, error) {
