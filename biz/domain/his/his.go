@@ -28,7 +28,7 @@ func NewHistoryManager(cache cache.Cmdable, mapper message.MongoMapper) {
 	Mgr = &HistoryManager{cache: cache, mapper: mapper}
 }
 
-// RetrieveMessage 获取信息, size 小于等于0时取出所有
+// RetrieveMessage 获取消息, size 小于等于0时取出所有
 func (h *HistoryManager) RetrieveMessage(ctx context.Context, id string, size int) (msgs []*message.Message, err error) {
 	// retrieve cache
 	if msgs, err = h.RetrieveMessageFromCache(ctx, cachePrefix+id); err == nil {

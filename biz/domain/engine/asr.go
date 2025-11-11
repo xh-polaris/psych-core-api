@@ -9,20 +9,8 @@ import (
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-pkg/app"
 	"github.com/xh-polaris/psych-pkg/core"
+	"github.com/xh-polaris/psych-pkg/wsx"
 )
-
-// 执行命令
-func (e *Engine) execCmd(ctx context.Context, cmd *core.Cmd) (err error) {
-	switch cmd.Command {
-	case core.CUserAudioASR: // 音频识别
-		return e.execASR(ctx, cmd)
-	case core.CUserText: // 常规文本
-	case core.CUserAudio: // 暂不支持
-	default:
-		return errorx.New(errno.InvalidCmdContent)
-	}
-	return
-}
 
 // execASR 用于处理语音转文字命令(发送端) [engine]
 func (e *Engine) execASR(ctx context.Context, cmd *core.Cmd) (err error) {
@@ -56,7 +44,7 @@ func (e *Engine) execASRRecv(ctx context.Context) {
 			return
 		default:
 			text, last, err := e.asr.Receive(ctx)
-			if err != nil { // 出现问题, 需要结束整个链路
+			if err != nil && !wsx.IsNormal(err) { // 出现问题, 需要结束整个链路
 				e.unexpected(err, "asr receive err")
 				return
 			}
@@ -68,9 +56,4 @@ func (e *Engine) execASRRecv(ctx context.Context) {
 			}
 		}
 	}
-}
-
-func (e *Engine) execLLM() {
-	// 获取历史记录
-
 }

@@ -24,6 +24,8 @@ const (
 	CreateTime     = "create_time"
 	UpdateTime     = "update_time"
 	DeleteTime     = "delete_time"
+	UnitId         = "unit_id"
+	Code           = "code"
 
 	Status        = "status"
 	DeletedStatus = -1
@@ -37,13 +39,6 @@ const (
 	Search        = "$search"
 	Regex         = "$regex"
 	Options       = "$options"
-)
-
-const (
-	JWTUnitId    = "unitId"
-	JWTUserId    = "userId"
-	JWTStudentId = "studentId"
-	Strong       = "strong"
 )
 
 // Event中各种类型枚举值

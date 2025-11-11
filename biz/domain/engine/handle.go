@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"context"
+
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
@@ -41,11 +43,25 @@ func (e *Engine) handle(data []byte) (err error) {
 		return e.MWrite(core.MErr, core.Err{Code: 100_000_1, Message: "请先认证"})
 	}
 	switch msg.Type {
-	case core.MCmd: // 命令消息, cmd 过程目前是串行的, 但不排除后续有并行可能
+	case core.MCmd:
 		return e.execCmd(e.ctx, payload.(*core.Cmd))
 	case core.MPing: // Ping消息
 		return e.mockHeartbeat(payload.(*core.Ping))
 	default: // 不支持的消息
 		return e.Write(core.UnSupportErr)
 	}
+}
+
+// 执行命令
+func (e *Engine) execCmd(ctx context.Context, cmd *core.Cmd) (err error) {
+	switch cmd.Command {
+	case core.CUserAudioASR: // 音频识别
+		return e.execASR(ctx, cmd)
+	case core.CUserText: // 常规文本
+		return e.execLLM(ctx, cmd)
+	case core.CUserAudio: // 暂不支持
+	default:
+		return errorx.New(errno.InvalidCmdContent)
+	}
+	return
 }

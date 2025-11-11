@@ -9,6 +9,7 @@ import (
 	"github.com/xh-polaris/psych-idl/kitex_gen/user"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // auth 验证用户信息 [engine]
@@ -22,11 +23,15 @@ func (e *Engine) auth(auth *core.Auth) (bool, error) {
 	default:
 		alreadyAuth, merr = e.unAuth(auth)
 	}
-
 	if merr != nil {
 		return false, e.MWrite(core.MErr, merr)
 	}
 	e.info = alreadyAuth.Info
+	if cid, ok := alreadyAuth.Info[cst.ConversationId]; ok {
+		e.uSession = cid.(string)
+	} else {
+		e.uSession = primitive.NewObjectID().Hex()
+	}
 	util.DPrint("[engine] [auth] info: %+v, merr: %+v\n", alreadyAuth, merr) // debug
 	return true, e.MWrite(core.MAuth, alreadyAuth)                           // 前端收到Auth响应后, 需要显示配置中
 }
@@ -41,10 +46,9 @@ func (e *Engine) already(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Er
 	// 提取字段
 	alreadyAuth.Info = auth.Info
 	e.info = alreadyAuth.Info
-	e.info[cst.JWTUnitId] = claims[cst.JWTUnitId].(string)
+	e.info[cst.UnitId] = claims[cst.UnitId].(string)
 	e.info[cst.UserId] = claims[cst.UserId].(string)
-	e.info[cst.StudentId] = claims[cst.StudentId].(string)
-	e.info[cst.Strong] = claims[cst.Strong].(bool)
+	e.info[cst.Code] = claims[cst.Code].(string)
 	return alreadyAuth, nil
 }
 
@@ -54,7 +58,7 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 	var getResp *user.UserGetInfoResp
 	pu, alreadyAuth := rpc.GetPsychUser(), &core.Auth{}
 	// 用户登录
-	sign := &user.UserSignInReq{UnitId: auth.Info[cst.JWTUnitId].(string),
+	sign := &user.UserSignInReq{UnitId: auth.Info[cst.UnitId].(string),
 		AuthType: auth.AuthType, AuthId: auth.AuthID, VerifyCode: auth.VerifyCode}
 	if signResp, err = pu.UserSignIn(e.ctx, sign); err != nil {
 		logx.Error("[engine] [%s] UserSignIn err: %v", core.AAuth, err)
@@ -76,10 +80,9 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 		return
 	}
 	alreadyAuth.Info = form
-	alreadyAuth.Info[cst.JWTUnitId] = signResp.UnitId
+	alreadyAuth.Info[cst.UnitId] = signResp.UnitId
 	alreadyAuth.Info[cst.UserId] = signResp.UserId
-	alreadyAuth.Info[cst.StudentId] = *signResp.StudentId
-	alreadyAuth.Info[cst.Strong] = signResp.Strong
+	//alreadyAuth.Info[cst.Code] = *signResp.Code TODO
 	e.info = alreadyAuth.Info
 	return
 }

@@ -7,14 +7,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudwego/eino/components/model"
 	"github.com/hertz-contrib/websocket"
-	"github.com/xh-polaris/psych-core-api/biz/domain/his"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mq"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-pkg/app"
 	"github.com/xh-polaris/psych-pkg/core"
-	"github.com/xh-polaris/psych-pkg/util"
 	"github.com/xh-polaris/psych-pkg/util/logx"
 	"github.com/xh-polaris/psych-pkg/wsx"
 )
@@ -34,10 +33,10 @@ type Engine struct {
 	errs   chan error         // errs task线程错误收集
 
 	// 应用
-	asr app.ASRApp          // asr 管理文字转语音
-	tts app.TTSApp          // tts 管理语言转文字
-	llm app.ChatApp         // llm 管理大模型
-	his *his.HistoryManager // his 管理历史记录
+	asr       app.ASRApp                 // asr 管理文字转语音
+	tts       app.TTSApp                 // tts 管理语言转文字
+	llm       model.ToolCallingChatModel // llm 管理大模型
+	llmCancel context.CancelFunc         // 用于中断大模型输出
 
 	// ws 与前端的websocket链接
 	wsx             *wsx.HZWSClient // wsx 是与前端的连接
@@ -49,14 +48,14 @@ type Engine struct {
 	count    int            //对话轮数
 	info     map[string]any // 基本信息
 	isAuth   bool           // 是否认证
-	uSession string         // uSession 对话标识
+	uSession string         // uSession 对话ID
 	conf     *core.Config
 }
 
 // NewEngine 创建一个新的对话引擎
 func NewEngine(ctx context.Context, conn *websocket.Conn) *Engine {
-	ctx, cancel := util.NNCtxWithCancel(ctx)
-	e := &Engine{ctx: ctx, cancel: cancel, wsx: wsx.NewHZWSClient(conn), uSession: util.NewUID(),
+	ctx, cancel := context.WithCancel(ctx)
+	e := &Engine{ctx: ctx, cancel: cancel, wsx: wsx.NewHZWSClient(conn),
 		start: time.Now(), meta: meta, info: make(map[string]any), errs: make(chan error, 3)}
 	//e.wsx.SetCloseHandler(func(code int, text string) (err error) { // 处理close消息
 	//	if err = e.wsx.ControlClose(websocket.FormatCloseMessage(code, text)); err != nil { // 给客户端写回一个close消息
@@ -154,8 +153,8 @@ func (e *Engine) MWrite(t core.MType, payload any) (err error) {
 // Close 释放engine的资源
 func (e *Engine) Close() (err error) {
 	e.once.Do(func() {
-		// 关闭各个应用
-		appClose(e.asr, e.llm, e.tts)
+		// 关闭各个应用, llm无需关闭
+		appClose(e.asr, e.tts)
 		// 关闭子线程
 		e.cancel()
 		// 关闭主线程的ws连接

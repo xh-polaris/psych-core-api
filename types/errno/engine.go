@@ -13,6 +13,10 @@ const (
 	AppConfigErr      = 999_001_004
 
 	GetConfigErr = 999_002_001
+
+	RetrieveHisErr = 999_003_001
+	LLMStreamErr   = 999_003_002
+	AddUserMsgErr  = 999_003_003
 )
 
 func init() {
@@ -55,6 +59,21 @@ func init() {
 	code.Register(
 		GetConfigErr,
 		"获取模型配置失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		RetrieveHisErr,
+		"获取历史记录失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		LLMStreamErr,
+		"调用大模型失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		AddUserMsgErr,
+		"创建用户消息失败",
 		code.WithAffectStability(false),
 	)
 }

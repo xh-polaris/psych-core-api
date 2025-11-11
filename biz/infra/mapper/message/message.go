@@ -23,7 +23,7 @@ type Message struct {
 	Content        string             `json:"content" bson:"content"`                             // 消息内容, json字符串
 	ContentType    int32              `json:"content_type" bson:"content_type"`                   // 内容类型, text/think/suggest, 依次为0,1,2
 	MessageType    int32              `json:"message_type" bson:"message_type"`                   // 消息类型, 默认为text, 0
-	Ext            *Ext               `json:"ext" bson:"ext"`                                     // 额外信息
+	Ext            *Ext               `json:"ext,omitempty" bson:"ext,omitempty"`                 // 额外信息
 	Feedback       int32              `json:"feedback,omitempty" bson:"feedback,omitempty"`       // 反馈, 无/喜欢/踩/删除, 依次为0,1,2,3
 	Role           int32              `json:"role" bson:"role"`                                   // 角色, system/assistant/user/tool, 依次为0,1,2,3,4
 	CreateTime     time.Time          `json:"create_time" bson:"create_time"`                     // 创建时间
@@ -33,9 +33,9 @@ type Message struct {
 }
 
 type Ext struct {
-	BotState string `json:"bot_state" bson:"bot_state"`             // json字符串, 模型信息
-	Brief    string `json:"brief,omitempty" bson:"brief,omitempty"` // 内容备份
-	Think    string `json:"think,omitempty" bson:"think,omitempty"` // 深度思考内容
+	//BotState string `json:"bot_state" bson:"bot_state"`             // json字符串, 模型信息
+	//Brief    string `json:"brief,omitempty" bson:"brief,omitempty"` // 内容备份
+	//Think    string `json:"think,omitempty" bson:"think,omitempty"` // 深度思考内容
 	//Suggest         string        `json:"suggest,omitempty" bson:"suggest,omitempty"`         // 建议内容
 	//Cite            []*Cite       `json:"cite,omitempty" bson:"cite,omitempty"`               // 引用
 	//Code            []*Code       `json:"code,omitempty" bson:"code,omitempty"`               // 代码
