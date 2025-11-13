@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
 	_ "github.com/xh-polaris/psych-pkg/app/bailian"
 	_ "github.com/xh-polaris/psych-pkg/app/volc/asr"
 	_ "github.com/xh-polaris/psych-pkg/app/volc/tts"
@@ -10,7 +11,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
-	"github.com/xh-polaris/psych-idl/kitex_gen/model"
 	"github.com/xh-polaris/psych-pkg/app"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
@@ -21,12 +21,12 @@ func (e *Engine) config() error {
 	var err error
 	var conf *core.Config
 	var wfConf *core.WorkFlowConfig
-	var configResp *model.UnitAppConfigGetByUnitIdResp
-	pm := rpc.GetPsychModel()
+	var configResp *profile.ConfigGetByUnitIdResp
+	pm := rpc.GetPsychProfile()
 
 	// 获取配置
-	req := &model.UnitAppConfigGetByUnitIdReq{UnitId: e.info[consts.UnitId].(string), Admin: true}
-	if configResp, err = pm.UnitAppConfigGetByUnitId(e.ctx, req); err != nil {
+	req := &profile.ConfigGetByUnitIdReq{UnitId: e.info[consts.UnitId].(string), Admin: true}
+	if configResp, err = pm.ConfigGetByUnitID(e.ctx, req); err != nil {
 		logx.Error("[engine] [%s] UnitAppConfigGetByUnitId err: %v", core.AConfig, err)
 		return e.MWrite(core.MErr, consts.Err(consts.GetConfigFailed))
 	}
@@ -55,16 +55,19 @@ func (e *Engine) config() error {
 }
 
 // 构造配置
-func (e *Engine) buildConfig(resp *model.UnitAppConfigGetByUnitIdResp) (*core.Config, *core.WorkFlowConfig) {
-	return buildClientConfig(resp), buildAppSetting(resp)
+func (e *Engine) buildConfig(resp *profile.ConfigGetByUnitIdResp) (*core.Config, *core.WorkFlowConfig) {
+	return &core.Config{}, buildAppSetting(resp)
 }
 
 // 构造返回给客户端的配置
-func buildClientConfig(resp *model.UnitAppConfigGetByUnitIdResp) *core.Config {
+// Deprecated
+/* Resp中待用字段：
+- resp.Config.UnitId
+- resp.Config.Type string 需转化枚举值 chain | end2end
+func buildClientConfig(resp *profile.ConfigGetByUnitIdResp) *core.Config {
 	config := &core.Config{
-		Id:        resp.UnitAppConfig.Id,
-		ModelName: resp.UnitAppConfig.Name,
-		ModelView: resp.UnitAppConfig.View,
+		Id:        resp.Config.UnitId,
+
 	}
 	for _, one := range resp.Apps {
 		switch one.Type {
@@ -105,83 +108,136 @@ func buildClientConfig(resp *model.UnitAppConfigGetByUnitIdResp) *core.Config {
 	}
 	return config
 }
+*/
 
+// Deprecated
+/*
 // 构造模型app的Setting
-func buildAppSetting(resp *model.UnitAppConfigGetByUnitIdResp) *core.WorkFlowConfig {
-	var wfConfig core.WorkFlowConfig
-	for _, one := range resp.Apps {
-		switch one.Type {
-		case consts.ChatApp:
-			chatApp := one.GetChatApp()
-			wfConfig.ChatConfig = &app.ChatSetting{
-				Id:        chatApp.App.Id,
-				Provider:  chatApp.App.Provider,
-				Url:       chatApp.App.Url,
-				AppId:     chatApp.App.AppId,
-				AccessKey: chatApp.App.AccessKey,
-			}
-		case consts.TtsApp:
-			ttsApp := one.GetTtsApp()
-			wfConfig.TTSConfig = &app.TTSSetting{
-				Id:         ttsApp.App.Id,
-				Provider:   ttsApp.App.Provider,
-				Url:        ttsApp.App.Url,
-				AppID:      ttsApp.App.AppId,
-				AccessKey:  ttsApp.App.AccessKey,
-				Namespace:  ttsApp.Namespace,
-				Speaker:    ttsApp.Speaker,
-				ResourceId: ttsApp.ResourceId,
-				AudioParams: struct {
-					Format       string `json:"format"`
-					Codec        string `json:"codec"`
-					Rate         int32  `json:"rate"`
-					Bits         int32  `json:"bits"`
-					Channels     int    `json:"channels"`
-					SpeechRate   int32  `json:"speech_rate"`
-					LoudnessRate int32  `json:"loudness_rate"`
-					Lang         string `json:"lang"`
-					ResultType   string `json:"result_type"`
-				}{
-					Format:       ttsApp.AudioParams.Format,
-					Codec:        ttsApp.AudioParams.Codec,
-					Rate:         ttsApp.AudioParams.Rate,
-					Bits:         ttsApp.AudioParams.Bits,
-					Channels:     int(ttsApp.AudioParams.Channels),
-					SpeechRate:   ttsApp.AudioParams.SpeechRate,
-					LoudnessRate: ttsApp.AudioParams.LoudnessRate,
-					Lang:         ttsApp.AudioParams.Lang,
-					ResultType:   ttsApp.AudioParams.ResultType,
-				},
-			}
-		case consts.AsrApp:
-			asrApp := one.GetAsrApp()
-			wfConfig.ASRConfig = &app.ASRSetting{
-				Id:         asrApp.App.Id,
-				Provider:   asrApp.App.Provider,
-				Url:        asrApp.App.Url,
-				AppID:      asrApp.App.AppId,
-				AccessKey:  asrApp.App.AccessKey,
-				ResourceId: asrApp.ResourceId,
-				Format:     asrApp.Format,
-				Codec:      asrApp.Codec,
-				Rate:       int(asrApp.Rate),
-				Bits:       int(asrApp.Bits),
-				Channels:   int(asrApp.Channels),
-				ModelName:  asrApp.ModelName,
-				EnablePunc: asrApp.EnablePunc,
-				EnableDdc:  asrApp.EnableDdc,
-				ResultType: asrApp.ResultType,
-			}
-		case consts.ReportApp:
-			reportApp := one.GetReportApp()
-			wfConfig.ReportConfig = &app.ReportSetting{
-				Id:        reportApp.App.Id,
-				Provider:  reportApp.App.Provider,
-				Url:       reportApp.App.Url,
-				AppId:     reportApp.App.AppId,
-				AccessKey: reportApp.App.AccessKey,
+
+	func buildAppSetting(resp *profile.ConfigGetByUnitIdResp) *core.WorkFlowConfig {
+		var wfConfig core.WorkFlowConfig
+		for _, one := range resp.Apps {
+			switch one.Type {
+			case consts.ChatApp:
+				chatApp := one.GetChatApp()
+				wfConfig.ChatConfig = &app.ChatSetting{
+					Id:        chatApp.App.Id,
+					Provider:  chatApp.App.Provider,
+					Url:       chatApp.App.Url,
+					AppId:     chatApp.App.AppId,
+					AccessKey: chatApp.App.AccessKey,
+				}
+			case consts.TtsApp:
+				ttsApp := one.GetTtsApp()
+				wfConfig.TTSConfig = &app.TTSSetting{
+					Id:         ttsApp.App.Id,
+					Provider:   ttsApp.App.Provider,
+					Url:        ttsApp.App.Url,
+					AppID:      ttsApp.App.AppId,
+					AccessKey:  ttsApp.App.AccessKey,
+					Namespace:  ttsApp.Namespace,
+					Speaker:    ttsApp.Speaker,
+					ResourceId: ttsApp.ResourceId,
+					AudioParams: struct {
+						Format       string `json:"format"`
+						Codec        string `json:"codec"`
+						Rate         int32  `json:"rate"`
+						Bits         int32  `json:"bits"`
+						Channels     int    `json:"channels"`
+						SpeechRate   int32  `json:"speech_rate"`
+						LoudnessRate int32  `json:"loudness_rate"`
+						Lang         string `json:"lang"`
+						ResultType   string `json:"result_type"`
+					}{
+						Format:       ttsApp.AudioParams.Format,
+						Codec:        ttsApp.AudioParams.Codec,
+						Rate:         ttsApp.AudioParams.Rate,
+						Bits:         ttsApp.AudioParams.Bits,
+						Channels:     int(ttsApp.AudioParams.Channels),
+						SpeechRate:   ttsApp.AudioParams.SpeechRate,
+						LoudnessRate: ttsApp.AudioParams.LoudnessRate,
+						Lang:         ttsApp.AudioParams.Lang,
+						ResultType:   ttsApp.AudioParams.ResultType,
+					},
+				}
+			case consts.AsrApp:
+				asrApp := one.GetAsrApp()
+				wfConfig.ASRConfig = &app.ASRSetting{
+					Id:         asrApp.App.Id,
+					Provider:   asrApp.App.Provider,
+					Url:        asrApp.App.Url,
+					AppID:      asrApp.App.AppId,
+					AccessKey:  asrApp.App.AccessKey,
+					ResourceId: asrApp.ResourceId,
+					Format:     asrApp.Format,
+					Codec:      asrApp.Codec,
+					Rate:       int(asrApp.Rate),
+					Bits:       int(asrApp.Bits),
+					Channels:   int(asrApp.Channels),
+					ModelName:  asrApp.ModelName,
+					EnablePunc: asrApp.EnablePunc,
+					EnableDdc:  asrApp.EnableDdc,
+					ResultType: asrApp.ResultType,
+				}
+			case consts.ReportApp:
+				reportApp := one.GetReportApp()
+				wfConfig.ReportConfig = &app.ReportSetting{
+					Id:        reportApp.App.Id,
+					Provider:  reportApp.App.Provider,
+					Url:       reportApp.App.Url,
+					AppId:     reportApp.App.AppId,
+					AccessKey: reportApp.App.AccessKey,
+				}
 			}
 		}
+		return &wfConfig
 	}
+*/
+
+func buildAppSetting(resp *profile.ConfigGetByUnitIdResp) *core.WorkFlowConfig {
+	config := resp.Config
+	// 响应中的配置字段（4条）
+	//    Name        string
+	//    Description string
+	//    Provider    string
+	//    AppId       string
+
+	if config == nil {
+		return &core.WorkFlowConfig{}
+	}
+
+	var wfConfig core.WorkFlowConfig
+	// 确定有效的字段更改：Provider和AppId
+
+	// 处理 Chat 配置
+	if config.Chat != nil {
+		wfConfig.ChatConfig = &app.ChatSetting{
+			Id:       config.Chat.Name, // TODO:Id就用模型名？
+			Provider: config.Chat.Provider,
+			AppId:    config.Chat.AppId,
+			// TODO: Url, AccessKey ?
+		}
+	}
+
+	// 处理 TTS 配置
+	if config.Tts != nil {
+		wfConfig.TTSConfig = &app.TTSSetting{
+			Id:       config.Tts.Name, // TODO:Id就用模型名？
+			Provider: config.Tts.Provider,
+			AppID:    config.Tts.AppId,
+			// TODO: Url, AccessKey, Namespace, Speaker, ResourceId 和 AudioParams 需要从其他途径获取？
+		}
+	}
+
+	// 处理 Report 配置
+	if config.Report != nil {
+		wfConfig.ReportConfig = &app.ReportSetting{
+			Id:       config.Report.Name, // TODO:Id就用模型名？
+			Provider: config.Report.Provider,
+			AppId:    config.Report.AppId,
+			// TODO: Url 和 AccessKey 需要从其他途径获取？
+		}
+	}
+
 	return &wfConfig
 }
