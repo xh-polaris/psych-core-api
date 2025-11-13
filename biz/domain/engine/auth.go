@@ -51,6 +51,7 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 	var signResp *profile.UserSignInResp
 	var getResp *profile.UserGetInfoResp
 	pp, alreadyAuth := rpc.GetPsychProfile(), &core.Auth{}
+	
 	// 获得枚举值
 	authTypeStr, ok := enum.GetAuthType(int(auth.AuthType))
 	if !ok {
@@ -81,13 +82,14 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 		merr = cst.Err(cst.InvalidAuth)
 		return
 	}
-	//form, err := utils.Anypb2Any(getResp.Form)
-	//if err != nil {
-	//	logx.Error("[engine] [%s] UserGetInfo err: %v", core.AAuth, err)
-	//	merr = cst.Err(cst.InvalidAuth)
-	//	return
-	//}
-	//alreadyAuth.Info = form
+
+	// 转换Options
+	alreadyAuth.Info, err = utils.Anypb2Any(getResp.User.Options)
+	if err != nil {
+		logx.Error("[engine] [%s] UserGetInfo err: %v", core.AAuth, err)
+		merr = cst.Err(cst.InvalidAuth)
+		return
+	}
 	alreadyAuth.Info[cst.UnitId] = signResp.UnitId
 	alreadyAuth.Info[cst.UserId] = signResp.UserId
 	alreadyAuth.Info[cst.Code] = getResp.User.Code
