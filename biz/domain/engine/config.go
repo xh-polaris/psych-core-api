@@ -5,7 +5,7 @@ import (
 	_ "github.com/xh-polaris/psych-pkg/app/volc/asr"
 	_ "github.com/xh-polaris/psych-pkg/app/volc/tts"
 
-	"github.com/xh-polaris/psych-core-api/biz/infra/consts"
+	"github.com/xh-polaris/psych-core-api/biz/infra/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
 	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
@@ -25,10 +25,10 @@ func (e *Engine) config() error {
 	pm := rpc.GetPsychModel()
 
 	// 获取配置
-	req := &model.UnitAppConfigGetByUnitIdReq{UnitId: e.info[consts.UnitId].(string), Admin: true}
+	req := &model.UnitAppConfigGetByUnitIdReq{UnitId: e.info[cst.UnitId].(string), Admin: true}
 	if configResp, err = pm.UnitAppConfigGetByUnitId(e.ctx, req); err != nil {
 		logx.Error("[engine] [%s] UnitAppConfigGetByUnitId err: %v", core.AConfig, err)
-		return e.MWrite(core.MErr, consts.Err(consts.GetConfigFailed))
+		return e.MWrite(core.MErr, cst.Err(cst.GetConfigFailed))
 	}
 	// 构造配置
 	conf, wfConf = e.buildConfig(configResp)
@@ -68,10 +68,10 @@ func buildClientConfig(resp *model.UnitAppConfigGetByUnitIdResp) *core.Config {
 	}
 	for _, one := range resp.Apps {
 		switch one.Type {
-		case consts.ChatApp:
+		case cst.ChatApp:
 			chatApp := one.GetChatApp()
 			config.ChatConfig = core.ChatConfig{Id: chatApp.App.Id}
-		case consts.TtsApp:
+		case cst.TtsApp:
 			ttsApp := one.GetTtsApp()
 			config.TTSConfig = core.TTSConfig{
 				Id:           ttsApp.App.Id,
@@ -85,7 +85,7 @@ func buildClientConfig(resp *model.UnitAppConfigGetByUnitIdResp) *core.Config {
 				LoudnessRate: float32(ttsApp.AudioParams.LoudnessRate),
 				Lang:         ttsApp.AudioParams.Lang,
 			}
-		case consts.AsrApp:
+		case cst.AsrApp:
 			asrApp := one.GetAsrApp()
 			config.ASRConfig = core.ASRConfig{
 				Id:         asrApp.App.Id,
@@ -96,7 +96,7 @@ func buildClientConfig(resp *model.UnitAppConfigGetByUnitIdResp) *core.Config {
 				Channels:   int(asrApp.Channels),
 				ResultType: asrApp.ResultType,
 			}
-		case consts.ReportApp:
+		case cst.ReportApp:
 			reportApp := one.GetReportApp()
 			config.ReportConfig = core.ReportConfig{
 				Id: reportApp.App.Id,
@@ -111,7 +111,7 @@ func buildAppSetting(resp *model.UnitAppConfigGetByUnitIdResp) *core.WorkFlowCon
 	var wfConfig core.WorkFlowConfig
 	for _, one := range resp.Apps {
 		switch one.Type {
-		case consts.ChatApp:
+		case cst.ChatApp:
 			chatApp := one.GetChatApp()
 			wfConfig.ChatConfig = &app.ChatSetting{
 				Id:        chatApp.App.Id,
@@ -120,7 +120,7 @@ func buildAppSetting(resp *model.UnitAppConfigGetByUnitIdResp) *core.WorkFlowCon
 				AppId:     chatApp.App.AppId,
 				AccessKey: chatApp.App.AccessKey,
 			}
-		case consts.TtsApp:
+		case cst.TtsApp:
 			ttsApp := one.GetTtsApp()
 			wfConfig.TTSConfig = &app.TTSSetting{
 				Id:         ttsApp.App.Id,
@@ -153,7 +153,7 @@ func buildAppSetting(resp *model.UnitAppConfigGetByUnitIdResp) *core.WorkFlowCon
 					ResultType:   ttsApp.AudioParams.ResultType,
 				},
 			}
-		case consts.AsrApp:
+		case cst.AsrApp:
 			asrApp := one.GetAsrApp()
 			wfConfig.ASRConfig = &app.ASRSetting{
 				Id:         asrApp.App.Id,
@@ -172,7 +172,7 @@ func buildAppSetting(resp *model.UnitAppConfigGetByUnitIdResp) *core.WorkFlowCon
 				EnableDdc:  asrApp.EnableDdc,
 				ResultType: asrApp.ResultType,
 			}
-		case consts.ReportApp:
+		case cst.ReportApp:
 			reportApp := one.GetReportApp()
 			wfConfig.ReportConfig = &app.ReportSetting{
 				Id:        reportApp.App.Id,

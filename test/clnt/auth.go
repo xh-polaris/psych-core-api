@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/websocket"
-	"github.com/xh-polaris/psych-core-api/biz/infra/consts"
+	"github.com/xh-polaris/psych-core-api/biz/infra/cst"
 	"github.com/xh-polaris/psych-pkg/core"
 )
 
@@ -18,9 +18,9 @@ func SendAuthMessage(conn *websocket.Conn, meta *core.Meta, reader *bufio.Reader
 	if !customUser {
 		auth = core.Auth{
 			AuthType:   authType2Int32["AuthStudentIdAndPwd"],
-			AuthID:     "hsdsfz2025",                                              //promptInput(reader, "请输入AuthID: "),
-			VerifyCode: "123456",                                                  //promptInput(reader, "请输入VerifyCode: "),
-			Info:       map[string]any{consts.UnitId: "683beddbdcc71f894d67e3b3"}, //make(map[string]any),
+			AuthID:     "hsdsfz2025",                                           //promptInput(reader, "请输入AuthID: "),
+			VerifyCode: "123456",                                               //promptInput(reader, "请输入VerifyCode: "),
+			Info:       map[string]any{cst.UnitId: "683beddbdcc71f894d67e3b3"}, //make(map[string]any),
 		}
 	} else {
 		auth = core.Auth{
