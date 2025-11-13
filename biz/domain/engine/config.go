@@ -6,7 +6,7 @@ import (
 	_ "github.com/xh-polaris/psych-pkg/app/volc/asr"
 	_ "github.com/xh-polaris/psych-pkg/app/volc/tts"
 
-	"github.com/xh-polaris/psych-core-api/biz/infra/cst"
+	"github.com/xh-polaris/psych-core-api/biz/infra/consts"
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
 	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
@@ -28,7 +28,7 @@ func (e *Engine) config() error {
 	req := &profile.ConfigGetByUnitIdReq{UnitId: e.info[consts.UnitId].(string), Admin: true}
 	if configResp, err = pm.ConfigGetByUnitID(e.ctx, req); err != nil {
 		logx.Error("[engine] [%s] UnitAppConfigGetByUnitId err: %v", core.AConfig, err)
-		return e.MWrite(core.MErr, cst.Err(cst.GetConfigFailed))
+		return e.MWrite(core.MErr, consts.Err(consts.GetConfigFailed))
 	}
 	// 构造配置
 	conf, wfConf = e.buildConfig(configResp)
@@ -71,10 +71,10 @@ func buildClientConfig(resp *profile.ConfigGetByUnitIdResp) *core.Config {
 	}
 	for _, one := range resp.Apps {
 		switch one.Type {
-		case cst.ChatApp:
+		case consts.ChatApp:
 			chatApp := one.GetChatApp()
 			config.ChatConfig = core.ChatConfig{Id: chatApp.App.Id}
-		case cst.TtsApp:
+		case consts.TtsApp:
 			ttsApp := one.GetTtsApp()
 			config.TTSConfig = core.TTSConfig{
 				Id:           ttsApp.App.Id,
@@ -88,7 +88,7 @@ func buildClientConfig(resp *profile.ConfigGetByUnitIdResp) *core.Config {
 				LoudnessRate: float32(ttsApp.AudioParams.LoudnessRate),
 				Lang:         ttsApp.AudioParams.Lang,
 			}
-		case cst.AsrApp:
+		case consts.AsrApp:
 			asrApp := one.GetAsrApp()
 			config.ASRConfig = core.ASRConfig{
 				Id:         asrApp.App.Id,
@@ -99,7 +99,7 @@ func buildClientConfig(resp *profile.ConfigGetByUnitIdResp) *core.Config {
 				Channels:   int(asrApp.Channels),
 				ResultType: asrApp.ResultType,
 			}
-		case cst.ReportApp:
+		case consts.ReportApp:
 			reportApp := one.GetReportApp()
 			config.ReportConfig = core.ReportConfig{
 				Id: reportApp.App.Id,
