@@ -5,8 +5,6 @@ const (
 	UserId   = "userId"
 	CodeType = "codeType"
 	Code     = "code"
-	Strong   = "strong"
-	Form     = "form"
 )
 
 // app type
@@ -16,10 +14,4 @@ const (
 	TtsApp    = 1
 	AsrApp    = 2
 	ReportApp = 3
-)
-
-// auth type
-const (
-	AuthTypePassword = 0
-	AuthTypeCode     = 1
 )

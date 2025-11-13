@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/xh-polaris/psych-core-api/biz/domain/usr"
@@ -49,7 +50,6 @@ func ExtraUserMeta(ctx context.Context) (m *usr.Meta, err error) {
 	}
 	meta.UserId = claims[cst.UserId].(string)
 	meta.UnitId = claims[cst.UnitId].(string)
-	meta.StudentId = claims[cst.StudentId].(string)
-	meta.Strong = claims[cst.Strong].(bool)
+	meta.Code = claims[cst.Code].(string)
 	return &meta, nil
 }
