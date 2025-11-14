@@ -1,4 +1,4 @@
-package consts
+package cst
 
 import (
 	"github.com/xh-polaris/psych-pkg/core"

@@ -28,7 +28,7 @@ func Get() *Provider {
 }
 
 var RpcSet = wire.NewSet(
-	rpc.NewPsychUser,
+	rpc.NewPsychProfile,
 )
 
 var ApplicationSet = wire.NewSet()

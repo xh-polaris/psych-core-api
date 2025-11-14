@@ -1,10 +1,11 @@
 package engine
 
 import (
-	"github.com/xh-polaris/psych-core-api/biz/infra/consts"
+	"github.com/xh-polaris/psych-core-api/biz/infra/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
 	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
-	"github.com/xh-polaris/psych-idl/kitex_gen/user"
+	"github.com/xh-polaris/psych-core-api/biz/infra/utils/enum"
+	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
 )
@@ -34,50 +35,64 @@ func (e *Engine) already(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Er
 	alreadyAuth = &core.Auth{}
 	claims, err := utils.ParseJwt(auth.VerifyCode)
 	if err != nil {
-		return nil, consts.Err(consts.JwtAuthErr)
+		return nil, cst.Err(cst.JwtAuthErr)
 	}
 	// 提取字段
 	alreadyAuth.Info = auth.Info
 	e.info = alreadyAuth.Info
-	e.info[consts.UnitId] = claims[consts.UnitId].(string)
-	e.info[consts.UserId] = claims[consts.UserId].(string)
-	e.info[consts.StudentId] = claims[consts.StudentId].(string)
-	e.info[consts.Strong] = claims[consts.Strong].(bool)
+	e.info[cst.UnitId] = claims[cst.UnitId].(string)
+	e.info[cst.UserId] = claims[cst.UserId].(string)
+	e.info[cst.Code] = claims[cst.Code].(string)
 	return alreadyAuth, nil
 }
 
 func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err) {
 	var err error
-	var signResp *user.UserSignInResp
-	var getResp *user.UserGetInfoResp
-	pu, alreadyAuth := rpc.GetPsychUser(), &core.Auth{}
+	var signResp *profile.UserSignInResp
+	var getResp *profile.UserGetInfoResp
+	pp, alreadyAuth := rpc.GetPsychProfile(), &core.Auth{}
+	
+	// 获得枚举值
+	authTypeStr, ok := enum.GetAuthType(int(auth.AuthType))
+	if !ok {
+		logx.Error("[engine] [%s] AuthType not found: %d", core.AAuth, auth.AuthType)
+		merr = cst.Err(cst.InvalidAuth)
+		return
+	}
+
 	// 用户登录
-	sign := &user.UserSignInReq{UnitId: auth.Info[consts.UnitId].(string),
-		AuthType: auth.AuthType, AuthId: auth.AuthID, VerifyCode: auth.VerifyCode}
-	if signResp, err = pu.UserSignIn(e.ctx, sign); err != nil {
+	sign := &profile.UserSignInReq{
+		UnitId:    auth.Info[cst.UnitId].(string),
+		AuthType:  authTypeStr,
+		AuthId:    auth.AuthID,
+		AuthValue: auth.VerifyCode,
+	}
+	if signResp, err = pp.UserSignIn(e.ctx, sign); err != nil {
 		logx.Error("[engine] [%s] UserSignIn err: %v", core.AAuth, err)
-		merr = consts.Err(consts.InvalidAuth)
+		merr = cst.Err(cst.InvalidAuth)
 		return
 	}
 
 	// 获取用户信息
-	get := &user.UserGetInfoReq{UserId: signResp.UserId, UnitId: &signResp.UnitId}
-	if getResp, err = pu.UserGetInfo(e.ctx, get); err != nil {
+	get := &profile.UserGetInfoReq{
+		UserId: signResp.UserId,
+	}
+	if getResp, err = pp.UserGetInfo(e.ctx, get); err != nil {
 		logx.Error("[engine] [%s] UserGetInfo err: %v", core.AAuth, err)
-		merr = consts.Err(consts.InvalidAuth)
+		merr = cst.Err(cst.InvalidAuth)
 		return
 	}
-	form, err := utils.Anypb2Any(getResp.Form)
+
+	// 转换Options
+	alreadyAuth.Info, err = utils.Anypb2Any(getResp.User.Options)
 	if err != nil {
 		logx.Error("[engine] [%s] UserGetInfo err: %v", core.AAuth, err)
-		merr = consts.Err(consts.InvalidAuth)
+		merr = cst.Err(cst.InvalidAuth)
 		return
 	}
-	alreadyAuth.Info = form
-	alreadyAuth.Info[consts.UnitId] = signResp.UnitId
-	alreadyAuth.Info[consts.UserId] = signResp.UserId
-	alreadyAuth.Info[consts.StudentId] = *signResp.StudentId
-	alreadyAuth.Info[consts.Strong] = signResp.Strong
+	alreadyAuth.Info[cst.UnitId] = signResp.UnitId
+	alreadyAuth.Info[cst.UserId] = signResp.UserId
+	alreadyAuth.Info[cst.Code] = getResp.User.Code
 	e.info = alreadyAuth.Info
 	return
 }

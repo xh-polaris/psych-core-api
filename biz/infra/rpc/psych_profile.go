@@ -3,10 +3,11 @@ package rpc
 import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/conf"
 
+	"sync"
+
 	"github.com/google/wire"
 	"github.com/xh-polaris/gopkg/kitex/client"
 	profile "github.com/xh-polaris/psych-idl/kitex_gen/profile/psychprofileservice"
-	"sync"
 )
 
 var ppOnce sync.Once
