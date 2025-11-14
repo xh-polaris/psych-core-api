@@ -6,7 +6,7 @@ import (
 	_ "github.com/xh-polaris/psych-pkg/app/volc/asr"
 	_ "github.com/xh-polaris/psych-pkg/app/volc/tts"
 
-	"github.com/xh-polaris/psych-core-api/biz/infra/consts"
+	"github.com/xh-polaris/psych-core-api/biz/infra/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
 	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
@@ -25,10 +25,10 @@ func (e *Engine) config() error {
 	pm := rpc.GetPsychProfile()
 
 	// 获取配置
-	req := &profile.ConfigGetByUnitIdReq{UnitId: e.info[consts.UnitId].(string), Admin: true}
+	req := &profile.ConfigGetByUnitIdReq{UnitId: e.info[cst.UnitId].(string), Admin: true}
 	if configResp, err = pm.ConfigGetByUnitID(e.ctx, req); err != nil {
 		logx.Error("[engine] [%s] UnitAppConfigGetByUnitId err: %v", core.AConfig, err)
-		return e.MWrite(core.MErr, consts.Err(consts.GetConfigFailed))
+		return e.MWrite(core.MErr, cst.Err(cst.GetConfigFailed))
 	}
 	// 构造配置
 	conf, wfConf = e.buildConfig(configResp)
