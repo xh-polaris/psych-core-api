@@ -2,18 +2,17 @@ package engine
 
 import (
 	"github.com/xh-polaris/psych-core-api/biz/cst"
+	"github.com/xh-polaris/psych-core-api/pkg/app"
+	_ "github.com/xh-polaris/psych-core-api/pkg/app/volc/asr"
+	_ "github.com/xh-polaris/psych-core-api/pkg/app/volc/tts"
+	"github.com/xh-polaris/psych-core-api/pkg/core"
+	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
-	_ "github.com/xh-polaris/psych-pkg/app/bailian"
-	_ "github.com/xh-polaris/psych-pkg/app/volc/asr"
-	_ "github.com/xh-polaris/psych-pkg/app/volc/tts"
 
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
-	"github.com/xh-polaris/psych-pkg/app"
-	"github.com/xh-polaris/psych-pkg/core"
-	"github.com/xh-polaris/psych-pkg/util/logx"
 )
 
 // config 配置app与workflow
@@ -27,25 +26,25 @@ func (e *Engine) config() error {
 	// 获取配置
 	req := &profile.ConfigGetByUnitIdReq{UnitId: e.info[cst.UnitId].(string), Admin: true}
 	if configResp, err = pm.ConfigGetByUnitID(e.ctx, req); err != nil {
-		logx.Error("[engine] [%s] UnitAppConfigGetByUnitId err: %v", core.AConfig, err)
-		return e.MWrite(core.MErr, util.Err(errorx.WrapByCode(err, errno.GetConfigErr)))
+		logs.Error("[engine] [%s] UnitAppConfigGetByUnitId err: %v", core.AConfig, err)
+		return e.MWrite(core.MErr, core.ToErr(errorx.WrapByCode(err, errno.GetConfigErr)))
 	}
 	// 构造配置
 	conf, wfConf = e.buildConfig(configResp)
 
 	// 构造llm
 	if e.llm, err = app.NewChatApp(e.uSession, wfConf.ChatConfig); err != nil {
-		logx.Error("[workflow] [config] new chatApp err: %v", err)
+		logs.Error("[workflow] [config] new chatApp err: %v", err)
 		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "llm"))
 	}
 	// 构造asr
 	if e.asr, err = app.NewASRApp(e.uSession, wfConf.ASRConfig); err != nil {
-		logx.Error("[workflow] [config] new asrApp err: %v", err)
+		logs.Error("[workflow] [config] new asrApp err: %v", err)
 		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "asr"))
 	}
 	// 构造tts
 	if e.tts, err = app.NewTTSApp(e.uSession, wfConf.TTSConfig); err != nil {
-		logx.Error("[workflow] [config] new asrApp err: %v", err)
+		logs.Error("[workflow] [config] new asrApp err: %v", err)
 		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "tts"))
 	}
 

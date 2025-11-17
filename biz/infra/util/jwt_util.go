@@ -9,10 +9,8 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/domain/usr"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
+	"github.com/xh-polaris/psych-core-api/pkg/httpx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
-	"github.com/xh-polaris/psych-core-api/biz/infra/conf"
-	"github.com/xh-polaris/psych-core-api/biz/infra/cst"
-	"github.com/xh-polaris/psych-pkg/httpx"
 )
 
 func GenerateJwt(claims map[string]any) (string, error) {

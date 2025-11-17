@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/xh-polaris/psych-pkg/app"
-	"github.com/xh-polaris/psych-pkg/core"
+	"github.com/xh-polaris/psych-core-api/pkg/app"
+	"github.com/xh-polaris/psych-core-api/pkg/core"
 )
 
 var audioPath = "D:\\Projects\\xhpolaris\\psych\\psych-core-api\\test\\output.pcm"

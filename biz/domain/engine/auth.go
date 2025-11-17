@@ -4,11 +4,11 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
+	"github.com/xh-polaris/psych-core-api/pkg/core"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
+	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
-	"github.com/xh-polaris/psych-pkg/core"
-	"github.com/xh-polaris/psych-pkg/util/logx"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -42,7 +42,7 @@ func (e *Engine) already(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Er
 	alreadyAuth = &core.Auth{}
 	claims, err := util.ParseJwt(auth.VerifyCode)
 	if err != nil {
-		return nil, util.Err(errorx.WrapByCode(err, errno.InvalidAuth))
+		return nil, core.ToErr(errorx.WrapByCode(err, errno.InvalidAuth))
 	}
 	// 提取字段
 	alreadyAuth.Info = auth.Info
@@ -67,8 +67,8 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 		VerifyCode: auth.VerifyCode,
 	}
 	if signResp, err = pp.UserSignIn(e.ctx, sign); err != nil {
-		logx.Error("[engine] [%s] UserSignIn err: %v", core.AAuth, err)
-		merr = util.Err(errorx.WrapByCode(err, errno.InvalidAuth))
+		logs.Error("[engine] [%s] UserSignIn err: %v", core.AAuth, err)
+		merr = core.ToErr(errorx.WrapByCode(err, errno.InvalidAuth))
 		return
 	}
 
@@ -77,16 +77,16 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 		UserId: signResp.UserId,
 	}
 	if getResp, err = pp.UserGetInfo(e.ctx, get); err != nil {
-		logx.Error("[engine] [%s] UserGetInfo err: %v", core.AAuth, err)
-		merr = util.Err(errorx.WrapByCode(err, errno.InvalidAuth))
+		logs.Error("[engine] [%s] UserGetInfo err: %v", core.AAuth, err)
+		merr = core.ToErr(errorx.WrapByCode(err, errno.InvalidAuth))
 		return
 	}
 
 	// 转换Options
 	alreadyAuth.Info, err = util.Anypb2Any(getResp.User.Options)
 	if err != nil {
-		logx.Error("[engine] [%s] UserGetInfo err: %v", core.AAuth, err)
-		merr = util.Err(errorx.WrapByCode(err, errno.InvalidAuth))
+		logs.Error("[engine] [%s] UserGetInfo err: %v", core.AAuth, err)
+		merr = core.ToErr(errorx.WrapByCode(err, errno.InvalidAuth))
 		return
 	}
 	alreadyAuth.Info[cst.UnitId] = signResp.UnitId

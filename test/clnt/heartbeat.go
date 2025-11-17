@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
-	"github.com/gorilla/websocket"
 	"log"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 func heartbeat(ctx context.Context, conn *websocket.Conn) {

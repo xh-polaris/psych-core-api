@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/websocket"
-	"github.com/xh-polaris/psych-pkg/core"
 	"log"
 	"os"
+
+	"github.com/gorilla/websocket"
+	"github.com/xh-polaris/psych-core-api/pkg/core"
 )
 
 var modelVideo []byte

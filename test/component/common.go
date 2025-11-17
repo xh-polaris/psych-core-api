@@ -3,12 +3,13 @@ package component
 import (
 	"bufio"
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"os"
 	"reflect"
 	"strings"
 	"sync"
 	"unsafe"
+
+	"gopkg.in/yaml.v3"
 )
 
 var TestConfig map[string]any

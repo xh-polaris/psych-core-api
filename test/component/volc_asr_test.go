@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xh-polaris/psych-pkg/app"
-	"github.com/xh-polaris/psych-pkg/app/volc/asr"
+	"github.com/xh-polaris/psych-core-api/pkg/app"
+	"github.com/xh-polaris/psych-core-api/pkg/app/volc/asr"
 )
 
 var audioPath = "../output.pcm"

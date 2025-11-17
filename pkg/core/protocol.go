@@ -1,0 +1,303 @@
+package core
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
+	"github.com/xh-polaris/psych-core-api/pkg/errorx"
+)
+
+// 定义前后端通信的协议
+
+var unimplement = errors.New("unimplement")
+
+var (
+	MPing   MType = -2 // Ping
+	MErr    MType = -1 // 错误消息
+	MMeta   MType = 0  // 协议元数据
+	MAuth   MType = 1  // 认证消息
+	MConfig MType = 2  // 配置消息
+	MCmd    MType = 3  // 常规命令
+	MResp   MType = 4  // 响应
+)
+
+var (
+	CUserText     CType = 1 // 用户文字输入
+	CUserAudio    CType = 2 // 用户音频输入, 直接作为输入, 也会返回识别结果给前端
+	CUserAudioASR CType = 3 // 用户音频输入, 用于识别
+	CModelText    CType = 4 // 模型文字输入, 用于转语音
+)
+
+var (
+	RModelText  RType = 1 // 模型文本响应
+	RModelAudio RType = 2 // 模型音频响应
+	RUserText   RType = 3 // 用户文本响应
+)
+
+var (
+	Version int8 = 1
+	GZIP    int8 = 1
+	JSON    int8 = 1
+)
+
+var (
+	AlreadyAuth int32 = -1 //"Already"
+)
+
+type (
+	// MType 消息类型
+	MType int8
+	// CType 命令类型
+	CType int8
+	// RType 响应类型
+	RType int8
+	// Message 单条消息
+	Message struct {
+		Type      MType     `json:"type"`      // 消息类型
+		Payload   []byte    `json:"payload"`   // 消息负载
+		Timestamp time.Time `json:"timestamp"` // 消息时间戳
+	}
+
+	// Meta 元数据
+	Meta struct {
+		Version       int8 `json:"version"`       // 协议版本
+		Serialization int8 `json:"serialization"` // 序列化方法
+		Compression   int8 `json:"compression"`   // 压缩方式
+	}
+
+	// Auth 认证消息
+	// 若用户在其他途径登录过来, 则使用Already类型并在authID传入用户ID, verifyCode中传入JWT, info中传入登录接口获取的额外信息
+	Auth struct {
+		AuthID     string         `json:"authId"`     // 认证ID, 如电话号码等
+		AuthType   int32          `json:"authType"`   // 校验方式, 如Phone
+		VerifyCode string         `json:"verifyCode"` // 校验令牌, 如验证码
+		Info       map[string]any `json:"info"`       // 额外信息
+	}
+
+	// Config 配置消息
+	Config struct {
+		Id           string       `json:"id"`        // 配置id
+		Type         string       `json:"type"`      // 配置类型, Chain | End2End
+		ModelName    string       `json:"modelName"` // 模型名称
+		ModelView    string       `json:"modelView"` // 模型外观路径
+		ChatConfig   ChatConfig   `json:"chatConfig"`
+		ASRConfig    ASRConfig    `json:"asrConfig"`
+		TTSConfig    TTSConfig    `json:"ttsConfig"`
+		ReportConfig ReportConfig `json:"reportConfig"`
+	}
+
+	// ChatConfig 对话配置
+	ChatConfig struct {
+		Id string `json:"id"`
+	}
+
+	// ReportConfig 报表配置
+	ReportConfig struct {
+		Id string `json:"id"`
+	}
+
+	// ASRConfig ASR配置
+	ASRConfig struct {
+		Id         string `json:"id"`
+		Format     string `json:"format"`     // 音频容器格式
+		Codec      string `json:"codec"`      // 编码方式
+		Rate       int    `json:"rate"`       // 采样频率
+		Bits       int    `json:"bits"`       // 比特率
+		Channels   int    `json:"channels"`   // 声道数
+		ResultType string `json:"resultType"` // 返回方式, full为全量, single为增量
+	}
+
+	// TTSConfig TTS配置
+	TTSConfig struct {
+		Id           string  `json:"id"`
+		Format       string  `json:"format"`       // 音频容器格式
+		Codec        string  `json:"codec"`        // 编码方式
+		Rate         int     `json:"rate"`         // 采样频率
+		Bits         int     `json:"bits"`         // 比特率
+		Channels     int     `json:"channels"`     // 声道数
+		ResultType   string  `json:"resultType"`   // 返回方式, full为全量, single为增量
+		SpeechRate   float32 `json:"speechRate"`   // 语速, 服务端配置
+		LoudnessRate float32 `json:"loudnessRate"` // 音量, 服务端配置
+		PitchRate    float32 `json:"pitchRate"`    // 音高, 服务端配置
+		Lang         string  `json:"lang"`         // 语种, 服务端配置
+	}
+
+	// Cmd 命名消息
+	Cmd struct {
+		ID      uint   `json:"id"`      // 命令编号, 自0开始递增, 客户端维护
+		Role    string `json:"role"`    // 身份
+		Command CType  `json:"command"` // 命令类型
+		Content any    `json:"content"` // 命令内容
+	}
+
+	// Resp 响应消息
+	Resp struct {
+		ID      uint  `json:"id"`
+		Type    RType `json:"type"`
+		Content any   `json:"content"`
+	}
+
+	// Err 错误消息
+	Err struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	}
+
+	// Ping 心跳
+	Ping struct {
+		Data string `json:"ping;omitempty"`
+	}
+)
+
+// MMarshal 序列化消息
+func MMarshal(m *Message, compression, serialization int8) (data []byte, err error) {
+	// 序列化
+	switch serialization {
+	case JSON:
+		if data, err = json.Marshal(m); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, unimplement
+	}
+
+	// 压缩
+	switch compression {
+	case GZIP:
+		if data, err = util.GzipCompress(data); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, unimplement
+	}
+	return data, nil
+}
+
+// MUnmarshal 反序列化消息
+func MUnmarshal(data []byte, compression, serialization int8) (m *Message, err error) {
+	// 解压
+	switch compression {
+	case GZIP:
+		if data, err = util.GzipDecompress(data); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, unimplement
+	}
+
+	// 反序列化
+	m = &Message{}
+	switch serialization {
+	case JSON:
+		err = json.Unmarshal(data, m)
+	default:
+		return nil, unimplement
+	}
+	return m, err
+}
+
+// DecodeMessage 从消息中解码 payload
+func DecodeMessage(m *Message) (payload any, err error) {
+	switch m.Type {
+	case MAuth:
+		return decodeMessage[Auth](m)
+	case MConfig:
+		return decodeMessage[Config](m)
+	case MCmd:
+		return decodeMessage[Cmd](m)
+	case MResp:
+		return decodeMessage[Resp](m)
+	case MErr:
+		return decodeMessage[Err](m)
+	case MPing:
+		return decodeMessage[Ping](m)
+	}
+	return nil, unimplement
+}
+
+func decodeMessage[T any](m *Message) (*T, error) {
+	var payload T
+	if err := json.Unmarshal(m.Payload, &payload); err != nil {
+		return nil, err
+	}
+	return &payload, nil
+}
+
+func EncodeMessage(t MType, payload any) (m *Message, err error) {
+	var data []byte
+
+	// 序列化
+	if data, err = json.Marshal(payload); err != nil {
+		return nil, err
+	}
+	m = &Message{
+		Type:      t,
+		Payload:   data,
+		Timestamp: time.Now(),
+	}
+	return m, nil
+}
+
+func EncodeMErr(code int, msg string) (*Message, error) {
+	e := &Err{Code: code, Message: msg}
+	return EncodeMessage(MErr, e)
+}
+
+var (
+	// ProtocolInitErr 协议初始化失败
+	ProtocolInitErr = &Err{Code: -1000, Message: "protocol init error"}
+	DecodeMsgErr    []byte // 解码消息错误
+	EncodeMsgErr    []byte // 编码消息错误
+	UnSupportErr    []byte // 不支持的消息类型
+	EndErr          []byte // 因错误结束
+)
+
+// init 初始化一些全局变量
+func init() {
+	var err error
+	var m *Message
+
+	// 解码消息错误
+	if m, err = EncodeMErr(-1001, "decode message error"); err != nil {
+		panic(fmt.Errorf("[protocol] DecodeMsgErr EncodeMErr error %s", err))
+	}
+	if DecodeMsgErr, err = MMarshal(m, GZIP, JSON); err != nil {
+		panic(fmt.Errorf("[protocol] DecodeMsgErr MMarshal error %s", err))
+	}
+
+	// 编码消息错误
+	if m, err = EncodeMErr(-1002, "encode message error"); err != nil {
+		panic(fmt.Errorf("[protocol] EncodeMsgErr EncodeMErr error %s", err))
+	}
+	if EncodeMsgErr, err = MMarshal(m, GZIP, JSON); err != nil {
+		panic(fmt.Errorf("[protocol] EncodeMsgErr MMarshal error %s", err))
+	}
+
+	// 不支持的消息类型错误
+	if m, err = EncodeMErr(-1003, "un-support message type error"); err != nil {
+		panic(fmt.Errorf("[protocol] UnSupportErr EncodeMErr error %s", err))
+	}
+	if UnSupportErr, err = MMarshal(m, GZIP, JSON); err != nil {
+		panic(fmt.Errorf("[protocol] UnSupportErr Marshal error %s", err))
+	}
+
+	// 因错误而结束
+	if m, err = EncodeMErr(-1004, "end with unexpected error"); err != nil {
+		panic(fmt.Errorf("[protocol] EndErr EncodeMErr error %s", err))
+	}
+	if EndErr, err = MMarshal(m, GZIP, JSON); err != nil {
+		panic(fmt.Errorf("[protocol] EndErr Marshal error %s", err))
+	}
+}
+
+func ToErr(err error) *Err {
+	var custom errorx.StatusError
+	if errors.As(err, &custom) {
+		return &Err{Code: int(custom.Code()), Message: custom.Error()}
+	}
+	return &Err{Code: 999, Message: err.Error()}
+
+}

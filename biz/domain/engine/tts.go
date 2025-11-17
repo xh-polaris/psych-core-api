@@ -5,9 +5,9 @@ import (
 	"io"
 
 	"github.com/cloudwego/eino/schema"
-	"github.com/xh-polaris/psych-pkg/app"
-	"github.com/xh-polaris/psych-pkg/core"
-	"github.com/xh-polaris/psych-pkg/wsx"
+	"github.com/xh-polaris/psych-core-api/pkg/app"
+	"github.com/xh-polaris/psych-core-api/pkg/core"
+	"github.com/xh-polaris/psych-core-api/pkg/wsx"
 )
 
 // execTTS 用于文字转语音(发送端) [task]

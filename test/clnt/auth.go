@@ -8,7 +8,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/xh-polaris/psych-core-api/biz/infra/cst"
-	"github.com/xh-polaris/psych-pkg/core"
+	"github.com/xh-polaris/psych-core-api/pkg/core"
 )
 
 var customUser = false

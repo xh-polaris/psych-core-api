@@ -1,7 +1,7 @@
 package rpc
 
 import (
-	"github.com/xh-polaris/psych-core-api/biz/infra/conf"
+	"github.com/xh-polaris/psych-core-api/biz/conf"
 
 	"sync"
 

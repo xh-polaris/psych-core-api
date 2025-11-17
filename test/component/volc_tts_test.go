@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xh-polaris/psych-pkg/app"
-	"github.com/xh-polaris/psych-pkg/app/volc/tts"
-	"github.com/xh-polaris/psych-pkg/core"
-	"github.com/xh-polaris/psych-pkg/util/logx"
+	"github.com/xh-polaris/psych-core-api/pkg/app"
+	"github.com/xh-polaris/psych-core-api/pkg/app/volc/tts"
+	"github.com/xh-polaris/psych-core-api/pkg/core"
+	"github.com/xh-polaris/psych-core-api/pkg/logs"
 )
 
 type TestTTSPipe struct {
@@ -37,7 +37,7 @@ func NewTestTTSPipe(ctx context.Context, unexpected func(error), close chan stru
 func (p *TestTTSPipe) In() {
 	for cmd := range p.in.C {
 		p.test <- cmd
-		logx.Info("[tts pipe] send cmd:%v", cmd)
+		logs.Info("[tts pipe] send cmd:%v", cmd)
 	}
 
 }

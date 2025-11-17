@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
+	"github.com/xh-polaris/psych-core-api/pkg/core"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
+	"github.com/xh-polaris/psych-core-api/pkg/logs"
+	"github.com/xh-polaris/psych-core-api/pkg/wsx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
-	"github.com/xh-polaris/psych-pkg/core"
-	"github.com/xh-polaris/psych-pkg/util/logx"
-	"github.com/xh-polaris/psych-pkg/wsx"
 )
 
 // handle 处理消息, 当messageCh关闭时退出
@@ -20,11 +20,11 @@ func (e *Engine) handle(data []byte) (err error) {
 
 	// 解码消息
 	if msg, err = core.MUnmarshal(data, e.meta.Compression, e.meta.Serialization); err != nil { // 消息反序列化失败
-		logx.CondError(!wsx.IsNormal(err), "[engine] %s error %s", core.AUMMsg, err)
+		logs.CondError(!wsx.IsNormal(err), "[engine] %s error %s", core.AUMMsg, err)
 		return errorx.WrapByCode(err, errno.MsgDecodeErr)
 	}
 	if payload, err = core.DecodeMessage(msg); err != nil {
-		logx.CondError(!wsx.IsNormal(err), "[engine] %s error %s", core.ADMsg, err)
+		logs.CondError(!wsx.IsNormal(err), "[engine] %s error %s", core.ADMsg, err)
 		return e.Write(core.DecodeMsgErr) // 解码失败要告知客户端错误消息
 	}
 

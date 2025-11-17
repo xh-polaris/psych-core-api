@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/xh-polaris/psych-pkg/core"
+	"github.com/xh-polaris/psych-core-api/pkg/core"
 )
 
 var authType2Int32 = map[string]int32{

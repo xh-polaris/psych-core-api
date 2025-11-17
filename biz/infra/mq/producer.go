@@ -8,8 +8,8 @@ import (
 	"github.com/avast/retry-go"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
-	"github.com/xh-polaris/psych-pkg/core"
-	"github.com/xh-polaris/psych-pkg/util/logx"
+	"github.com/xh-polaris/psych-core-api/pkg/core"
+	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"golang.org/x/net/context"
 )
 
@@ -43,7 +43,7 @@ func monitor() {
 		retry.DelayType(retry.BackOffDelay), // 指数退避策略
 		retry.MaxDelay(64 * time.Second),    // 最大退避间隔
 		retry.OnRetry(func(n uint, err error) { // 重试日志
-			logx.Info("[mq produce] retry #%d times with err:%v", n+1, err)
+			logs.Info("[mq produce] retry #%d times with err:%v", n+1, err)
 		}),
 	}
 
@@ -51,7 +51,7 @@ func monitor() {
 		if conn, err = amqp.Dial(url); err == nil {
 			_ = producer.channel.Close() // 关闭旧channel
 			if producer.channel, err = conn.Channel(); err == nil {
-				logx.Info("[mq producer] reconnect")
+				logs.Info("[mq producer] reconnect")
 			}
 		}
 		return err
@@ -59,7 +59,7 @@ func monitor() {
 
 	for {
 		reason := <-conn.NotifyClose(make(chan *amqp.Error))
-		logx.Info("[mq producer] connection closed , reason: ", reason)
+		logs.Info("[mq producer] connection closed , reason: ", reason)
 		if err := retry.Do(operation, opts...); err != nil {
 			panic("[mq produce] retry too many times:" + err.Error())
 		}
@@ -75,7 +75,7 @@ var (
 		retry.DelayType(retry.BackOffDelay), // 指数退避策略
 		retry.MaxDelay(16 * time.Second),    // 最大退避间隔
 		retry.OnRetry(func(n uint, err error) { // 重试日志
-			logx.Info("[mq produce] produce post msg retry #%d times with err:%v", n+1, err)
+			logs.Info("[mq produce] produce post msg retry #%d times with err:%v", n+1, err)
 		}),
 	}
 )
@@ -106,11 +106,11 @@ func (p *PostProducer) Produce(ctx context.Context, session string, info map[str
 	// 构造消息体
 	msg := &core.PostNotify{Session: session, Info: info, Start: start.Unix(), End: end.Unix(), Config: config}
 	if payload, err = json.Marshal(msg); err != nil {
-		logx.Error("[mq producer] marshal post notify failed, err:%v", err.Error())
+		logs.Error("[mq producer] marshal post notify failed, err:%v", err.Error())
 		return err
 	}
 	if conf.GetConfig().State == "test" { // debug 测试时不实践发布消息
-		logx.Info("[mq producer] post notify %+v", string(payload))
+		logs.Info("[mq producer] post notify %+v", string(payload))
 		return nil
 	}
 

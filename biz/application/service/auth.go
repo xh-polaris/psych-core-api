@@ -9,10 +9,10 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
+	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
 	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
-	"github.com/xh-polaris/psych-pkg/util/logx"
 )
 
 type IAuthService interface {
@@ -69,7 +69,7 @@ func (s AuthService) UserGetInfo(ctx context.Context, _ *core_api.UserGetInfoReq
 	get := &profile.UserGetInfoReq{UserId: meta.UserId}
 	getResp, err := rpc.GetPsychProfile().UserGetInfo(ctx, get)
 	if err != nil {
-		logx.Error("[auth service] get user %s info err:", meta.UserId, err)
+		logs.Error("[auth service] get user %s info err:", meta.UserId, err)
 		return nil, errorx.WrapByCode(err, errno.ExpireAuth)
 	}
 	// 构造响应
