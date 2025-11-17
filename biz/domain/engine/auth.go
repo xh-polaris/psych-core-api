@@ -2,15 +2,11 @@ package engine
 
 import (
 	"github.com/xh-polaris/psych-core-api/biz/cst"
-	"github.com/xh-polaris/psych-core-api/biz/infra/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
-	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
-	"github.com/xh-polaris/psych-core-api/biz/infra/utils/enum"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
-	"github.com/xh-polaris/psych-idl/kitex_gen/user"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -63,20 +59,12 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 	var getResp *profile.UserGetInfoResp
 	pp, alreadyAuth := rpc.GetPsychProfile(), &core.Auth{}
 
-	// 获得枚举值
-	authTypeStr, ok := enum.GetAuthType(int(auth.AuthType))
-	if !ok {
-		logx.Error("[engine] [%s] AuthType not found: %d", core.AAuth, auth.AuthType)
-		merr = cst.Err(cst.InvalidAuth)
-		return
-	}
-
 	// 用户登录
 	sign := &profile.UserSignInReq{
-		UnitId:    auth.Info[cst.UnitId].(string),
-		AuthType:  authTypeStr,
-		AuthId:    auth.AuthID,
-		AuthValue: auth.VerifyCode,
+		UnitId:     auth.Info[cst.UnitId].(string),
+		AuthType:   auth.AuthType,
+		AuthId:     auth.AuthID,
+		VerifyCode: auth.VerifyCode,
 	}
 	if signResp, err = pp.UserSignIn(e.ctx, sign); err != nil {
 		logx.Error("[engine] [%s] UserSignIn err: %v", core.AAuth, err)

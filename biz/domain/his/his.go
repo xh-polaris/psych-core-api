@@ -23,8 +23,8 @@ type HistoryManager struct {
 	mapper message.MongoMapper
 }
 
-// NewHistoryManager 创建一个新的历史记录管理器
-func NewHistoryManager(cache cache.Cmdable, mapper message.MongoMapper) {
+// New 创建一个新的历史记录管理器
+func New(cache cache.Cmdable, mapper message.MongoMapper) {
 	Mgr = &HistoryManager{cache: cache, mapper: mapper}
 }
 

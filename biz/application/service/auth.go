@@ -4,24 +4,19 @@ import (
 	"context"
 
 	"github.com/google/wire"
-	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/domain/usr"
-	"github.com/xh-polaris/psych-core-api/biz/infra/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
-	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
 	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
-	"github.com/xh-polaris/psych-idl/kitex_gen/user"
-	u "github.com/xh-polaris/psych-idl/kitex_gen/user"
 	"github.com/xh-polaris/psych-pkg/util/logx"
 )
 
 type IAuthService interface {
-	SignIn(ctx context.Context, req *profile.UserSignInReq) (resp *profile.UserSignInResp, err error)
+	SignIn(ctx context.Context, req *core_api.UserSignInReq) (resp *core_api.UserSignInResp, err error)
 }
 
 type AuthService struct {
@@ -36,19 +31,20 @@ func (s AuthService) UserSignIn(ctx context.Context, req *core_api.UserSignInReq
 	// 调用接口
 	client := rpc.GetPsychProfile()
 	userResp, err := client.UserSignIn(ctx, &profile.UserSignInReq{
-		UnitId:    req.UnitId,
-		AuthType:  req.AuthType,
-		AuthId:    req.AuthId,
-		AuthValue: req.AuthValue,
+		UnitId:     req.UnitId,
+		AuthType:   req.AuthType,
+		AuthId:     req.AuthId,
+		VerifyCode: req.VerifyCode,
 	})
 	if err != nil {
 		return nil, errorx.New(errno.InvalidAuth)
 	}
 
-	jwt, err := utils.GenerateJwt(map[string]any{
-		cst.UnitId: userResp.UnitId,
-		cst.UserId: userResp.UserId,
-		cst.Code:   req.AuthId,
+	jwt, err := util.GenerateJwt(map[string]any{
+		cst.UnitId:   userResp.UnitId,
+		cst.UserId:   userResp.UserId,
+		cst.Code:     userResp.Code,
+		cst.CodeType: userResp.CodeType,
 	})
 
 	resp = &core_api.UserSignInResp{
@@ -56,7 +52,7 @@ func (s AuthService) UserSignIn(ctx context.Context, req *core_api.UserSignInReq
 		Msg:       "success",
 		UnitId:    userResp.UnitId,
 		UserId:    userResp.UserId,
-		CodeValue: req.AuthId,
+		CodeValue: userResp.Code,
 		Token:     jwt,
 	}
 

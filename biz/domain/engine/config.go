@@ -7,7 +7,6 @@ import (
 	_ "github.com/xh-polaris/psych-pkg/app/volc/asr"
 	_ "github.com/xh-polaris/psych-pkg/app/volc/tts"
 
-	"github.com/xh-polaris/psych-core-api/biz/infra/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
@@ -57,7 +56,39 @@ func (e *Engine) config() error {
 
 // 构造配置
 func (e *Engine) buildConfig(resp *profile.ConfigGetByUnitIdResp) (*core.Config, *core.WorkFlowConfig) {
-	return &core.Config{}, buildAppSetting(resp)
+	return &core.Config{
+		Id:        resp.Config.UnitId,
+		ModelName: "",
+		ModelView: "",
+		ChatConfig: core.ChatConfig{
+			Id: "",
+		},
+		ASRConfig: core.ASRConfig{
+			Id:         "",
+			Format:     "",
+			Codec:      "",
+			Rate:       0,
+			Bits:       0,
+			Channels:   0,
+			ResultType: "",
+		},
+		TTSConfig: core.TTSConfig{
+			Id:           "",
+			Format:       "",
+			Codec:        "",
+			Rate:         0,
+			Bits:         0,
+			Channels:     0,
+			ResultType:   "",
+			SpeechRate:   0,
+			LoudnessRate: 0,
+			PitchRate:    0,
+			Lang:         "",
+		},
+		ReportConfig: core.ReportConfig{
+			Id: "",
+		},
+	}, buildAppSetting(resp)
 }
 
 // 构造返回给客户端的配置

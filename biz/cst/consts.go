@@ -26,6 +26,7 @@ const (
 	DeleteTime     = "delete_time"
 	UnitId         = "unit_id"
 	Code           = "code"
+	CodeType       = "code_type"
 
 	Status        = "status"
 	DeletedStatus = -1
