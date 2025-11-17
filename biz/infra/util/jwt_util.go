@@ -10,6 +10,8 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/domain/usr"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
+	"github.com/xh-polaris/psych-core-api/biz/infra/conf"
+	"github.com/xh-polaris/psych-core-api/biz/infra/cst"
 	"github.com/xh-polaris/psych-pkg/httpx"
 )
 
@@ -51,8 +53,7 @@ func ExtraUserMeta(ctx context.Context) (m *usr.Meta, err error) {
 		return nil, err
 	}
 	meta.UserId = claims[cst.UserId].(string)
-	meta.UnitId = claims[cst.JWTUnitId].(string)
-	meta.StudentId = claims[cst.JWTStudentId].(string)
-	meta.Strong = claims[cst.Strong].(bool)
+	meta.UnitId = claims[cst.UnitId].(string)
+	meta.Code = claims[cst.Code].(string)
 	return &meta, nil
 }

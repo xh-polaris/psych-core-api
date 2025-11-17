@@ -2,10 +2,14 @@ package engine
 
 import (
 	"github.com/xh-polaris/psych-core-api/biz/cst"
+	"github.com/xh-polaris/psych-core-api/biz/infra/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
+	"github.com/xh-polaris/psych-core-api/biz/infra/utils"
+	"github.com/xh-polaris/psych-core-api/biz/infra/utils/enum"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
+	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
 	"github.com/xh-polaris/psych-idl/kitex_gen/user"
 	"github.com/xh-polaris/psych-pkg/core"
 	"github.com/xh-polaris/psych-pkg/util/logx"
@@ -23,6 +27,7 @@ func (e *Engine) auth(auth *core.Auth) (bool, error) {
 	default:
 		alreadyAuth, merr = e.unAuth(auth)
 	}
+
 	if merr != nil {
 		return false, e.MWrite(core.MErr, merr)
 	}
@@ -54,35 +59,51 @@ func (e *Engine) already(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Er
 
 func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err) {
 	var err error
-	var signResp *user.UserSignInResp
-	var getResp *user.UserGetInfoResp
-	pu, alreadyAuth := rpc.GetPsychUser(), &core.Auth{}
+	var signResp *profile.UserSignInResp
+	var getResp *profile.UserGetInfoResp
+	pp, alreadyAuth := rpc.GetPsychProfile(), &core.Auth{}
+
+	// 获得枚举值
+	authTypeStr, ok := enum.GetAuthType(int(auth.AuthType))
+	if !ok {
+		logx.Error("[engine] [%s] AuthType not found: %d", core.AAuth, auth.AuthType)
+		merr = cst.Err(cst.InvalidAuth)
+		return
+	}
+
 	// 用户登录
-	sign := &user.UserSignInReq{UnitId: auth.Info[cst.UnitId].(string),
-		AuthType: auth.AuthType, AuthId: auth.AuthID, VerifyCode: auth.VerifyCode}
-	if signResp, err = pu.UserSignIn(e.ctx, sign); err != nil {
+	sign := &profile.UserSignInReq{
+		UnitId:    auth.Info[cst.UnitId].(string),
+		AuthType:  authTypeStr,
+		AuthId:    auth.AuthID,
+		AuthValue: auth.VerifyCode,
+	}
+	if signResp, err = pp.UserSignIn(e.ctx, sign); err != nil {
 		logx.Error("[engine] [%s] UserSignIn err: %v", core.AAuth, err)
 		merr = util.Err(errorx.WrapByCode(err, errno.InvalidAuth))
 		return
 	}
 
 	// 获取用户信息
-	get := &user.UserGetInfoReq{UserId: signResp.UserId, UnitId: &signResp.UnitId}
-	if getResp, err = pu.UserGetInfo(e.ctx, get); err != nil {
+	get := &profile.UserGetInfoReq{
+		UserId: signResp.UserId,
+	}
+	if getResp, err = pp.UserGetInfo(e.ctx, get); err != nil {
 		logx.Error("[engine] [%s] UserGetInfo err: %v", core.AAuth, err)
 		merr = util.Err(errorx.WrapByCode(err, errno.InvalidAuth))
 		return
 	}
-	form, err := util.Anypb2Any(getResp.Form)
+
+	// 转换Options
+	alreadyAuth.Info, err = util.Anypb2Any(getResp.User.Options)
 	if err != nil {
 		logx.Error("[engine] [%s] UserGetInfo err: %v", core.AAuth, err)
 		merr = util.Err(errorx.WrapByCode(err, errno.InvalidAuth))
 		return
 	}
-	alreadyAuth.Info = form
 	alreadyAuth.Info[cst.UnitId] = signResp.UnitId
 	alreadyAuth.Info[cst.UserId] = signResp.UserId
-	//alreadyAuth.Info[cst.Code] = *signResp.Code TODO
+	alreadyAuth.Info[cst.Code] = getResp.User.Code
 	e.info = alreadyAuth.Info
 	return
 }

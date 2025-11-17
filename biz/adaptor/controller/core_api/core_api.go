@@ -6,8 +6,8 @@ import (
 	"context"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
-	core_api "github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/provider"
+	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
 	"github.com/xh-polaris/psych-pkg/httpx"
 )
 
