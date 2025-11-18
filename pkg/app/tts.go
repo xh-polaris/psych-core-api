@@ -37,25 +37,25 @@ type (
 	}
 	// TTSSetting tts设置
 	TTSSetting struct {
-		Id          string   `json:"id"`
-		Provider    string   `json:"provider"`
-		Url         string   `json:"url"`
-		AppID       string   `json:"app_id"`
-		AccessKey   string   `json:"access_key"`
-		Namespace   string   `json:"namespace"`
-		Speaker     string   `json:"speaker"`
-		ResourceId  string   `json:"resourceId"` // 资源ID或ClusterID
-		AudioParams struct { // 音频参数
-			Format       string `json:"format"`        // 音频格式
-			Codec        string `json:"codec"`         // 编码方式 (volc)raw / opus，默认为 raw(pcm)
-			Rate         int32  `json:"rate"`          // 采用频率
-			Bits         int32  `json:"bits"`          // 比特率
-			Channels     int    `json:"channels"`      // 声道个数 (volc)默认为 1
-			SpeechRate   int32  `json:"speech_rate"`   // 语速 (volc)取值范围[-50,100]，100代表2.0倍速，-50代表0.5倍数
-			LoudnessRate int32  `json:"loudness_rate"` // 音量 (volc)取值范围[-50,100]，100代表2.0倍音量，-50代表0.5倍音量
-			Lang         string `json:"lang"`          // 语言
-			ResultType   string `json:"result_type"`   // 返回方式,full为全量, single为增量
-		} `json:"audio_params"`
+		Provider    string       `json:"provider"`
+		Url         string       `json:"url"`
+		AppID       string       `json:"app_id"`
+		AccessKey   string       `json:"access_key"`
+		Namespace   string       `json:"namespace"`
+		Speaker     string       `json:"speaker"`
+		ResourceId  string       `json:"resourceId"` // 资源ID或ClusterID
+		AudioParams *AudioParams `json:"audio_params"`
+	}
+	AudioParams struct { // 音频参数
+		Format       string `json:"format"`        // 音频格式
+		Codec        string `json:"codec"`         // 编码方式 (volc)raw / opus，默认为 raw(pcm)
+		Rate         int32  `json:"rate"`          // 采用频率
+		Bits         int32  `json:"bits"`          // 比特率
+		Channels     int    `json:"channels"`      // 声道个数 (volc)默认为 1
+		SpeechRate   int32  `json:"speech_rate"`   // 语速 (volc)取值范围[-50,100]，100代表2.0倍速，-50代表0.5倍数
+		LoudnessRate int32  `json:"loudness_rate"` // 音量 (volc)取值范围[-50,100]，100代表2.0倍音量，-50代表0.5倍音量
+		Lang         string `json:"lang"`          // 语言
+		ResultType   string `json:"result_type"`   // 返回方式,full为全量, single为增量
 	}
 )
 

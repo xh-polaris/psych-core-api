@@ -79,7 +79,6 @@ type (
 
 	// Config 配置消息
 	Config struct {
-		Id           string       `json:"id"`        // 配置id
 		Type         string       `json:"type"`      // 配置类型, Chain | End2End
 		ModelName    string       `json:"modelName"` // 模型名称
 		ModelView    string       `json:"modelView"` // 模型外观路径
@@ -91,17 +90,14 @@ type (
 
 	// ChatConfig 对话配置
 	ChatConfig struct {
-		Id string `json:"id"`
 	}
 
 	// ReportConfig 报表配置
 	ReportConfig struct {
-		Id string `json:"id"`
 	}
 
 	// ASRConfig ASR配置
 	ASRConfig struct {
-		Id         string `json:"id"`
 		Format     string `json:"format"`     // 音频容器格式
 		Codec      string `json:"codec"`      // 编码方式
 		Rate       int    `json:"rate"`       // 采样频率
@@ -112,7 +108,6 @@ type (
 
 	// TTSConfig TTS配置
 	TTSConfig struct {
-		Id           string  `json:"id"`
 		Format       string  `json:"format"`       // 音频容器格式
 		Codec        string  `json:"codec"`        // 编码方式
 		Rate         int     `json:"rate"`         // 采样频率
@@ -121,8 +116,8 @@ type (
 		ResultType   string  `json:"resultType"`   // 返回方式, full为全量, single为增量
 		SpeechRate   float32 `json:"speechRate"`   // 语速, 服务端配置
 		LoudnessRate float32 `json:"loudnessRate"` // 音量, 服务端配置
-		PitchRate    float32 `json:"pitchRate"`    // 音高, 服务端配置
-		Lang         string  `json:"lang"`         // 语种, 服务端配置
+		//PitchRate    float32 `json:"pitchRate"`    // 音高, 服务端配置
+		Lang string `json:"lang"` // 语种, 服务端配置
 	}
 
 	// Cmd 命名消息

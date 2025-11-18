@@ -37,7 +37,6 @@ type (
 		Close() error
 	}
 	ASRSetting struct {
-		Id         string `json:"id"`
 		Provider   string `json:"provider"`
 		Url        string `json:"url"`
 		AppID      string `json:"app_id"`

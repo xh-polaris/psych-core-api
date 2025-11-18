@@ -12,7 +12,6 @@ type ( // ReportApp 是报告分析大模型应用
 	ReportApp = model.ToolCallingChatModel
 
 	ReportSetting struct {
-		Id        string `json:"id"`
 		Provider  string `json:"provider"`
 		Url       string `json:"url"`
 		AppId     string `json:"appId"`

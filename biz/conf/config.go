@@ -32,14 +32,14 @@ type Mongo struct {
 
 type Config struct {
 	service.ServiceConf
-	ListenOn  string
-	State     string
-	Auth      Auth
-	Cache     *Cache
-	CacheConf cache.CacheConf
-	RabbitMQ  *RabbitMQ
-	Mongo     *Mongo
-	Coze      *Coze
+	ListenOn    string
+	State       string
+	Auth        Auth
+	Cache       *Cache
+	CacheConf   cache.CacheConf
+	RabbitMQ    *RabbitMQ
+	Mongo       *Mongo
+	ModelConfig *ModelConfig
 }
 
 func NewConfig() (*Config, error) {

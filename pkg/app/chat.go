@@ -14,7 +14,6 @@ type (
 	ChatApp = model.ToolCallingChatModel
 
 	ChatSetting struct {
-		Id        string `json:"id"`
 		Provider  string `json:"provider"`
 		Url       string `json:"url"`
 		AppId     string `json:"appId"`

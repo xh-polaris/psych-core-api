@@ -17,6 +17,8 @@ const (
 	RetrieveHisErr = 999_003_001
 	LLMStreamErr   = 999_003_002
 	AddUserMsgErr  = 999_003_003
+
+	ConfigErr = 999_004_000
 )
 
 func init() {
@@ -74,6 +76,11 @@ func init() {
 	code.Register(
 		AddUserMsgErr,
 		"创建用户消息失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ConfigErr,
+		"配置 {app} 失败",
 		code.WithAffectStability(false),
 	)
 }

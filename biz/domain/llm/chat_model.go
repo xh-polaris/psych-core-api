@@ -17,18 +17,18 @@ type ChatModel struct {
 }
 
 // NewChatModel 根据provider创建对应的对话大模型
-func NewChatModel(ctx context.Context, provider, model, botId, uid string) (_ model.ToolCallingChatModel, err error) {
+func NewChatModel(ctx context.Context, provider, url, sk, model, botId, uid string) (_ model.ToolCallingChatModel, err error) {
 	cm := &ChatModel{provider: provider, model: model, botId: botId, uid: uid}
-	if cm.cli, err = newCli(ctx, provider, model, botId, uid); err != nil {
+	if cm.cli, err = newCli(ctx, provider, url, sk, model, botId, uid); err != nil {
 		return
 	}
 	return cm, nil
 }
 
-func newCli(ctx context.Context, provider, model, botId, uid string) (_ model.ToolCallingChatModel, err error) {
+func newCli(ctx context.Context, provider, url, sk, model, botId, uid string) (_ model.ToolCallingChatModel, err error) {
 	switch provider {
 	case impl.Coze:
-		return impl.NewCozeModel(ctx, uid, botId)
+		return impl.NewCozeModel(ctx, url, sk, uid, botId)
 	default:
 		return nil, errorx.New(errno.UnImplementErr)
 	}

@@ -7,7 +7,6 @@ import (
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 	"github.com/coze-dev/coze-go"
-	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
@@ -28,8 +27,8 @@ type CozeModel struct {
 	botId string
 }
 
-func NewCozeModel(ctx context.Context, uid, botId string) (_ model.ToolCallingChatModel, err error) {
-	cozeCli := coze.NewCozeAPI(coze.NewTokenAuth(conf.GetConfig().Coze.PAT), coze.WithBaseURL(conf.GetConfig().Coze.BaseURL))
+func NewCozeModel(ctx context.Context, url, sk, uid, botId string) (_ model.ToolCallingChatModel, err error) {
+	cozeCli := coze.NewCozeAPI(coze.NewTokenAuth(sk), coze.WithBaseURL(url))
 	return &CozeModel{Coze, &cozeCli, uid, botId}, nil
 }
 
