@@ -68,7 +68,9 @@ func (h *HistoryManager) RetrieveMessageFromCache(ctx context.Context, key strin
 		}
 		msgs = append(msgs, &msg)
 	}
-	sort.Slice(msgs, func(i, j int) bool { return msgs[i].Index > msgs[j].Index }) // 倒序
+	if len(msgs) > 0 {
+		sort.Slice(msgs, func(i, j int) bool { return msgs[i].Index > msgs[j].Index }) // 倒序
+	}
 	return msgs, nil
 }
 

@@ -37,7 +37,7 @@ func (e *Engine) config() error {
 	}
 
 	// 构造llm
-	if e.llm, err = app.NewChatApp(e.uSession, wfc.ChatConfig); err != nil {
+	if e.llm, err = app.NewChatApp(e.ctx, e.uSession, wfc.ChatConfig); err != nil {
 		logs.Error("[workflow] [config] new chatApp err: %v", err)
 		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "llm"))
 	}
@@ -63,6 +63,7 @@ func (e *Engine) buildConfig(resp *profile.ConfigGetByUnitIdResp) (c *core.Confi
 	if wfc.ChatConfig, err = conf.GetConfig().ChatConf(resp.Config.Chat); err != nil {
 		return
 	}
+	wfc.ChatConfig.UserId = e.info[cst.UserId].(string)
 	if wfc.TTSConfig, err = conf.GetConfig().TTSConf(resp.Config.Tts); err != nil {
 		return
 	}
@@ -72,9 +73,7 @@ func (e *Engine) buildConfig(resp *profile.ConfigGetByUnitIdResp) (c *core.Confi
 	if wfc.ASRConfig, err = conf.GetConfig().ASRConf(); err != nil {
 		return
 	}
-	c = &core.Config{Type: resp.Config.Type,
-		ModelName: "", ModelView: "",
-		ChatConfig: core.ChatConfig{},
+	c = &core.Config{Type: resp.Config.Type, ModelName: "", ModelView: "", ChatConfig: core.ChatConfig{},
 		ASRConfig: core.ASRConfig{Format: wfc.ASRConfig.Format, Codec: wfc.ASRConfig.Codec, Rate: wfc.ASRConfig.Rate,
 			Bits: wfc.ASRConfig.Bits, Channels: wfc.ASRConfig.Channels, ResultType: wfc.ASRConfig.ResultType},
 		TTSConfig: core.TTSConfig{Format: wfc.TTSConfig.AudioParams.Format, Codec: wfc.TTSConfig.AudioParams.Codec,

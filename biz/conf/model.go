@@ -21,7 +21,6 @@ type TTSConfig struct {
 	URL         string
 	AccessKey   string
 	Namespace   string
-	Speaker     string // TODO 下游配置
 	ResourceId  string
 	AudioParams struct {
 		Format       string
@@ -65,7 +64,8 @@ func (c *Config) ChatConf(chat *profile.ChatApp) (*app.ChatSetting, error) {
 		return nil, errorx.New(errno.ConfigErr, errorx.KV("app", "chat"))
 	}
 	if cc, ok := c.ModelConfig.Chat[chat.Provider]; ok {
-		return &app.ChatSetting{Provider: chat.Provider, Url: cc.URL, AppId: chat.AppId, AccessKey: cc.AccessKey}, nil
+		return &app.ChatSetting{Provider: chat.Provider, Url: cc.URL, Model: "",
+			BotId: chat.AppId, UserId: "", AccessKey: cc.AccessKey}, nil
 	}
 	return nil, errorx.New(errno.ConfigErr, errorx.KV("app", "chat"))
 }
@@ -80,7 +80,7 @@ func (c *Config) TTSConf(tts *profile.TTSApp) (*app.TTSSetting, error) {
 			Bits: ct.AudioParams.Bits, Channels: ct.AudioParams.Channels, SpeechRate: ct.AudioParams.SpeechRate,
 			LoudnessRate: ct.AudioParams.LoudnessRate, Lang: ct.AudioParams.Lang, ResultType: ct.AudioParams.ResultType}
 		return &app.TTSSetting{Provider: tts.Provider, Url: ct.URL, AppID: tts.AppId, AccessKey: ct.AccessKey,
-			Namespace: ct.Namespace, Speaker: ct.Speaker, ResourceId: ct.ResourceId, AudioParams: ap}, nil
+			Speaker: tts.Speaker, Namespace: ct.Namespace, ResourceId: ct.ResourceId, AudioParams: ap}, nil
 	}
 	return nil, errorx.New(errno.ConfigErr, errorx.KV("app", "tts"))
 }

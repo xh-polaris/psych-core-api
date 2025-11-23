@@ -63,7 +63,9 @@ func processBinaryMessage(data []byte, meta *core.Meta) {
 		switch payload.(*core.Resp).Type {
 		case core.RModelAudio: // 模型音频
 			log.Printf("收到音频消息\n")
-			modelVideo = append(modelVideo, []byte(payload.(*core.Resp).Content.(string))...)
+			if payload.(*core.Resp) != nil && payload.(*core.Resp).Content != nil {
+				modelVideo = append(modelVideo, []byte(payload.(*core.Resp).Content.(string))...)
+			}
 		default:
 			// 格式化输出
 			jsonData, _ := json.MarshalIndent(payload, "", "  ")

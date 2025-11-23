@@ -13,10 +13,14 @@ import (
 // execTTS 用于文字转语音(发送端) [task]
 func (e *Engine) execTTS(ctx context.Context, id uint, stream *schema.StreamReader[*schema.Message]) {
 	defer stream.Close()
+	if err := e.tts.Dial(ctx); err != nil {
+		e.unexpected(err, "tts dial err")
+	}
 	if err := e.tts.Send(ctx, app.FirstTTS); err != nil { // 首包
 		e.unexpected(err, "tts first send err")
 	}
-
+	// 启用tts接收
+	go e.execTTSRecv(ctx, id)
 	var stop bool
 	for {
 		select {

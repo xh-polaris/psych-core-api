@@ -5,6 +5,8 @@
 package app
 
 import (
+	"context"
+
 	"github.com/cloudwego/eino/components/model"
 )
 
@@ -16,7 +18,9 @@ type (
 	ChatSetting struct {
 		Provider  string `json:"provider"`
 		Url       string `json:"url"`
-		AppId     string `json:"appId"`
+		Model     string `json:"model"`
+		BotId     string `json:"botId"`
+		UserId    string `json:"userId"`
 		AccessKey string `json:"accessKey"`
 	}
 
@@ -36,7 +40,7 @@ type (
 )
 
 // chatFactory ChatApp的构造函数类型
-type chatFactory func(uSession string, setting *ChatSetting) ChatApp
+type chatFactory func(ctx context.Context, uSession string, setting *ChatSetting) (ChatApp, error)
 
 // chatProviders ChatApp的构造函数
 var chatProviders = make(map[string]chatFactory)
@@ -47,9 +51,9 @@ func ChatRegister(name string, factory chatFactory) {
 }
 
 // NewChatApp 构造ChatApp的工厂方法
-func NewChatApp(uSession string, setting *ChatSetting) (ChatApp, error) {
+func NewChatApp(ctx context.Context, uSession string, setting *ChatSetting) (ChatApp, error) {
 	if factory, ok := chatProviders[setting.Provider]; ok {
-		return factory(uSession, setting), nil
+		return factory(ctx, uSession, setting)
 	}
 	return nil, NoFactory
 }

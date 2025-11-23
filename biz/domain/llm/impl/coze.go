@@ -2,7 +2,6 @@ package impl
 
 import (
 	"context"
-	"strings"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
@@ -45,7 +44,6 @@ func (c *CozeModel) Stream(ctx context.Context, in []*schema.Message, opts ...mo
 		AutoSaveHistory: &autoSaveHistory,
 		Stream:          &isStream,
 		ConnectorID:     "1024",
-		ConversationID:  "0",
 	}
 	var stream coze.Stream[coze.ChatEvent]
 	if stream, err = c.cli.Chat.Stream(ctx, request); err != nil {
@@ -63,8 +61,8 @@ func process(ctx context.Context, reader coze.Stream[coze.ChatEvent], writer *sc
 	var event *coze.ChatEvent
 	var msg *schema.Message
 
-	var pass int       // 跳过次数
-	var collect string // 收集跳过的内容
+	//var pass int       // 跳过次数
+	//var collect string // 收集跳过的内容
 	var status = cst.EventMessageContentTypeText
 	for {
 		select {
@@ -85,28 +83,28 @@ func process(ctx context.Context, reader coze.Stream[coze.ChatEvent], writer *sc
 			}
 			msg = ce2e(event)
 
-			if pass > 0 { // 跳过指定个数
-				pass, collect = pass-1, collect+msg.Content
-				continue
-			}
+			//if pass > 0 { // 跳过指定个数
+			//pass, collect = pass-1, collect+msg.Content
+			//continue
+			//}
 			// 深度思考需要处理 Think标签
-			if len(msg.Content) > 0 && msg.Content[0] == '<' { // 如果是 < 开头, 可能为深度思考<think>标签, 考虑到都是三个, 所以收集三个
-				pass, collect = 2, msg.Content
-				continue
-			}
+			//if len(msg.Content) > 0 && msg.Content[0] == '<' { // 如果是 < 开头, 可能为深度思考<think>标签, 考虑到都是三个, 所以收集三个
+			//	pass, collect = 2, msg.Content
+			//	continue
+			//}
 			// 处理消息
-			switch strings.Trim(collect, "\n") {
-			case cst.ThinkStart:
-				collect = ""
-				status = cst.EventMessageContentTypeThink
-			case cst.ThinkEnd:
-				collect = ""
-				status = cst.EventMessageContentTypeText
-			default:
-			}
-			if collect != "" {
-				msg.Content = collect + msg.Content
-			}
+			//switch strings.Trim(collect, "\n") {
+			//case cst.ThinkStart:
+			//	collect = ""
+			//	status = cst.EventMessageContentTypeThink
+			//case cst.ThinkEnd:
+			//	collect = ""
+			//	status = cst.EventMessageContentTypeText
+			//default:
+			//}
+			//if collect != "" {
+			//	msg.Content = collect + msg.Content
+			//}
 			util.AddExtra(msg, cst.EventMessageContentType, status)
 			writer.Send(msg, nil)
 		}

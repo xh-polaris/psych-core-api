@@ -117,7 +117,6 @@ func TestVolcTTSApp(t *testing.T) {
 
 func GetVolcTTSApp() app.TTSApp {
 	return tts.NewVcMTTSApp("volc-test"+strconv.Itoa(rand.New(rand.NewSource(time.Now().Unix())).Int()), &app.TTSSetting{
-		Id:         GetTestConfig()["VCTTSAppId"].(string),
 		Provider:   GetTestConfig()["VCTTSAppProvider"].(string),
 		Url:        GetTestConfig()["VCTTSAppUrl"].(string),
 		AppID:      GetTestConfig()["VCTTSAppAppID"].(string),
@@ -125,17 +124,7 @@ func GetVolcTTSApp() app.TTSApp {
 		Namespace:  GetTestConfig()["VCTTSAppNamespace"].(string),
 		Speaker:    GetTestConfig()["VCTTSAppSpeaker"].(string),
 		ResourceId: GetTestConfig()["VCTTSAppResourceId"].(string),
-		AudioParams: struct {
-			Format       string `json:"format"`
-			Codec        string `json:"codec"`
-			Rate         int32  `json:"rate"`
-			Bits         int32  `json:"bits"`
-			Channels     int    `json:"channels"`
-			SpeechRate   int32  `json:"speech_rate"`
-			LoudnessRate int32  `json:"loudness_rate"`
-			Lang         string `json:"lang"`
-			ResultType   string `json:"result_type"`
-		}{
+		AudioParams: &app.AudioParams{
 			Format:       GetTestConfig()["VCTTSAppAudioFormat"].(string),
 			Codec:        GetTestConfig()["VCTTSAppAudioCodec"].(string),
 			Rate:         int32(GetTestConfig()["VCTTSAppAudioRate"].(int)),

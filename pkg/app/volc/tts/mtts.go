@@ -16,7 +16,7 @@ import (
 var _ app.TTSApp = (*VcMTTSApp)(nil)
 
 func init() {
-	app.TTSRegister("volc-model", NewVcMTTSApp)
+	app.TTSRegister("volc-mtts", NewVcMTTSApp)
 }
 
 // VcMTTSApp 是火山引擎的大模型语音合成

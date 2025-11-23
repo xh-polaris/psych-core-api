@@ -112,7 +112,6 @@ func receiveResults(ctx context.Context, t *testing.T, app app.ASRApp) {
 
 func GetASRApp() app.ASRApp {
 	return asr.NewVcASRApp("vc-asr-test", &app.ASRSetting{
-		Id:         GetTestConfig()["VCASRAppId"].(string),
 		Provider:   GetTestConfig()["VCASRAppProvider"].(string),
 		Url:        GetTestConfig()["VCASRAppUrl"].(string),
 		AppID:      GetTestConfig()["VCASRAppAppID"].(string),

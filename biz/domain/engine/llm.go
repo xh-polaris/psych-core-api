@@ -9,6 +9,7 @@ import (
 	"github.com/cloudwego/eino/schema"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/domain/his"
+	_ "github.com/xh-polaris/psych-core-api/biz/domain/llm"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/app"
@@ -38,6 +39,7 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	if err = his.Mgr.AddMessage(ctx, e.uSession, usrMsg); err != nil {
 		return errorx.WrapByCode(err, errno.AddUserMsgErr)
 	}
+	mMsgs = append([]*message.Message{usrMsg}, mMsgs...)
 	// 创建模型消息
 	astMsg := util.AssistantMMsg(oids[0], oids[1], "", index+1)
 
@@ -57,12 +59,10 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	go e.execLLMResponse(ctx, cmd.ID, ret, astMsg)
 	// 启用tts发送
 	go e.execTTS(ctx, cmd.ID, tts)
-	// 启用tts接收
-	go e.execTTSRecv(ctx, cmd.ID)
 	return err
 }
 
-// execLLMResponse 负责将大模型响应返回给前端
+// execLLMResponse 负责将大模型响应返回给前端 [task]
 func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.StreamReader[*schema.Message], astMsg *message.Message) {
 	defer stream.Close()
 	var collect strings.Builder
@@ -91,6 +91,10 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 				}
 				finish = "stop"
 			}
+			if msg == nil {
+				msg = &schema.Message{}
+			}
+			util.DPrint("llm msg:%s", msg.Content)
 			frame := &app.ChatFrame{Id: index, Content: msg.Content, SessionId: e.uSession, Timestamp: time.Now().Unix(), Finish: finish}
 			// 写回给前端
 			if err = e.MWrite(core.MResp, &core.Resp{ID: id, Type: core.RModelText, Content: frame}); err != nil {

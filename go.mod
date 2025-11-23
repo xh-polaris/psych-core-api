@@ -26,6 +26,8 @@ require (
 require (
 	github.com/bytedance/sonic v1.14.1
 	github.com/cloudwego/eino v0.5.12
+	github.com/coze-dev/coze-go v0.0.0-20251029161603-312b7fd62d20
+	github.com/golang/glog v1.2.5
 	github.com/redis/go-redis/v9 v9.12.1
 	go.mongodb.org/mongo-driver v1.12.0
 	go.mongodb.org/mongo-driver/v2 v2.3.0
@@ -53,7 +55,6 @@ require (
 	github.com/cloudwego/prutal v0.1.2 // indirect
 	github.com/cloudwego/runtimex v0.1.1 // indirect
 	github.com/cloudwego/thriftgo v0.4.2 // indirect
-	github.com/coze-dev/coze-go v0.0.0-20251029161603-312b7fd62d20 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -67,7 +68,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/swag v0.22.4 // indirect
-	github.com/golang/glog v1.2.5 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8 // indirect
