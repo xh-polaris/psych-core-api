@@ -30,13 +30,20 @@ func (e *Engine) handle(data []byte) (err error) {
 
 	util.DPrint("[engine] receive message: %+v\n", payload) // debug
 	if msg.Type == core.MAuth {
-		if auth, ok := util.Convert[*core.Auth](payload); ok { // 认证消息
-			if ok, err = e.auth(auth); err != nil {
-				e.unexpected(err, "auth")
-			} else if ok {
-				e.isAuth = true
-				return e.config() // 认证成功后配置
+		if !e.isAuth { // 一次连接中不能多次Auth
+			if auth, ok := util.Convert[*core.Auth](payload); ok { // 认证消息
+				if ok, err = e.auth(auth); err != nil {
+					e.unexpected(err, "auth")
+				} else if ok {
+					if e.unexpected(e.Lock(), "lock") {
+						return
+					}
+					e.isAuth = true
+					return e.config() // 认证成功后配置
+				}
 			}
+		} else {
+			return e.MWrite(core.MErr, core.Err{Code: 999_005_002, Message: "已认证"})
 		}
 	}
 	if !e.isAuth {

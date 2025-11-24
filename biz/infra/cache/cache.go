@@ -32,6 +32,7 @@ type StringCmdable interface {
 	Get(ctx context.Context, key string) StringCmd
 	IncrBy(ctx context.Context, key string, value int64) IntCmd
 	Incr(ctx context.Context, key string) IntCmd
+	SetNX(ctx context.Context, key string, value interface{}, expiration time.Duration) BoolCmd
 }
 
 type HashCmdable interface {

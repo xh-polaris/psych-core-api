@@ -110,7 +110,7 @@ func (p *PostProducer) Produce(ctx context.Context, session string, info map[str
 		return err
 	}
 	if conf.GetConfig().State == "test" { // debug 测试时不实践发布消息
-		logs.Info("[mq producer] post notify %+v", string(payload))
+		logs.Info("[mq producer] post notify :", string(payload))
 		return nil
 	}
 

@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/hertz-contrib/websocket"
+	"github.com/xh-polaris/psych-core-api/biz/cst"
+	"github.com/xh-polaris/psych-core-api/biz/infra/lock"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mq"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/app"
@@ -16,6 +19,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/pkg/wsx"
+	"github.com/xh-polaris/psych-core-api/types/errno"
 )
 
 // 目前当websocket层出现问题, engine会直接结束, 并未处理可恢复错误而是强制由客户端尝试重连
@@ -26,11 +30,14 @@ var meta = &core.Meta{
 	Compression:   core.GZIP,
 }
 
+const must = "[must]"
+
 type Engine struct {
-	ctx    context.Context    // ctx 上下文
-	cancel context.CancelFunc // cancel 关闭所有的task线程
-	once   sync.Once          // once 保证close操作只执行一次
-	errs   chan error         // errs task线程错误收集
+	ctx    context.Context       // ctx 上下文
+	cancel context.CancelFunc    // cancel 关闭所有的task线程
+	once   sync.Once             // once 保证close操作只执行一次
+	errs   chan error            // errs task线程错误收集
+	lock   lock.DistributionLock // 分布式锁, 确保一个用户只有一个进行中对话
 
 	// 应用
 	asr       app.ASRApp                 // asr 管理文字转语音
@@ -84,7 +91,7 @@ func (e *Engine) Run() {
 			// 从客户端读取信息
 			if mt, data, err = e.Read(); err != nil {
 				logs.CondError(!wsx.IsNormal(err), "[engine] close by read error %s", err)
-				e.unexpected(err, "read err")
+				e.unexpected(err, "[must] read err")
 				return
 			}
 			switch mt {
@@ -109,13 +116,23 @@ func (e *Engine) init() (err error) {
 }
 
 // unexpected engine进程中的错误处理
-func (e *Engine) unexpected(err error, cause string) {
+func (e *Engine) unexpected(err error, cause string) bool {
 	var custom errorx.StatusError
-	if err != nil && (!errors.As(err, &custom) || custom.IsAffectStability()) && !wsx.IsNormal(err) { // 错误或影响稳定性
+	if errors.As(err, &custom) {
+		if err = e.MWrite(core.MErr, core.ToErr(custom)); err != nil {
+			e.unexpected(err, cause)
+		}
+		if custom.IsAffectStability() {
+			util.DPrint("[engine] [unexpected] cause: %s\n", cause)
+			_ = e.Close()
+			return true
+		}
+	} else if (err != nil && !wsx.IsNormal(err)) || strings.HasPrefix(cause, must) { // 错误或影响稳定性
 		util.DPrint("[engine] [unexpected] err: %s,cause: %s\n", err, cause)
 		_ = e.Close()
+		return true
 	}
-	return
+	return false
 }
 
 // Read 读取输入并适时地记录日志
@@ -150,11 +167,34 @@ func (e *Engine) MWrite(t core.MType, payload any) (err error) {
 	return e.Write(data)
 }
 
+// Lock 锁定
+func (e *Engine) Lock() error {
+	if e.lock == nil {
+		e.lock = lock.Mgr.NewLock(e.info[cst.UserId].(string))
+	}
+	if ok, err := e.lock.TryLock(e.ctx, time.Minute*3, time.Second*90, time.Minute*2); err != nil {
+		return errorx.WrapByCode(err, errno.UnKnown)
+	} else if !ok {
+		return errorx.New(errno.ExistConn)
+	}
+	return nil
+}
+
+func (e *Engine) Unlock() error {
+	if err := e.lock.TryUnlock(e.ctx); err != nil {
+		return errorx.WrapByCode(err, errno.UnKnown)
+	}
+	return nil
+}
+
 // Close 释放engine的资源
 func (e *Engine) Close() (err error) {
 	e.once.Do(func() {
 		// 关闭各个应用, llm无需关闭
 		appClose(e.asr, e.tts)
+		if err = e.Unlock(); err != nil {
+			logs.Error("[engine] unlock err: %s", err)
+		}
 		// 关闭子线程
 		e.cancel()
 		// 关闭主线程的ws连接

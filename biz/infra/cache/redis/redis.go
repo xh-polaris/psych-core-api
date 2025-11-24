@@ -41,6 +41,10 @@ type redisImpl struct {
 	client *redis.Client
 }
 
+func (r *redisImpl) SetNX(ctx context.Context, key string, value interface{}, expiration time.Duration) cache.BoolCmd {
+	return r.client.SetNX(ctx, key, value, expiration)
+}
+
 // Del implements cache.Cmdable.
 func (r *redisImpl) Del(ctx context.Context, keys ...string) cache.IntCmd {
 	return r.client.Del(ctx, keys...)
@@ -128,6 +132,10 @@ func (r *redisImpl) Eval(ctx context.Context, script string, keys []string, args
 
 type pipelineImpl struct {
 	p redis.Pipeliner
+}
+
+func (p *pipelineImpl) SetNX(ctx context.Context, key string, value interface{}, expiration time.Duration) cache.BoolCmd {
+	return p.p.SetNX(ctx, key, value, expiration)
 }
 
 // Del implements cache.Pipeliner.

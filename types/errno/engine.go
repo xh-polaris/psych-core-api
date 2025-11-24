@@ -19,6 +19,8 @@ const (
 	AddUserMsgErr  = 999_003_003
 
 	ConfigErr = 999_004_000
+
+	ExistConn = 999_005_000
 )
 
 func init() {
@@ -83,4 +85,8 @@ func init() {
 		"配置 {app} 失败",
 		code.WithAffectStability(false),
 	)
+	code.Register(
+		ExistConn,
+		"用户连接数已满, 请先关闭先前的连接",
+		code.WithAffectStability(true))
 }
