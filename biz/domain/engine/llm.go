@@ -15,6 +15,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/app"
 	"github.com/xh-polaris/psych-core-api/pkg/core"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
+	"github.com/xh-polaris/psych-core-api/types/convert"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 )
 
@@ -35,16 +36,16 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	if len(mMsgs) > 0 {
 		index = int(mMsgs[0].Index) + 1
 	}
-	usrMsg := util.UserMMsg(oids[0], oids[1], cmd.Content.(string), index)
+	usrMsg := convert.UserMMsg(oids[0], oids[1], cmd.Content.(string), index)
 	if err = his.Mgr.AddMessage(ctx, e.uSession, usrMsg); err != nil {
 		return errorx.WrapByCode(err, errno.AddUserMsgErr)
 	}
 	mMsgs = append([]*message.Message{usrMsg}, mMsgs...)
 	// 创建模型消息
-	astMsg := util.AssistantMMsg(oids[0], oids[1], "", index+1)
+	astMsg := convert.AssistantMMsg(oids[0], oids[1], "", index+1)
 
 	// 调用大模型
-	eMsgs := util.MMsgToEMsgList(mMsgs) // 存储域消息转模型域
+	eMsgs := convert.MMsgToEMsgList(mMsgs) // 存储域消息转模型域
 	ctx, e.llmCancel = context.WithCancel(ctx)
 	stream, err := e.llm.Stream(ctx, eMsgs)
 	if err != nil {
@@ -67,6 +68,7 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 	defer stream.Close()
 	var collect strings.Builder
 	defer func(collect *strings.Builder, astMsg *message.Message) { // 存储模型消息
+		astMsg.Usage = e.usage.LLMUsage
 		now := time.Now()
 		astMsg.CreateTime, astMsg.UpdateTime, astMsg.Content = now, now, collect.String()
 		if err := his.Mgr.AddMessage(context.Background(), e.uSession, astMsg); err != nil {
@@ -94,6 +96,9 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 			if msg == nil {
 				msg = &schema.Message{}
 			}
+			if msg.ResponseMeta != nil {
+				e.llmUsage(msg.ResponseMeta) // 记录用量
+			}
 			util.DPrint("llm msg:%s", msg.Content)
 			frame := &app.ChatFrame{Id: index, Content: msg.Content, SessionId: e.uSession, Timestamp: time.Now().Unix(), Finish: finish}
 			// 写回给前端
@@ -108,5 +113,16 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 				return
 			}
 		}
+	}
+}
+
+func (e *Engine) llmUsage(usage *schema.ResponseMeta) {
+	e.usage.LLMUsage = &core.LLMUsage{
+		PromptTokens: usage.Usage.PromptTokens,
+		PromptTokenDetails: core.PromptTokenDetails{
+			CachedTokens: usage.Usage.PromptTokenDetails.CachedTokens,
+		},
+		CompletionTokens: usage.Usage.CompletionTokens,
+		TotalTokens:      usage.Usage.TotalTokens,
 	}
 }

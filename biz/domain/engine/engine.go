@@ -56,13 +56,14 @@ type Engine struct {
 	info     map[string]any // 基本信息
 	isAuth   bool           // 是否认证
 	uSession string         // uSession 对话ID
+	usage    *core.Usage    // 用量
 	conf     *core.Config
 }
 
 // NewEngine 创建一个新的对话引擎
 func NewEngine(ctx context.Context, conn *websocket.Conn) *Engine {
 	ctx, cancel := context.WithCancel(ctx)
-	e := &Engine{ctx: ctx, cancel: cancel, wsx: wsx.NewHZWSClient(conn),
+	e := &Engine{ctx: ctx, cancel: cancel, wsx: wsx.NewHZWSClient(conn), usage: &core.Usage{},
 		start: time.Now(), meta: meta, info: make(map[string]any), errs: make(chan error, 3)}
 	//e.wsx.SetCloseHandler(func(code int, text string) (err error) { // 处理close消息
 	//	if err = e.wsx.ControlClose(websocket.FormatCloseMessage(code, text)); err != nil { // 给客户端写回一个close消息
