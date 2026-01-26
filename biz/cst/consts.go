@@ -30,16 +30,25 @@ const (
 
 	Status        = "status"
 	DeletedStatus = -1
+	Processed     = "processed" // 预警状态-已处理
+	Pending       = "pending"   // 预警状态-待处理
 	Meta          = "$meta"
 	TextScore     = "textScore"
 	Score         = "score"
 	NE            = "$ne"
 	LT            = "$lt"
+	GT            = "$gt"
 	Set           = "$set"
 	Text          = "$text"
 	Search        = "$search"
 	Regex         = "$regex"
 	Options       = "$options"
+
+	// 预警管理-情绪类型
+	Danger   = "danger"
+	Depress  = "depress"
+	Negative = "negative"
+	Normal   = "normal"
 )
 
 // Event中各种类型枚举值

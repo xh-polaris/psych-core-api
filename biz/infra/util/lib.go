@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 )
 
 func Convert[T any](in any) (out T, ok bool) {
@@ -62,4 +63,16 @@ func BuildBytes(data ...[]byte) []byte {
 		b.Write(d)
 	}
 	return b.Bytes()
+}
+
+// ChangePercent 计算变化率
+func ChangePercent(now, past int64) float64 {
+	if past == 0 {
+		if now > 0 {
+			return 100.00
+		}
+		return 0.00
+	}
+	percent := float64(now-past) / float64(past) * 100
+	return math.Round(percent*100) / 100
 }

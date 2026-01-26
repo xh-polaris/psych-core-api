@@ -3,7 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/psych-core-api.iml" filepath="$PROJECT_DIR$/.idea/psych-core-api.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../psych-idl/.idea/psych-idl.iml" filepath="$PROJECT_DIR$/../psych-idl/.idea/psych-idl.iml" />
     </modules>
   </component>
 </project>

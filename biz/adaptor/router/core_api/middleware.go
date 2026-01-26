@@ -30,3 +30,33 @@ func _usersigninMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _dashboardMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardgetalarmoverviewMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardlistalarmusersMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardlistclassesMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardgetdataoverviewMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardlistusersMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

@@ -43,3 +43,82 @@ func UserGetInfo(ctx context.Context, c *app.RequestContext) {
 	resp, err := p.AuthService.UserGetInfo(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
+
+// DashboardGetDataOverview .
+// @router /dashboard/overview [GET]
+func DashboardGetDataOverview(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.DashboardGetDataOverviewReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	resp := new(core_api.DashboardGetDataOverviewResp)
+
+	c.JSON(consts.StatusOK, resp)
+}
+
+// DashboardGetAlarmOverview .
+// @router /dashboard/alarm_overview [GET]
+func DashboardGetAlarmOverview(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.DashboardGetAlarmOverviewReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	resp := new(core_api.DashboardGetAlarmOverviewResp)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// DashboardListAlarmRecords .
+// @router /dashboard/alarm_users [GET]
+func DashboardListAlarmRecords(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.DashboardListAlarmRecordsReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.AlarmService.ListRecords(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// DashboardListClasses .
+// @router /dashboard/classes [GET]
+func DashboardListClasses(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.DashboardListClassesReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.DashboardService.ListClasses(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// DashboardListUsers .
+// @router /dashboard/users [GET]
+func DashboardListUsers(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.DashboardListUsersReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.DashboardService.ListUsers(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}

@@ -18,6 +18,14 @@ func Register(r *server.Hertz) {
 
 	root := r.Group("/", rootMw()...)
 	{
+		_dashboard := root.Group("/dashboard", _dashboardMw()...)
+		_dashboard.GET("/alarm_overview", append(_dashboardgetalarmoverviewMw(), core_api.DashboardGetAlarmOverview)...)
+		_dashboard.GET("/alarm_users", append(_dashboardlistalarmusersMw(), core_api.DashboardListAlarmRecords)...)
+		_dashboard.GET("/classes", append(_dashboardlistclassesMw(), core_api.DashboardListClasses)...)
+		_dashboard.GET("/overview", append(_dashboardgetdataoverviewMw(), core_api.DashboardGetDataOverview)...)
+		_dashboard.GET("/users", append(_dashboardlistusersMw(), core_api.DashboardListUsers)...)
+	}
+	{
 		_user := root.Group("/user", _userMw()...)
 		_user.GET("/info", append(_usergetinfoMw(), core_api.UserGetInfo)...)
 		_user.POST("/sign_in", append(_usersigninMw(), core_api.UserSignIn)...)

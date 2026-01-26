@@ -9,6 +9,7 @@ package provider
 import (
 	"github.com/xh-polaris/psych-core-api/biz/application/service"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 )
 
@@ -20,11 +21,18 @@ func NewProvider() (*Provider, error) {
 		return nil, err
 	}
 	authService := service.AuthService{}
+	iMongoMapper := alarm.NewMessageMongoMapper(config)
+	alarmService := service.AlarmService{
+		AlarmMapper: iMongoMapper,
+	}
+	dashboardService := service.DashboardService{}
 	mongoMapper := message.NewMessageMongoMapper(config)
 	providerProvider := &Provider{
-		Config:        config,
-		AuthService:   authService,
-		MessageMapper: mongoMapper,
+		Config:           config,
+		AuthService:      authService,
+		AlarmService:     alarmService,
+		DashboardService: dashboardService,
+		MessageMapper:    mongoMapper,
 	}
 	return providerProvider, nil
 }

@@ -16,7 +16,9 @@ import (
 )
 
 type IAuthService interface {
-	SignIn(ctx context.Context, req *core_api.UserSignInReq) (resp *core_api.UserSignInResp, err error)
+	// SignIn(ctx context.Context, req *core_api.UserSignInReq) (resp *core_api.UserSignInResp, err error)
+	UserSignIn(ctx context.Context, req *core_api.UserSignInReq) (resp *core_api.UserSignInResp, err error)
+	UserGetInfo(ctx context.Context, _ *core_api.UserGetInfoReq) (resp *core_api.UserGetInfoResp, err error)
 }
 
 type AuthService struct {
@@ -27,7 +29,7 @@ var AuthServiceSet = wire.NewSet(
 	wire.Bind(new(IAuthService), new(*AuthService)),
 )
 
-func (s AuthService) UserSignIn(ctx context.Context, req *core_api.UserSignInReq) (resp *core_api.UserSignInResp, err error) {
+func (s *AuthService) UserSignIn(ctx context.Context, req *core_api.UserSignInReq) (resp *core_api.UserSignInResp, err error) {
 	// 调用接口
 	client := rpc.GetPsychProfile()
 	userResp, err := client.UserSignIn(ctx, &profile.UserSignInReq{
@@ -59,7 +61,7 @@ func (s AuthService) UserSignIn(ctx context.Context, req *core_api.UserSignInReq
 	return resp, nil
 }
 
-func (s AuthService) UserGetInfo(ctx context.Context, _ *core_api.UserGetInfoReq) (resp *core_api.UserGetInfoResp, err error) {
+func (s *AuthService) UserGetInfo(ctx context.Context, _ *core_api.UserGetInfoReq) (resp *core_api.UserGetInfoResp, err error) {
 	var meta *usr.Meta
 	if meta, err = util.ExtraUserMeta(ctx); err != nil {
 		return nil, errorx.WrapByCode(err, errno.ExpireAuth)
