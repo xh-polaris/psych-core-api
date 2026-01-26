@@ -51,6 +51,23 @@ const (
 	Normal   = "normal"
 )
 
+// 原profile相关mapper常量
+const (
+	ID         = "_id"
+	Phone      = "phone"
+	StudentID  = "student_id"
+	Name       = "name"
+	UnitID     = "unit_id"
+	Gender     = "gender"
+	Birth      = "birth"
+	EnrollYear = "enroll_year"
+	Grade      = "grade"
+	Class      = "class"
+	Address    = "address"
+	Contact    = "contact"
+	Password   = "password"
+)
+
 // Event中各种类型枚举值
 const (
 	EventMessageContentTypeText     = 0

@@ -21,7 +21,7 @@ func NewProvider() (*Provider, error) {
 		return nil, err
 	}
 	authService := service.AuthService{}
-	iMongoMapper := alarm.NewMessageMongoMapper(config)
+	iMongoMapper := alarm.NewAlarmMongoMapper(config)
 	alarmService := service.AlarmService{
 		AlarmMapper: iMongoMapper,
 	}

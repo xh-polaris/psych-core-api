@@ -33,7 +33,7 @@ type mongoMapper struct {
 	conn *monc.Model
 }
 
-func NewMessageMongoMapper(config *conf.Config) IMongoMapper {
+func NewAlarmMongoMapper(config *conf.Config) IMongoMapper {
 	conn := monc.MustNewModel(config.Mongo.URL, config.Mongo.DB, collection, config.CacheConf)
 	return &mongoMapper{conn: conn}
 }
