@@ -18,16 +18,38 @@ func Register(r *server.Hertz) {
 
 	root := r.Group("/", rootMw()...)
 	{
+		_config := root.Group("/config", _configMw()...)
+		_config.POST("/create", append(_configcreateMw(), core_api.ConfigCreate)...)
+		_config.GET("/get_by_unit_id", append(_configgetbyunitidMw(), core_api.ConfigGetByUnitID)...)
+		_config.POST("/update_info", append(_configupdateinfoMw(), core_api.ConfigUpdateInfo)...)
+	}
+	{
 		_dashboard := root.Group("/dashboard", _dashboardMw()...)
 		_dashboard.GET("/alarm_overview", append(_dashboardgetalarmoverviewMw(), core_api.DashboardGetAlarmOverview)...)
-		_dashboard.GET("/alarm_users", append(_dashboardlistalarmusersMw(), core_api.DashboardListAlarmRecords)...)
+		_dashboard.GET("/alarm_records", append(_dashboardlistalarmrecordsMw(), core_api.DashboardListAlarmRecords)...)
 		_dashboard.GET("/classes", append(_dashboardlistclassesMw(), core_api.DashboardListClasses)...)
 		_dashboard.GET("/overview", append(_dashboardgetdataoverviewMw(), core_api.DashboardGetDataOverview)...)
+		_dashboard.GET("/psych_trend", append(_dashboardgetpsychtrendMw(), core_api.DashboardGetPsychTrend)...)
+		_dashboard.GET("/trend", append(_dashboardgetdatatrendMw(), core_api.DashboardGetDataTrend)...)
+		_dashboard.GET("/units", append(_dashboardlistunitsMw(), core_api.DashboardListUnits)...)
 		_dashboard.GET("/users", append(_dashboardlistusersMw(), core_api.DashboardListUsers)...)
 	}
 	{
+		_unit := root.Group("/unit", _unitMw()...)
+		_unit.POST("/create_and_link_user", append(_unitcreateandlinkuserMw(), core_api.UnitCreateAndLinkUser)...)
+		_unit.GET("/get_info", append(_unitgetinfoMw(), core_api.UnitGetInfo)...)
+		_unit.POST("/link_user", append(_unitlinkuserMw(), core_api.UnitLinkUser)...)
+		_unit.POST("/sign_in", append(_unitsigninMw(), core_api.UnitSignIn)...)
+		_unit.POST("/sign_up", append(_unitsignupMw(), core_api.UnitSignUp)...)
+		_unit.POST("/update_info", append(_unitupdateinfoMw(), core_api.UnitUpdateInfo)...)
+		_unit.POST("/update_password", append(_unitupdatepasswordMw(), core_api.UnitUpdatePassword)...)
+	}
+	{
 		_user := root.Group("/user", _userMw()...)
-		_user.GET("/info", append(_usergetinfoMw(), core_api.UserGetInfo)...)
+		_user.GET("/get_info", append(_usergetinfoMw(), core_api.UserGetInfo)...)
 		_user.POST("/sign_in", append(_usersigninMw(), core_api.UserSignIn)...)
+		_user.POST("/sign_up", append(_usersignupMw(), core_api.UserSignUp)...)
+		_user.POST("/update_info", append(_userupdateinfoMw(), core_api.UserUpdateInfo)...)
+		_user.POST("/update_password", append(_userupdatepasswordMw(), core_api.UserUpdatePassword)...)
 	}
 }

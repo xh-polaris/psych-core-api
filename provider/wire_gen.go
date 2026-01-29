@@ -10,28 +10,48 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/application/service"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 )
 
 // Injectors from wire.go:
 
 func NewProvider() (*Provider, error) {
-	config, err := conf.NewConfig()
+	confConfig, err := conf.NewConfig()
 	if err != nil {
 		return nil, err
 	}
 	authService := service.AuthService{}
-	iMongoMapper := alarm.NewAlarmMongoMapper(config)
+	iMongoMapper := alarm.NewAlarmMongoMapper(confConfig)
 	alarmService := service.AlarmService{
 		AlarmMapper: iMongoMapper,
 	}
 	dashboardService := service.DashboardService{}
-	mongoMapper := message.NewMessageMongoMapper(config)
+	configIMongoMapper := config.NewConfigMongoMapper(confConfig)
+	configService := service.ConfigService{
+		ConfigMapper: configIMongoMapper,
+	}
+	userIMongoMapper := user.NewUserMongoMapper(confConfig)
+	unitIMongoMapper := unit.NewUnitMongoMapper(confConfig)
+	userService := service.UserService{
+		UserMapper: userIMongoMapper,
+		UnitMapper: unitIMongoMapper,
+	}
+	unitService := service.UnitService{
+		UnitMapper: unitIMongoMapper,
+		UserMapper: userIMongoMapper,
+	}
+	mongoMapper := message.NewMessageMongoMapper(confConfig)
 	providerProvider := &Provider{
-		Config:           config,
+		Config:           confConfig,
 		AuthService:      authService,
 		AlarmService:     alarmService,
 		DashboardService: dashboardService,
+		ConfigService:    configService,
+		UserService:      userService,
+		UnitService:      unitService,
 		MessageMapper:    mongoMapper,
 	}
 	return providerProvider, nil

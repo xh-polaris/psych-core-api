@@ -68,6 +68,12 @@ const (
 	Password   = "password"
 )
 
+// 原profile 前端字段相关
+const (
+	AuthTypePassword = 0
+	AuthTypeCode     = 1
+)
+
 // Event中各种类型枚举值
 const (
 	EventMessageContentTypeText     = 0

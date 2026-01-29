@@ -28,6 +28,9 @@ type Provider struct {
 	AuthService      service.AuthService
 	AlarmService     service.AlarmService
 	DashboardService service.DashboardService
+	ConfigService    service.ConfigService
+	UserService      service.UserService
+	UnitService      service.UnitService
 	MessageMapper    message.MongoMapper
 }
 
@@ -43,6 +46,9 @@ var ApplicationSet = wire.NewSet(
 	service.AuthServiceSet,
 	service.AlarmServiceSet,
 	service.DashboardServiceSet,
+	service.ConfigServiceSet,
+	service.UserServiceSet,
+	service.UnitServiceSet,
 )
 
 var InfrastructureSet = wire.NewSet(
