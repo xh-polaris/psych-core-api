@@ -60,3 +60,98 @@ func _dashboardlistusersMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _configMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _configcreateMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _configgetbyunitidMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _configupdateinfoMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardlistalarmrecordsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardgetpsychtrendMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardgetdatatrendMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardlistunitsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _unitMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _unitcreateandlinkuserMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _unitgetinfoMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _unitlinkuserMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _unitsigninMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _unitsignupMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _unitupdateinfoMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _unitupdatepasswordMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _usersignupMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _userupdateinfoMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _userupdatepasswordMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

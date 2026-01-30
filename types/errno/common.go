@@ -7,6 +7,21 @@ const (
 	UnKnown        = 500
 )
 
+// 通用错误码 1000 开始
+const (
+	ErrUnAuth                 = 1000
+	ErrUnImplement            = 1001
+	ErrInvalidParams          = 1002
+	ErrMissingParams          = 1003
+	ErrMissingEntity          = 1004
+	ErrNotFound               = 1005
+	ErrWrongAccountOrPassword = 1006
+	ErrUserNotFound           = 1007
+	ErrInternalError          = 1008
+	ErrPhoneAlreadyExist      = 1009
+	ErrWrongPassword          = 1010
+)
+
 func init() {
 	code.Register(
 		UnImplementErr,
@@ -16,5 +31,61 @@ func init() {
 	code.Register(
 		UnKnown,
 		"未知错误, 请重试",
-		code.WithAffectStability(false))
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrUnAuth,
+		"用户未登录",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrUnImplement,
+		"功能暂未实现",
+		code.WithAffectStability(true),
+	)
+	code.Register(
+		ErrInvalidParams,
+		"{field}格式错误",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrMissingParams,
+		"未填写{filed}",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrMissingEntity,
+		"不可以提交空的{entity}",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrNotFound,
+		"{field}不存在",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrWrongAccountOrPassword,
+		"账号或密码错误",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrUserNotFound,
+		"用户未注册",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrInternalError,
+		"内部错误",
+		code.WithAffectStability(true),
+	)
+	code.Register(
+		ErrPhoneAlreadyExist,
+		"手机号已被注册",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrWrongPassword,
+		"密码错误",
+		code.WithAffectStability(false),
+	)
 }

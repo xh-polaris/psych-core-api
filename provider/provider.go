@@ -5,7 +5,10 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/application/service"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
 )
 
@@ -25,6 +28,9 @@ type Provider struct {
 	AuthService      service.AuthService
 	AlarmService     service.AlarmService
 	DashboardService service.DashboardService
+	ConfigService    service.ConfigService
+	UserService      service.UserService
+	UnitService      service.UnitService
 	MessageMapper    message.MongoMapper
 }
 
@@ -40,12 +46,19 @@ var ApplicationSet = wire.NewSet(
 	service.AuthServiceSet,
 	service.AlarmServiceSet,
 	service.DashboardServiceSet,
+	service.ConfigServiceSet,
+	service.UserServiceSet,
+	service.UnitServiceSet,
 )
 
 var InfrastructureSet = wire.NewSet(
 	conf.NewConfig,
 	message.NewMessageMongoMapper,
-	alarm.NewMessageMongoMapper,
+	user.NewUserMongoMapper,
+	unit.NewUnitMongoMapper,
+	config.NewConfigMongoMapper,
+
+	alarm.NewAlarmMongoMapper,
 	RpcSet,
 )
 

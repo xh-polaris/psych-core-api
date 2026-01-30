@@ -4,45 +4,12 @@ package core_api
 
 import (
 	"context"
-
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/xh-polaris/psych-core-api/pkg/httpx"
 	"github.com/xh-polaris/psych-core-api/provider"
 	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
 )
-
-// UserSignIn .
-// @router /user/sign_in [POST]
-func UserSignIn(ctx context.Context, c *app.RequestContext) {
-	var err error
-	var req core_api.UserSignInReq
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		c.String(consts.StatusBadRequest, err.Error())
-		return
-	}
-
-	p := provider.Get()
-	resp, err := p.AuthService.UserSignIn(ctx, &req)
-	httpx.PostProcess(ctx, c, &req, resp, err)
-}
-
-// UserGetInfo .
-// @router /user/info [GET]
-func UserGetInfo(ctx context.Context, c *app.RequestContext) {
-	var err error
-	var req core_api.UserGetInfoReq
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		c.String(consts.StatusBadRequest, err.Error())
-		return
-	}
-
-	p := provider.Get()
-	resp, err := p.AuthService.UserGetInfo(ctx, &req)
-	httpx.PostProcess(ctx, c, &req, resp, err)
-}
 
 // DashboardGetDataOverview .
 // @router /dashboard/overview [GET]
@@ -56,6 +23,54 @@ func DashboardGetDataOverview(ctx context.Context, c *app.RequestContext) {
 	}
 
 	resp := new(core_api.DashboardGetDataOverviewResp)
+
+	c.JSON(consts.StatusOK, resp)
+}
+
+// DashboardGetDataTrend .
+// @router /dashboard/trend [GET]
+func DashboardGetDataTrend(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.DashboardGetDataTrendReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	resp := new(core_api.DashboardGetDataTrendResp)
+
+	c.JSON(consts.StatusOK, resp)
+}
+
+// DashboardListUnits .
+// @router /dashboard/units [GET]
+func DashboardListUnits(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.DashboardListUnitsReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	resp := new(core_api.DashboardListUnitsResp)
+
+	c.JSON(consts.StatusOK, resp)
+}
+
+// DashboardGetPsychTrend .
+// @router /dashboard/psych_trend [GET]
+func DashboardGetPsychTrend(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.DashboardGetPsychTrendReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	resp := new(core_api.DashboardGetPsychTrendResp)
 
 	c.JSON(consts.StatusOK, resp)
 }
@@ -120,5 +135,245 @@ func DashboardListUsers(ctx context.Context, c *app.RequestContext) {
 
 	p := provider.Get()
 	resp, err := p.DashboardService.ListUsers(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// UserSignUp .
+// @router /user/sign_up [POST]
+func UserSignUp(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.UserSignUpReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.UserService.UserSignUp(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// UserSignIn .
+// @router /user/sign_in [POST]
+func UserSignIn(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.UserSignInReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.UserService.UserSignIn(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// UserGetInfo .
+// @router /user/get_info [GET]
+func UserGetInfo(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.UserGetInfoReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.UserService.UserGetInfo(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// UserUpdateInfo .
+// @router /user/update_info [POST]
+func UserUpdateInfo(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.UserUpdateInfoReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.UserService.UserUpdateInfo(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// UserUpdatePassword .
+// @router /user/update_password [POST]
+func UserUpdatePassword(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.UserUpdatePasswordReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.UserService.UserUpdatePassword(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// UnitSignUp .
+// @router /unit/sign_up [POST]
+func UnitSignUp(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.UnitSignUpReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.UnitService.UnitSignUp(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// UnitSignIn .
+// @router /unit/sign_in [POST]
+func UnitSignIn(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.UnitSignInReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.UnitService.UnitSignIn(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// UnitGetInfo .
+// @router /unit/get_info [GET]
+func UnitGetInfo(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.UnitGetInfoReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.UnitService.UnitGetInfo(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// UnitUpdateInfo .
+// @router /unit/update_info [POST]
+func UnitUpdateInfo(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.UnitUpdateInfoReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.UnitService.UnitUpdateInfo(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// UnitUpdatePassword .
+// @router /unit/update_password [POST]
+func UnitUpdatePassword(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.UnitUpdatePasswordReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.UnitService.UnitUpdatePassword(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// UnitLinkUser .
+// @router /unit/link_user [POST]
+func UnitLinkUser(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.UnitLinkUserReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.UnitService.UnitLinkUser(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// UnitCreateAndLinkUser .
+// @router /unit/create_and_link_user [POST]
+func UnitCreateAndLinkUser(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.UnitCreateAndLinkUserReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.UnitService.UnitCreateAndLinkUser(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// ConfigCreate .
+// @router /config/create [POST]
+func ConfigCreate(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.ConfigCreateOrUpdateReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.ConfigService.ConfigCreate(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// ConfigUpdateInfo .
+// @router /config/update_info [POST]
+func ConfigUpdateInfo(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.ConfigCreateOrUpdateReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.ConfigService.ConfigUpdateInfo(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// ConfigGetByUnitID .
+// @router /config/get_by_unit_id [GET]
+func ConfigGetByUnitID(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.ConfigGetByUnitIdReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.ConfigService.ConfigGetByUnitID(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
