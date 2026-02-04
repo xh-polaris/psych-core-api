@@ -6,12 +6,18 @@ import "github.com/xh-polaris/psych-core-api/pkg/errorx/code"
 
 const (
 	ErrStudentIDAlreadyExist = 3000
+	ErrCountUserByClasses    = 3001
 )
 
 func init() {
 	code.Register(
 		ErrStudentIDAlreadyExist,
 		"学号已被注册",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrCountUserByClasses,
+		"学生人数统计失败",
 		code.WithAffectStability(false),
 	)
 }

@@ -38,7 +38,7 @@ func (m *mongoMapper[T]) FindOneByFields(ctx context.Context, filter bson.M) (*T
 
 // FindOne 根据ID查询实体
 func (m *mongoMapper[T]) FindOne(ctx context.Context, id primitive.ObjectID) (*T, error) {
-	return m.FindOneByFields(ctx, bson.M{cst.ID: id})
+	return m.FindOneByFields(ctx, bson.M{cst.Id: id})
 }
 
 // FindAllByFields 根据字段查询所有实体
@@ -58,7 +58,7 @@ func (m *mongoMapper[T]) Insert(ctx context.Context, data *T) error {
 
 // UpdateFields 更新字段
 func (m *mongoMapper[T]) UpdateFields(ctx context.Context, id primitive.ObjectID, update bson.M) error {
-	_, err := m.conn.UpdateOneNoCache(ctx, bson.M{cst.ID: id}, bson.M{"$set": update})
+	_, err := m.conn.UpdateOneNoCache(ctx, bson.M{cst.Id: id}, bson.M{"$set": update})
 	return err
 }
 

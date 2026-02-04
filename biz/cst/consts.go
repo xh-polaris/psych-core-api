@@ -27,6 +27,7 @@ const (
 	UnitId         = "unit_id"
 	Code           = "code"
 	CodeType       = "code_type"
+	Role           = "role"
 
 	Status        = "status"
 	DeletedStatus = -1
@@ -38,6 +39,7 @@ const (
 	NE            = "$ne"
 	LT            = "$lt"
 	GT            = "$gt"
+	In            = "$in"
 	Set           = "$set"
 	Text          = "$text"
 	Search        = "$search"
@@ -49,6 +51,11 @@ const (
 	Depress  = "depress"
 	Negative = "negative"
 	Normal   = "normal"
+
+	// 用户风险等级
+	High   = "high"
+	Medium = "medium"
+	Low    = "low"
 )
 
 // 原profile相关mapper常量

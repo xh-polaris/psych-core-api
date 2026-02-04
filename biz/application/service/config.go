@@ -83,7 +83,7 @@ func (c *ConfigService) ConfigCreate(ctx context.Context, req *core_api.ConfigCr
 }
 
 func (c *ConfigService) ConfigUpdateInfo(ctx context.Context, req *core_api.ConfigCreateOrUpdateReq) (resp *basic.Response, err error) {
-	// 鉴权
+	// TODO鉴权
 	if !req.Admin {
 		return nil, errorx.New(errno.ErrNotAdmin)
 	}

@@ -3,6 +3,7 @@ package message
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
@@ -25,6 +26,7 @@ const (
 type MongoMapper interface {
 	RetrieveMessage(ctx context.Context, conversation string, size int) ([]*Message, error)
 	Insert(ctx context.Context, msg *Message) error
+	BatchMessageStats(ctx context.Context, userIds []primitive.ObjectID) (map[primitive.ObjectID]*MsgStats, error)
 }
 
 type mongoMapper struct {
@@ -57,4 +59,53 @@ func (m *mongoMapper) RetrieveMessage(ctx context.Context, conversation string, 
 func (m *mongoMapper) Insert(ctx context.Context, msg *Message) error {
 	_, err := m.conn.InsertOneNoCache(ctx, msg)
 	return err
+}
+
+type MsgStats struct {
+	Rounds     int32
+	LatestTime int64
+}
+
+func (m *mongoMapper) BatchMessageStats(ctx context.Context, userIds []primitive.ObjectID) (map[primitive.ObjectID]*MsgStats, error) {
+	if len(userIds) == 0 {
+		return make(map[primitive.ObjectID]*MsgStats), nil
+	}
+
+	pipeline := []bson.M{
+		{
+			"$match": bson.M{
+				cst.UserId: bson.M{cst.In: userIds},
+				cst.Role:   RoleStoI[cst.User],                // user角色
+				cst.Status: bson.M{cst.NE: cst.DeletedStatus}, // 非删除状态
+			},
+		},
+		{
+			"$group": bson.M{
+				cst.Id:       "$" + cst.UserId, // 按用户分组
+				"rounds":     bson.M{"$sum": 1},
+				"latestTime": bson.M{"$max": "$" + cst.CreateTime},
+			},
+		},
+	}
+
+	var results []struct {
+		UserID     primitive.ObjectID `bson:"_id"`
+		Rounds     int32              `bson:"rounds"`
+		LatestTime time.Time          `bson:"latestTime"`
+	}
+	err := m.conn.Aggregate(ctx, &results, pipeline)
+	if err != nil {
+		logs.Errorf("[message mapper] aggregate user conversation statistic err:%s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	stats := make(map[primitive.ObjectID]*MsgStats)
+	for _, r := range results {
+		stats[r.UserID] = &MsgStats{
+			Rounds:     r.Rounds,
+			LatestTime: r.LatestTime.Unix(),
+		}
+	}
+
+	return stats, nil
 }

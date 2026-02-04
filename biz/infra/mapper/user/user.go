@@ -1,7 +1,13 @@
 package user
 
 import (
+	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+var (
+	RiskLevelStoI = map[string]int32{cst.High: 1, cst.Medium: 2, cst.Low: 3, cst.Normal: 4}
+	RiskLevelItoS = map[int32]string{1: cst.High, 2: cst.Medium, 3: cst.Low, 4: cst.Normal}
 )
 
 type User struct {
@@ -13,6 +19,7 @@ type User struct {
 	Name       string             `json:"name,omitempty" bson:"name,omitempty"`
 	Birth      int64              `json:"birth,omitempty" bson:"birth,omitempty"`
 	Gender     int                `json:"gender,omitempty" bson:"gender,omitempty"`
+	RiskLevel  int                `json:"riskLevel,omitempty" bson:"riskLevel,omitempty"`
 	Status     int                `json:"status,omitempty" bson:"status,omitempty"`
 	EnrollYear int32              `json:"enrollYear,omitempty" bson:"enrollYear,omitempty"`
 	Grade      int32              `json:"grade,omitempty" bson:"grade,omitempty"`
