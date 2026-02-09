@@ -1,11 +1,11 @@
 package util
 
-import "go.mongodb.org/mongo-driver/bson/primitive"
+import "go.mongodb.org/mongo-driver/v2/bson"
 
-func ObjectIDsFromHex(ids ...string) ([]primitive.ObjectID, error) {
-	var objectIDs []primitive.ObjectID
+func ObjectIDsFromHex(ids ...string) ([]bson.ObjectID, error) {
+	var objectIDs []bson.ObjectID
 	for _, id := range ids {
-		oid, err := primitive.ObjectIDFromHex(id)
+		oid, err := bson.ObjectIDFromHex(id)
 		if err != nil {
 			return nil, err
 		}

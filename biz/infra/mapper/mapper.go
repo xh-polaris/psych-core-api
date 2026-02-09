@@ -5,18 +5,17 @@ import (
 	"context"
 
 	"github.com/xh-polaris/psych-core-api/biz/cst"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/zeromicro/go-zero/core/stores/monc"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type IMongoMapper[T any] interface {
 	FindOneByFields(ctx context.Context, filter bson.M) (*T, error)
-	FindOne(ctx context.Context, id primitive.ObjectID) (*T, error)
+	FindOne(ctx context.Context, id bson.ObjectID) (*T, error)
 	FindAllByFields(ctx context.Context, filter bson.M) ([]*T, error)
 	Insert(ctx context.Context, data *T) error
-	UpdateFields(ctx context.Context, id primitive.ObjectID, update bson.M) error
+	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
 	ExistsByFields(ctx context.Context, filter bson.M) (bool, error)
 }
 
@@ -38,7 +37,7 @@ func (m *mongoMapper[T]) FindOneByFields(ctx context.Context, filter bson.M) (*T
 }
 
 // FindOne 根据ID查询实体
-func (m *mongoMapper[T]) FindOne(ctx context.Context, id primitive.ObjectID) (*T, error) {
+func (m *mongoMapper[T]) FindOne(ctx context.Context, id bson.ObjectID) (*T, error) {
 	return m.FindOneByFields(ctx, bson.M{cst.ID: id})
 }
 
@@ -58,7 +57,7 @@ func (m *mongoMapper[T]) Insert(ctx context.Context, data *T) error {
 }
 
 // UpdateFields 更新字段
-func (m *mongoMapper[T]) UpdateFields(ctx context.Context, id primitive.ObjectID, update bson.M) error {
+func (m *mongoMapper[T]) UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error {
 	_, err := m.conn.UpdateOneNoCache(ctx, bson.M{cst.ID: id}, bson.M{"$set": update})
 	return err
 }

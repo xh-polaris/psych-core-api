@@ -8,10 +8,9 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/zeromicro/go-zero/core/stores/monc"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 var _ IMongoMapper = (*mongoMapper)(nil)
@@ -23,15 +22,15 @@ const (
 
 type IMongoMapper interface {
 	FindOneByCode(ctx context.Context, phone string) (*User, error)
-	FindOneByCodeAndUnitID(ctx context.Context, phone string, unitId primitive.ObjectID) (*User, error)
-	FindOne(ctx context.Context, id primitive.ObjectID) (*User, error)
+	FindOneByCodeAndUnitID(ctx context.Context, phone string, unitId bson.ObjectID) (*User, error)
+	FindOne(ctx context.Context, id bson.ObjectID) (*User, error)
 	Insert(ctx context.Context, user *User) error
-	UpdateFields(ctx context.Context, id primitive.ObjectID, update bson.M) error
+	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
 	ExistsByCode(ctx context.Context, phone string) (bool, error)
-	ExistsByCodeAndUnitID(ctx context.Context, code string, unitId primitive.ObjectID) (bool, error)
-	FindAllByUnitID(ctx context.Context, unitId primitive.ObjectID) ([]*User, error)
-	BatchFindByIDs(ctx context.Context, userIds []primitive.ObjectID) (map[primitive.ObjectID]*User, error)
-	CountByClasses(ctx context.Context, unitId primitive.ObjectID, grade, class []int32) ([]*ClassStatResult, error)
+	ExistsByCodeAndUnitID(ctx context.Context, code string, unitId bson.ObjectID) (bool, error)
+	FindAllByUnitID(ctx context.Context, unitId bson.ObjectID) ([]*User, error)
+	BatchFindByIDs(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*User, error)
+	CountByClasses(ctx context.Context, unitId bson.ObjectID, grade, class []int32) ([]*ClassStatResult, error)
 }
 
 type mongoMapper struct {
@@ -53,7 +52,7 @@ func (m *mongoMapper) FindOneByCode(ctx context.Context, code string) (*User, er
 }
 
 // FindOneByCodeAndUnitID 根据电话号码和UnitID查询用户
-func (m *mongoMapper) FindOneByCodeAndUnitID(ctx context.Context, code string, unitId primitive.ObjectID) (*User, error) {
+func (m *mongoMapper) FindOneByCodeAndUnitID(ctx context.Context, code string, unitId bson.ObjectID) (*User, error) {
 	return m.FindOneByFields(ctx, bson.M{cst.Code: code, cst.UnitID: unitId})
 }
 
@@ -63,20 +62,20 @@ func (m *mongoMapper) ExistsByCode(ctx context.Context, code string) (bool, erro
 }
 
 // ExistsByCodeAndUnitID 根据电话号码和UnitID查询用户是否存在
-func (m *mongoMapper) ExistsByCodeAndUnitID(ctx context.Context, code string, unitId primitive.ObjectID) (bool, error) {
+func (m *mongoMapper) ExistsByCodeAndUnitID(ctx context.Context, code string, unitId bson.ObjectID) (bool, error) {
 	return m.ExistsByFields(ctx, bson.M{cst.Code: code, cst.UnitID: unitId})
 }
 
 // FindAllByUnitID 根据UnitID查询所有用户
-func (m *mongoMapper) FindAllByUnitID(ctx context.Context, unitId primitive.ObjectID) ([]*User, error) {
+func (m *mongoMapper) FindAllByUnitID(ctx context.Context, unitId bson.ObjectID) ([]*User, error) {
 	return m.FindAllByFields(ctx, bson.M{cst.UnitID: unitId, cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
 }
 
 // BatchFindByIDs 根据UserID切片批量查询用户
-func (m *mongoMapper) BatchFindByIDs(ctx context.Context, userIds []primitive.ObjectID) (map[primitive.ObjectID]*User, error) {
+func (m *mongoMapper) BatchFindByIDs(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*User, error) {
 	if len(userIds) == 0 {
 		logs.Warnf("[user mapper] try to find from empty userIds")
-		return make(map[primitive.ObjectID]*User), nil
+		return make(map[bson.ObjectID]*User), nil
 	}
 
 	filter := bson.M{cst.ID: bson.M{"$in": userIds}}
@@ -86,7 +85,7 @@ func (m *mongoMapper) BatchFindByIDs(ctx context.Context, userIds []primitive.Ob
 		return nil, err
 	}
 
-	mp := make(map[primitive.ObjectID]*User)
+	mp := make(map[bson.ObjectID]*User)
 	for _, user := range users {
 		mp[user.ID] = user
 	}
@@ -103,7 +102,7 @@ type ClassStatResult struct {
 }
 
 // CountByClasses 统计各班级（高危）用户人数，结果按班年级排序
-func (m *mongoMapper) CountByClasses(ctx context.Context, unitId primitive.ObjectID, grade, class []int32) ([]*ClassStatResult, error) {
+func (m *mongoMapper) CountByClasses(ctx context.Context, unitId bson.ObjectID, grade, class []int32) ([]*ClassStatResult, error) {
 	match := bson.M{
 		cst.UnitID: unitId,
 		cst.Status: bson.M{cst.NE: cst.DeletedStatus},

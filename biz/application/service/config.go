@@ -10,11 +10,10 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-idl/kitex_gen/basic"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 var _ IConfigService = (*ConfigService)(nil)
@@ -36,7 +35,7 @@ var ConfigServiceSet = wire.NewSet(
 
 func (c *ConfigService) ConfigCreate(ctx context.Context, req *core_api.ConfigCreateOrUpdateReq) (resp *basic.Response, err error) {
 	// 参数合法性校验
-	unitOID, err := primitive.ObjectIDFromHex(req.Config.UnitId)
+	unitOID, err := bson.ObjectIDFromHex(req.Config.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 	}
@@ -48,7 +47,7 @@ func (c *ConfigService) ConfigCreate(ctx context.Context, req *core_api.ConfigCr
 	// 构造并插入数据库
 	now := time.Now().Unix()
 	confDAO := &config.Config{
-		ID:     primitive.NewObjectID(),
+		ID:     bson.NewObjectID(),
 		Type:   confType,
 		UnitID: unitOID,
 		Chat: &config.Chat{
@@ -93,7 +92,7 @@ func (c *ConfigService) ConfigUpdateInfo(ctx context.Context, req *core_api.Conf
 	}
 
 	// 参数校验
-	unitOid, err := primitive.ObjectIDFromHex(req.Config.UnitId)
+	unitOid, err := bson.ObjectIDFromHex(req.Config.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "单位ID"))
 	}
@@ -126,7 +125,7 @@ func (c *ConfigService) ConfigGetByUnitID(ctx context.Context, req *core_api.Con
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
 	}
 
-	unitOid, err := primitive.ObjectIDFromHex(req.UnitId)
+	unitOid, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "单位ID"))
 	}

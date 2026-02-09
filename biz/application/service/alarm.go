@@ -16,7 +16,6 @@ import (
 	"github.com/xh-polaris/psych-idl/kitex_gen/basic"
 	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
 	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
@@ -38,7 +37,7 @@ var AlarmServiceSet = wire.NewSet(
 )
 
 func (s *AlarmService) Overview(ctx context.Context, req *core_api.DashboardGetAlarmOverviewReq) (resp *core_api.DashboardGetAlarmOverviewResp, err error) {
-	unitOID, err := primitive.ObjectIDFromHex(req.UnitId)
+	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 	}
@@ -62,7 +61,7 @@ func (s *AlarmService) Overview(ctx context.Context, req *core_api.DashboardGetA
 }
 
 func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardListAlarmRecordsReq) (resp *core_api.DashboardListAlarmRecordsResp, err error) {
-	unitOID, err := primitive.ObjectIDFromHex(req.UnitId)
+	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 	}
@@ -106,14 +105,14 @@ func findPageOption(reqOpt *basic.PaginationOptions) *options.FindOptionsBuilder
 
 func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alarm) ([]*core_api.AlarmRecord, error) {
 	// 提取需获取信息的userId列表
-	userIds := make([]primitive.ObjectID, len(dbAlarms))
+	userIds := make([]bson.ObjectID, len(dbAlarms))
 	for i, al := range dbAlarms {
 		userIds[i] = al.UserID
 	}
 
 	// 并行处理：获取user基础信息和对话情况
-	var userInfo map[primitive.ObjectID]*user.User
-	var msgStats map[primitive.ObjectID]*message.MsgStats
+	var userInfo map[bson.ObjectID]*user.User
+	var msgStats map[bson.ObjectID]*message.MsgStats
 	var userErr, msgErr error
 
 	var wg sync.WaitGroup

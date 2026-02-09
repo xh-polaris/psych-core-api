@@ -10,7 +10,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/zeromicro/go-zero/core/stores/monc"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -26,7 +25,7 @@ const (
 type MongoMapper interface {
 	RetrieveMessage(ctx context.Context, conversation string, size int) ([]*Message, error)
 	Insert(ctx context.Context, msg *Message) error
-	BatchMessageStats(ctx context.Context, userIds []primitive.ObjectID) (map[primitive.ObjectID]*MsgStats, error)
+	BatchMessageStats(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*MsgStats, error)
 }
 
 type mongoMapper struct {
@@ -39,7 +38,7 @@ func NewMessageMongoMapper(config *conf.Config) MongoMapper {
 }
 
 func (m *mongoMapper) RetrieveMessage(ctx context.Context, conversation string, size int) (msgs []*Message, err error) {
-	oid, err := primitive.ObjectIDFromHex(conversation)
+	oid, err := bson.ObjectIDFromHex(conversation)
 	if err != nil {
 		return nil, err
 	}
@@ -66,9 +65,9 @@ type MsgStats struct {
 	LatestTime int64
 }
 
-func (m *mongoMapper) BatchMessageStats(ctx context.Context, userIds []primitive.ObjectID) (map[primitive.ObjectID]*MsgStats, error) {
+func (m *mongoMapper) BatchMessageStats(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*MsgStats, error) {
 	if len(userIds) == 0 {
-		return make(map[primitive.ObjectID]*MsgStats), nil
+		return make(map[bson.ObjectID]*MsgStats), nil
 	}
 
 	pipeline := []bson.M{
@@ -89,9 +88,9 @@ func (m *mongoMapper) BatchMessageStats(ctx context.Context, userIds []primitive
 	}
 
 	var results []struct {
-		UserID     primitive.ObjectID `bson:"_id"`
-		Rounds     int32              `bson:"rounds"`
-		LatestTime time.Time          `bson:"latestTime"`
+		UserID     bson.ObjectID `bson:"_id"`
+		Rounds     int32         `bson:"rounds"`
+		LatestTime time.Time     `bson:"latestTime"`
 	}
 	err := m.conn.Aggregate(ctx, &results, pipeline)
 	if err != nil {
@@ -99,7 +98,7 @@ func (m *mongoMapper) BatchMessageStats(ctx context.Context, userIds []primitive
 		return nil, err
 	}
 
-	stats := make(map[primitive.ObjectID]*MsgStats)
+	stats := make(map[bson.ObjectID]*MsgStats)
 	for _, r := range results {
 		stats[r.UserID] = &MsgStats{
 			Rounds:     r.Rounds,

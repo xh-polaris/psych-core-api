@@ -14,7 +14,7 @@ import (
 	"github.com/xh-polaris/psych-idl/kitex_gen/basic"
 	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
 	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type IDashboardService interface {
@@ -33,7 +33,7 @@ var DashboardServiceSet = wire.NewSet(
 )
 
 func (s *DashboardService) ListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (resp *core_api.DashboardListClassesResp, err error) {
-	unitOID, err := primitive.ObjectIDFromHex(req.UnitId)
+	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 	}
@@ -98,7 +98,7 @@ func aggregateAndSort(mapperRes []*user.ClassStatResult) []*core_api.GradeInfo {
 }
 
 func (s *DashboardService) ListUsers(ctx context.Context, req *core_api.DashboardListUsersReq) (resp *core_api.DashboardListUsersResp, err error) {
-	unitOID, err := primitive.ObjectIDFromHex(req.UnitId)
+	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 	}
@@ -144,13 +144,13 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 
 	// 提取分页所需的dbUser切片和uid切片
 	targetUsers := dbUsers[start : end+1]
-	uids := make([]primitive.ObjectID, end-start+1)
+	uids := make([]bson.ObjectID, end-start+1)
 	for i, dbUser := range targetUsers {
 		uids[i] = dbUser.ID
 	}
 
 	// 补全dbUser相关信息
-	var msgStats map[primitive.ObjectID]*message.MsgStats
+	var msgStats map[bson.ObjectID]*message.MsgStats
 	var msgErr, kwErr error
 
 	var wg sync.WaitGroup

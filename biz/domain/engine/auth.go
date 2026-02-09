@@ -9,7 +9,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // auth 验证用户信息 [engine]
@@ -31,7 +31,7 @@ func (e *Engine) auth(auth *core.Auth) (bool, error) {
 	if cid, ok := alreadyAuth.Info[cst.ConversationID]; ok {
 		e.uSession = cid.(string)
 	} else {
-		e.uSession = primitive.NewObjectID().Hex()
+		e.uSession = bson.NewObjectID().Hex()
 	}
 	util.DPrint("[engine] [auth] info: %+v, merr: %+v\n", alreadyAuth, merr) // debug
 	return true, e.MWrite(core.MAuth, alreadyAuth)                           // 前端收到Auth响应后, 需要显示配置中

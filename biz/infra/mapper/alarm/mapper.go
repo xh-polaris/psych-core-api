@@ -13,7 +13,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/zeromicro/go-zero/core/stores/monc"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
@@ -27,10 +26,10 @@ const (
 
 type IMongoMapper interface {
 	Insert(ctx context.Context, msg *Alarm) error
-	RetrieveByTime(ctx context.Context, unitID primitive.ObjectID, start, end time.Time, opt *options.FindOptionsBuilder) ([]*Alarm, error)
-	CountByTime(ctx context.Context, unitID primitive.ObjectID, start, end time.Time) (int64, error)
-	Exists(ctx context.Context, id primitive.ObjectID) (bool, error)
-	AggregateStats(ctx context.Context, unitID primitive.ObjectID, start, end time.Time) (*OverviewStats, error)
+	RetrieveByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time, opt *options.FindOptionsBuilder) ([]*Alarm, error)
+	CountByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (int64, error)
+	Exists(ctx context.Context, id bson.ObjectID) (bool, error)
+	AggregateStats(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (*OverviewStats, error)
 }
 
 type mongoMapper struct {
@@ -48,7 +47,7 @@ func (m *mongoMapper) Insert(ctx context.Context, msg *Alarm) error {
 }
 
 // RetrieveByTime 返回某Unit下一段时间内的所有预警信息 如时间范围传入零值time.Time{} 则查询所有
-func (m *mongoMapper) RetrieveByTime(ctx context.Context, unitID primitive.ObjectID, start, end time.Time, opt *options.FindOptionsBuilder) (alarms []*Alarm, err error) {
+func (m *mongoMapper) RetrieveByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time, opt *options.FindOptionsBuilder) (alarms []*Alarm, err error) {
 	var tf bson.M
 	if !start.IsZero() {
 		tf[cst.GT] = start
@@ -66,7 +65,7 @@ func (m *mongoMapper) RetrieveByTime(ctx context.Context, unitID primitive.Objec
 }
 
 // CountByTime 计数某Unit下一段时间内的所有预警信息 如时间范围传入零值time.Time{} 则查询所有
-func (m *mongoMapper) CountByTime(ctx context.Context, unitID primitive.ObjectID, start, end time.Time) (int64, error) {
+func (m *mongoMapper) CountByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (int64, error) {
 	var tf bson.M
 	if !start.IsZero() {
 		tf[cst.GT] = start
@@ -84,7 +83,7 @@ func (m *mongoMapper) CountByTime(ctx context.Context, unitID primitive.ObjectID
 	return c, nil
 }
 
-func (m *mongoMapper) Exists(ctx context.Context, userID primitive.ObjectID) (bool, error) {
+func (m *mongoMapper) Exists(ctx context.Context, userID bson.ObjectID) (bool, error) {
 	c, err := m.conn.CountDocuments(ctx, bson.M{cst.UserID: userID, cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
 	if err != nil {
 		logs.Errorf("[alarm mapper] find err:%s", errorx.ErrorWithoutStack(err))
@@ -111,7 +110,7 @@ type weekData []struct {
 
 // AggregateStats 计算预警统计信息：当前和较上周变化
 // 入参start, end暂无用
-func (m *mongoMapper) AggregateStats(ctx context.Context, unitID primitive.ObjectID, start, end time.Time) (*OverviewStats, error) {
+func (m *mongoMapper) AggregateStats(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (*OverviewStats, error) {
 	now := time.Now()
 	lastweek := time.Now().AddDate(0, 0, -7)
 

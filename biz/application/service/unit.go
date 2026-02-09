@@ -14,11 +14,10 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-idl/kitex_gen/basic"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 var _ IUnitService = (*UnitService)(nil)
@@ -80,7 +79,7 @@ func (u *UnitService) UnitSignUp(ctx context.Context, req *core_api.UnitSignUpRe
 
 	// 构造 Unit
 	unitDAO := &unit.Unit{
-		ID:         primitive.NewObjectID(),
+		ID:         bson.NewObjectID(),
 		Phone:      req.Unit.Phone,
 		Password:   hashedPwd,
 		Name:       req.Unit.Name,
@@ -180,7 +179,7 @@ func (u *UnitService) UnitGetInfo(ctx context.Context, req *core_api.UnitGetInfo
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
 	}
 
-	unitId, err := primitive.ObjectIDFromHex(req.UnitId)
+	unitId, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
@@ -226,7 +225,7 @@ func (u *UnitService) UnitUpdateInfo(ctx context.Context, req *core_api.UnitUpda
 
 	// 不允许修改手机号、密码、验证方式、level、状态
 	// 密码、验证方式需要通过其他接口修改
-	unitId, err := primitive.ObjectIDFromHex(req.Unit.Id)
+	unitId, err := bson.ObjectIDFromHex(req.Unit.Id)
 	if err != nil {
 		logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
@@ -278,7 +277,7 @@ func (u *UnitService) UnitUpdatePassword(ctx context.Context, req *core_api.Unit
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "新密码"))
 	}
 
-	unitId, err := primitive.ObjectIDFromHex(req.Id)
+	unitId, err := bson.ObjectIDFromHex(req.Id)
 	if err != nil {
 		logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
@@ -336,12 +335,12 @@ func (u *UnitService) UnitLinkUser(ctx context.Context, req *core_api.UnitLinkUs
 	}
 
 	// 转换ID
-	unitId, err := primitive.ObjectIDFromHex(req.UnitId)
+	unitId, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}
-	userId, err := primitive.ObjectIDFromHex(req.UserId)
+	userId, err := bson.ObjectIDFromHex(req.UserId)
 	if err != nil {
 		logs.Errorf("parse user id error: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
@@ -378,7 +377,7 @@ func (u *UnitService) UnitCreateAndLinkUser(ctx context.Context, req *core_api.U
 	}
 
 	// 转换ID
-	unitId, err := primitive.ObjectIDFromHex(req.UnitId)
+	unitId, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
@@ -474,7 +473,7 @@ func (u *UnitService) UnitCreateAndLinkUser(ctx context.Context, req *core_api.U
 
 		// 构造用户
 		userDAO := &user.User{
-			ID:         primitive.NewObjectID(),
+			ID:         bson.NewObjectID(),
 			CodeType:   codeType,
 			Code:       userReq.Code,
 			Password:   hashedPwd,

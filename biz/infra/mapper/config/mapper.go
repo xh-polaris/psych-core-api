@@ -6,10 +6,9 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/zeromicro/go-zero/core/stores/monc"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 var _ IMongoMapper = (*mongoMapper)(nil)
@@ -20,10 +19,10 @@ const (
 )
 
 type IMongoMapper interface {
-	FindOne(ctx context.Context, id primitive.ObjectID) (*Config, error) // 继承模板类
-	FindOneByUnitID(ctx context.Context, unitID primitive.ObjectID) (*Config, error)
+	FindOne(ctx context.Context, id bson.ObjectID) (*Config, error) // 继承模板类
+	FindOneByUnitID(ctx context.Context, unitID bson.ObjectID) (*Config, error)
 	Insert(ctx context.Context, unit *Config) error
-	UpdateFields(ctx context.Context, id primitive.ObjectID, update bson.M) error
+	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
 }
 
 type mongoMapper struct {
@@ -39,6 +38,6 @@ func NewConfigMongoMapper(config *conf.Config) IMongoMapper {
 	}
 }
 
-func (m *mongoMapper) FindOneByUnitID(ctx context.Context, unitID primitive.ObjectID) (*Config, error) {
+func (m *mongoMapper) FindOneByUnitID(ctx context.Context, unitID bson.ObjectID) (*Config, error) {
 	return m.FindOneByFields(ctx, bson.M{cst.UnitID: unitID})
 }

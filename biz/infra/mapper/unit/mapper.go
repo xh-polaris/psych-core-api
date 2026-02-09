@@ -8,8 +8,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
 
 	"github.com/zeromicro/go-zero/core/stores/monc"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 var _ IMongoMapper = (*mongoMapper)(nil)
@@ -21,9 +20,9 @@ const (
 
 type IMongoMapper interface {
 	FindOneByPhone(ctx context.Context, phone string) (*Unit, error)
-	FindOne(ctx context.Context, id primitive.ObjectID) (*Unit, error)
+	FindOne(ctx context.Context, id bson.ObjectID) (*Unit, error)
 	Insert(ctx context.Context, unit *Unit) error
-	UpdateFields(ctx context.Context, id primitive.ObjectID, update bson.M) error
+	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
 	ExistsByPhone(ctx context.Context, phone string) (bool, error)
 }
 

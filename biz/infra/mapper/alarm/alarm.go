@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/cst"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 var (
@@ -16,14 +16,14 @@ var (
 )
 
 type Alarm struct {
-	ID             primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	UserID         primitive.ObjectID `json:"userId,omitempty" bson:"userId,omitempty"`
-	ReportID       primitive.ObjectID `json:"reportId,omitempty" bson:"reportId,omitempty"`
-	ConversationID primitive.ObjectID `json:"conversationId,omitempty" bson:"conversationId,omitempty"`
-	UnitID         primitive.ObjectID `json:"unitId,omitempty" bson:"unitId,omitempty"`
-	Emotion        int32              `json:"emotion,omitempty" bson:"emotion,omitempty"`
-	Keywords       []string           `json:"keywords,omitempty" bson:"keywords,omitempty"`
-	Status         int32              `json:"status,omitempty" bson:"status,omitempty"`
-	CreateTime     time.Time          `json:"createTime,omitempty" bson:"createTime,omitempty"`
-	DeleteTime     time.Time          `json:"updateTime,omitempty" bson:"updateTime,omitempty"`
+	ID             bson.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	UserID         bson.ObjectID `json:"userId,omitempty" bson:"userId,omitempty"`
+	ReportID       bson.ObjectID `json:"reportId,omitempty" bson:"reportId,omitempty"`
+	ConversationID bson.ObjectID `json:"conversationId,omitempty" bson:"conversationId,omitempty"`
+	UnitID         bson.ObjectID `json:"unitId,omitempty" bson:"unitId,omitempty"`
+	Emotion        int32         `json:"emotion,omitempty" bson:"emotion,omitempty"`
+	Keywords       []string      `json:"keywords,omitempty" bson:"keywords,omitempty"`
+	Status         int32         `json:"status,omitempty" bson:"status,omitempty"`
+	CreateTime     time.Time     `json:"createTime,omitempty" bson:"createTime,omitempty"`
+	DeleteTime     time.Time     `json:"updateTime,omitempty" bson:"updateTime,omitempty"`
 }

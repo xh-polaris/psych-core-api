@@ -16,11 +16,10 @@ import (
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
 	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-idl/kitex_gen/basic"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 var _ IUserService = (*UserService)(nil)
@@ -87,9 +86,9 @@ func (u *UserService) UserSignUp(ctx context.Context, req *core_api.UserSignUpRe
 	}
 
 	// 转换ID
-	var unitId primitive.ObjectID
+	var unitId bson.ObjectID
 	if req.User.UnitId != "" {
-		unitId, err = primitive.ObjectIDFromHex(req.User.UnitId)
+		unitId, err = bson.ObjectIDFromHex(req.User.UnitId)
 		if err != nil {
 			logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
 			return nil, err
@@ -98,7 +97,7 @@ func (u *UserService) UserSignUp(ctx context.Context, req *core_api.UserSignUpRe
 
 	// 构造用户
 	userDAO := &user.User{
-		ID:         primitive.NewObjectID(),
+		ID:         bson.NewObjectID(),
 		CodeType:   enum.CodeTypePhone,
 		Code:       req.User.Code,
 		Password:   hashedPwd,
@@ -177,7 +176,7 @@ func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInRe
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "登录方式"))
 	}
 
-	unitId, err := primitive.ObjectIDFromHex(req.UnitId)
+	unitId, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
@@ -215,7 +214,7 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 	}
 
 	// 转换用户ID
-	userId, err := primitive.ObjectIDFromHex(req.UserId)
+	userId, err := bson.ObjectIDFromHex(req.UserId)
 	if err != nil {
 		logs.Errorf("parse user id error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "用户ID"))
@@ -278,7 +277,7 @@ func (u *UserService) UserUpdateInfo(ctx context.Context, req *core_api.UserUpda
 
 	// 不允许修改手机号、密码、验证方式、单位ID、状态
 	// 密码、验证方式需要通过其他接口修改
-	userId, err := primitive.ObjectIDFromHex(req.User.Id)
+	userId, err := bson.ObjectIDFromHex(req.User.Id)
 	if err != nil {
 		logs.Errorf("parse user id error: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
@@ -351,7 +350,7 @@ func (u *UserService) UserUpdatePassword(ctx context.Context, req *core_api.User
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "新密码"))
 	}
 
-	userId, err := primitive.ObjectIDFromHex(req.Id)
+	userId, err := bson.ObjectIDFromHex(req.Id)
 	if err != nil {
 		logs.Errorf("parse user id error: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
