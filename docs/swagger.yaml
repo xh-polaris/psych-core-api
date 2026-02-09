@@ -1,0 +1,1307 @@
+basePath: /
+definitions:
+  anypb.Any:
+    properties:
+      type_url:
+        description: |-
+          A URL/resource name that uniquely identifies the type of the serialized
+          protocol buffer message. This string must contain at least
+          one "/" character. The last segment of the URL's path must represent
+          the fully qualified name of the type (as in
+          `path/google.protobuf.Duration`). The name should be in a canonical form
+          (e.g., leading "." is not accepted).
+
+          In practice, teams usually precompile into the binary all types that they
+          expect it to use in the context of Any. However, for URLs which use the
+          scheme `http`, `https`, or no scheme, one can optionally set up a type
+          server that maps type URLs to message definitions as follows:
+
+            - If no scheme is provided, `https` is assumed.
+            - An HTTP GET on the URL must yield a [google.protobuf.Type][]
+              value in binary format, or produce an error.
+            - Applications are allowed to cache lookup results based on the
+              URL, or have them precompiled into a binary to avoid any
+              lookup. Therefore, binary compatibility needs to be preserved
+              on changes to types. (Use versioned type names to manage
+              breaking changes.)
+
+          Note: this functionality is not currently available in the official
+          protobuf release, and it is not used for type URLs beginning with
+          type.googleapis.com. As of May 2023, there are no widely used type server
+          implementations and no plans to implement one.
+
+          Schemes other than `http`, `https` (or the empty scheme) might be
+          used with implementation specific semantics.
+        type: string
+      value:
+        description: Must be a valid serialized protocol buffer of the above specified
+          type.
+        items:
+          type: integer
+        type: array
+    type: object
+  basic.Pagination:
+    properties:
+      hasNext:
+        type: boolean
+      limit:
+        type: integer
+      nextToken:
+        type: string
+      page:
+        type: integer
+      total:
+        type: integer
+    type: object
+  basic.Response:
+    properties:
+      code:
+        type: integer
+      msg:
+        type: string
+    type: object
+  core_api.AlarmRecord:
+    properties:
+      emotion:
+        description: 情绪状态
+        type: string
+      id:
+        description: 唯一Id
+        type: string
+      keywords:
+        description: 关键词列表
+        items:
+          type: string
+        type: array
+      lastConversationTime:
+        description: 上次对话时间（分钟时间戳）
+        type: integer
+      status:
+        description: 处理状态
+        type: string
+      totalConversationRounds:
+        description: 总对话轮数
+        type: integer
+      user:
+        allOf:
+        - $ref: '#/definitions/profile.User'
+        description: 用户信息
+    type: object
+  core_api.ChatApp:
+    properties:
+      appId:
+        type: string
+      description:
+        type: string
+      name:
+        type: string
+      provider:
+        type: string
+    type: object
+  core_api.ClassInfo:
+    properties:
+      alarmNum:
+        type: integer
+      class:
+        type: integer
+      teacherName:
+        type: string
+      teacherPhone:
+        type: string
+      userNum:
+        type: integer
+    type: object
+  core_api.Config:
+    properties:
+      chat:
+        $ref: '#/definitions/core_api.ChatApp'
+      createTime:
+        type: integer
+      report:
+        $ref: '#/definitions/core_api.ReportApp'
+      status:
+        description: active | deleted
+        type: string
+      tts:
+        $ref: '#/definitions/core_api.TTSApp'
+      type:
+        description: chain | end2end
+        type: string
+      unitId:
+        type: string
+      updateTime:
+        type: integer
+    type: object
+  core_api.ConfigCreateOrUpdateReq:
+    properties:
+      admin:
+        type: boolean
+      config:
+        $ref: '#/definitions/core_api.Config'
+    type: object
+  core_api.ConfigGetByUnitIdResp:
+    properties:
+      code:
+        type: integer
+      config:
+        $ref: '#/definitions/core_api.Config'
+      msg:
+        type: string
+    type: object
+  core_api.ConversationDuration:
+    properties:
+      count:
+        type: integer
+      minutes:
+        type: integer
+    type: object
+  core_api.DashboardGetAlarmOverviewResp:
+    properties:
+      code:
+        type: integer
+      msg:
+        type: string
+      pending:
+        description: 当前待处理数
+        type: integer
+      pendingChange:
+        description: 对比上周待处理变化百分比
+        type: number
+      processed:
+        description: 当前已处理数
+        type: integer
+      processedChange:
+        description: 对比上周已处理变化百分比
+        type: number
+      total:
+        description: 当前高风险用户总数
+        type: integer
+      totalChange:
+        description: 对比上周总数变化百分比
+        type: number
+      track:
+        description: 当前需追踪数
+        type: integer
+      trackChange:
+        description: 对比上周需追踪变化百分比
+        type: number
+    type: object
+  core_api.DashboardGetDataOverviewResp:
+    properties:
+      activeUsers:
+        type: integer
+      alarmUsers:
+        type: integer
+      averageTimePerConversation:
+        description: minutes
+        type: number
+      code:
+        type: integer
+      msg:
+        type: string
+      totalConversations:
+        type: integer
+      totalUnits:
+        type: integer
+      totalUsers:
+        type: integer
+      weeklyIncreaseActiveUsers:
+        type: integer
+      weeklyIncreaseActiveUsersRate:
+        type: number
+      weeklyIncreaseAlarmUsers:
+        type: integer
+      weeklyIncreaseAlarmUsersRate:
+        type: number
+      weeklyIncreaseAverageTimePerConversation:
+        description: minutes
+        type: number
+      weeklyIncreaseAverageTimePerConversationRate:
+        type: number
+      weeklyIncreaseConversations:
+        type: integer
+      weeklyIncreaseConversationsRate:
+        type: number
+      weeklyIncreaseUnits:
+        type: integer
+      weeklyIncreaseUnitsRate:
+        type: number
+      weeklyIncreaseUsers:
+        type: integer
+      weeklyIncreaseUsersRate:
+        type: number
+    type: object
+  core_api.DashboardGetDataTrendResp:
+    properties:
+      activePoints:
+        items:
+          $ref: '#/definitions/core_api.TrendPoint'
+        type: array
+      code:
+        type: integer
+      conversationDurations:
+        items:
+          $ref: '#/definitions/core_api.ConversationDuration'
+        type: array
+      conversationPoints:
+        items:
+          $ref: '#/definitions/core_api.TrendPoint'
+        type: array
+      msg:
+        type: string
+    type: object
+  core_api.DashboardGetPsychTrendResp:
+    properties:
+      code:
+        type: integer
+      keywords:
+        items:
+          $ref: '#/definitions/core_api.Keyword'
+        type: array
+      msg:
+        type: string
+      risks:
+        items:
+          $ref: '#/definitions/core_api.RiskDistribution'
+        type: array
+    type: object
+  core_api.DashboardListAlarmRecordsResp:
+    properties:
+      code:
+        type: integer
+      msg:
+        type: string
+      pagination:
+        $ref: '#/definitions/basic.Pagination'
+      records:
+        items:
+          $ref: '#/definitions/core_api.AlarmRecord'
+        type: array
+    type: object
+  core_api.DashboardListClassesResp:
+    properties:
+      code:
+        type: integer
+      grades:
+        items:
+          $ref: '#/definitions/core_api.GradeInfo'
+        type: array
+      msg:
+        type: string
+    type: object
+  core_api.DashboardListUnitsResp:
+    properties:
+      code:
+        type: integer
+      msg:
+        type: string
+      units:
+        items:
+          $ref: '#/definitions/core_api.DashboardUnit'
+        type: array
+    type: object
+  core_api.DashboardListUsersResp:
+    properties:
+      code:
+        type: integer
+      msg:
+        type: string
+      pagination:
+        $ref: '#/definitions/basic.Pagination'
+      riskUsers:
+        items:
+          $ref: '#/definitions/core_api.RiskUser'
+        type: array
+    type: object
+  core_api.DashboardUnit:
+    properties:
+      averageConversationMinutes:
+        type: number
+      name:
+        type: string
+      property:
+        type: string
+      riskUserCount:
+        type: integer
+      type:
+        type: string
+      updateTime:
+        type: integer
+      userCount:
+        type: integer
+    type: object
+  core_api.GradeInfo:
+    properties:
+      classes:
+        items:
+          $ref: '#/definitions/core_api.ClassInfo'
+        type: array
+      grade:
+        type: integer
+    type: object
+  core_api.Keyword:
+    properties:
+      count:
+        type: integer
+      keyword:
+        type: string
+    type: object
+  core_api.ReportApp:
+    properties:
+      appId:
+        type: string
+      description:
+        type: string
+      name:
+        type: string
+      provider:
+        type: string
+    type: object
+  core_api.RiskDistribution:
+    properties:
+      count:
+        type: integer
+      gender:
+        description: 0=all 1=male 2=female
+        type: integer
+      level:
+        description: 0=正常 1=低危 2=中危 3=高危
+        type: integer
+    type: object
+  core_api.RiskUser:
+    properties:
+      keywords:
+        items:
+          type: string
+        type: array
+      lastConversationTime:
+        description: 上次对话时间（分钟时间戳）
+        type: integer
+      level:
+        type: integer
+      totalConversationRounds:
+        description: 总对话轮数
+        type: integer
+      user:
+        $ref: '#/definitions/profile.User'
+    type: object
+  core_api.TTSApp:
+    properties:
+      appId:
+        type: string
+      description:
+        type: string
+      name:
+        type: string
+      provider:
+        type: string
+      speaker:
+        type: string
+    type: object
+  core_api.TrendPoint:
+    properties:
+      count:
+        type: integer
+      hour:
+        description: 0–23
+        type: integer
+      week:
+        description: 1=Mon ... 7=Sun
+        type: integer
+    type: object
+  core_api.Unit:
+    properties:
+      address:
+        type: string
+      contact:
+        type: string
+      createTime:
+        type: integer
+      deleteTime:
+        type: integer
+      id:
+        type: string
+      level:
+        type: integer
+      name:
+        type: string
+      password:
+        type: string
+      phone:
+        type: string
+      status:
+        type: string
+      updateTime:
+        type: integer
+    type: object
+  core_api.UnitCreateAndLinkUserReq:
+    properties:
+      codeType:
+        type: string
+      unitId:
+        type: string
+      users:
+        items:
+          $ref: '#/definitions/core_api.User'
+        type: array
+    type: object
+  core_api.UnitCreateAndLinkUserResp:
+    properties:
+      allCount:
+        type: integer
+      code:
+        type: integer
+      msg:
+        type: string
+      skipCount:
+        type: integer
+      successCount:
+        type: integer
+    type: object
+  core_api.UnitGetInfoResp:
+    properties:
+      code:
+        type: integer
+      msg:
+        type: string
+      unit:
+        $ref: '#/definitions/core_api.Unit'
+    type: object
+  core_api.UnitLinkUserReq:
+    properties:
+      unitId:
+        type: string
+      userId:
+        type: string
+    type: object
+  core_api.UnitSignInReq:
+    properties:
+      authId:
+        type: string
+      authType:
+        type: integer
+      verifyCode:
+        type: string
+    type: object
+  core_api.UnitSignInResp:
+    properties:
+      code:
+        type: integer
+      msg:
+        type: string
+      unitId:
+        type: string
+    type: object
+  core_api.UnitSignUpReq:
+    properties:
+      unit:
+        $ref: '#/definitions/core_api.Unit'
+    type: object
+  core_api.UnitSignUpResp:
+    properties:
+      code:
+        type: integer
+      msg:
+        type: string
+      unit:
+        $ref: '#/definitions/core_api.Unit'
+    type: object
+  core_api.UnitUpdateInfoReq:
+    properties:
+      unit:
+        $ref: '#/definitions/core_api.Unit'
+    type: object
+  core_api.UnitUpdatePasswordReq:
+    properties:
+      authType:
+        type: integer
+      id:
+        type: string
+      newPassword:
+        type: string
+      verifyCode:
+        type: string
+    type: object
+  core_api.User:
+    properties:
+      birth:
+        type: integer
+      class:
+        type: integer
+      code:
+        type: string
+      codeType:
+        type: string
+      createTime:
+        type: integer
+      deleteTime:
+        type: integer
+      enrollYear:
+        type: integer
+      gender:
+        type: string
+      grade:
+        type: integer
+      id:
+        type: string
+      name:
+        type: string
+      options:
+        additionalProperties:
+          $ref: '#/definitions/anypb.Any'
+        type: object
+      password:
+        type: string
+      status:
+        type: string
+      unitId:
+        type: string
+      updateTime:
+        type: integer
+    type: object
+  core_api.UserGetInfoResp:
+    properties:
+      code:
+        type: integer
+      msg:
+        type: string
+      user:
+        $ref: '#/definitions/profile.User'
+    type: object
+  core_api.UserSignInReq:
+    properties:
+      authId:
+        type: string
+      authType:
+        type: integer
+      unitId:
+        type: string
+      verifyCode:
+        type: string
+    type: object
+  core_api.UserSignInResp:
+    properties:
+      code:
+        type: integer
+      codeType:
+        type: string
+      codeValue:
+        type: string
+      msg:
+        type: string
+      token:
+        type: string
+      unitId:
+        type: string
+      userId:
+        type: string
+    type: object
+  core_api.UserSignUpReq:
+    properties:
+      user:
+        $ref: '#/definitions/core_api.User'
+    type: object
+  core_api.UserSignUpResp:
+    properties:
+      code:
+        type: integer
+      msg:
+        type: string
+      user:
+        $ref: '#/definitions/core_api.User'
+    type: object
+  core_api.UserUpdateInfoReq:
+    properties:
+      user:
+        $ref: '#/definitions/core_api.User'
+    type: object
+  core_api.UserUpdatePasswordReq:
+    properties:
+      authType:
+        type: integer
+      id:
+        type: string
+      newPassword:
+        type: string
+      verifyCode:
+        type: string
+    type: object
+  profile.User:
+    properties:
+      birth:
+        type: integer
+      class:
+        type: integer
+      code:
+        type: string
+      codeType:
+        type: string
+      createTime:
+        type: integer
+      deleteTime:
+        type: integer
+      enrollYear:
+        type: integer
+      gender:
+        type: string
+      grade:
+        type: integer
+      id:
+        type: string
+      name:
+        type: string
+      options:
+        additionalProperties:
+          $ref: '#/definitions/anypb.Any'
+        type: object
+      password:
+        type: string
+      status:
+        type: string
+      unitId:
+        type: string
+      updateTime:
+        type: integer
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Psych Core API
+  title: Psych Core API
+  version: "1.0"
+paths:
+  /chat:
+    get:
+      responses: {}
+  /config/create:
+    post:
+      consumes:
+      - application/json
+      description: 创建或初始化单位配置
+      parameters:
+      - description: Config Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/core_api.ConfigCreateOrUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/basic.Response'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Create Config (创建配置)
+      tags:
+      - Config
+  /config/get_by_unit_id:
+    get:
+      consumes:
+      - application/json
+      description: 根据 Unit ID 获取配置详情
+      parameters:
+      - description: Unit ID
+        in: query
+        name: unitId
+        required: true
+        type: string
+      - description: Is Admin
+        in: query
+        name: admin
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core_api.ConfigGetByUnitIdResp'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Get Config (获取配置)
+      tags:
+      - Config
+  /config/update_info:
+    post:
+      consumes:
+      - application/json
+      description: 更新单位的配置信息（如Chat/TTS/Report配置）
+      parameters:
+      - description: Config Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/core_api.ConfigCreateOrUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/basic.Response'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Update Config (更新配置)
+      tags:
+      - Config
+  /dashboard/alarm_overview:
+    get:
+      consumes:
+      - application/json
+      description: 获取预警管理的统计概览（高危、已处理、待处理等）
+      parameters:
+      - description: Unit ID
+        in: query
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core_api.DashboardGetAlarmOverviewResp'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Alarm Overview (预警概览)
+      tags:
+      - Dashboard
+  /dashboard/alarm_records:
+    get:
+      consumes:
+      - application/json
+      description: 获取预警记录列表，支持筛选和分页
+      parameters:
+      - description: Unit ID
+        in: query
+        name: unitId
+        required: true
+        type: string
+      - description: Emotion
+        in: query
+        name: emotion
+        type: string
+      - description: Status
+        in: query
+        name: status
+        type: string
+      - description: Keyword
+        in: query
+        name: keyword
+        type: string
+      - description: Page Number
+        in: query
+        name: page
+        type: integer
+      - description: Page Size
+        in: query
+        name: size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core_api.DashboardListAlarmRecordsResp'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: List Alarm Records (预警记录)
+      tags:
+      - Dashboard
+  /dashboard/classes:
+    get:
+      consumes:
+      - application/json
+      description: 获取班级列表及班级内的用户/预警统计
+      parameters:
+      - description: Unit ID
+        in: query
+        name: unitId
+        required: true
+        type: string
+      - description: Grade
+        in: query
+        name: grade
+        type: integer
+      - description: Class
+        in: query
+        name: class
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core_api.DashboardListClassesResp'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: List Classes (班级列表)
+      tags:
+      - Dashboard
+  /dashboard/overview:
+    get:
+      consumes:
+      - application/json
+      description: 获取数据看板的总体概览数据
+      parameters:
+      - description: Unit ID
+        in: query
+        name: unitId
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core_api.DashboardGetDataOverviewResp'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Data Overview (数据概览)
+      tags:
+      - Dashboard
+  /dashboard/psych_trend:
+    get:
+      consumes:
+      - application/json
+      description: 获取心理风险分布和高频关键词
+      parameters:
+      - description: Unit ID
+        in: query
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core_api.DashboardGetPsychTrendResp'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Psych Trend (心理趋势)
+      tags:
+      - Dashboard
+  /dashboard/trend:
+    get:
+      consumes:
+      - application/json
+      description: 获取活跃度和对话数据的趋势图表
+      parameters:
+      - description: Unit ID
+        in: query
+        name: unitId
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core_api.DashboardGetDataTrendResp'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Data Trend (数据趋势)
+      tags:
+      - Dashboard
+  /dashboard/units:
+    get:
+      consumes:
+      - application/json
+      description: 获取数据看板中的单位列表统计信息
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core_api.DashboardListUnitsResp'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: List Units (单位列表)
+      tags:
+      - Dashboard
+  /dashboard/users:
+    get:
+      consumes:
+      - application/json
+      description: 获取风险用户列表，支持筛选和分页
+      parameters:
+      - description: Unit ID
+        in: query
+        name: unitId
+        required: true
+        type: string
+      - description: Risk Level
+        in: query
+        name: level
+        type: integer
+      - description: Gender
+        in: query
+        name: gender
+        type: string
+      - description: Keyword
+        in: query
+        name: keyword
+        type: string
+      - description: Page Number
+        in: query
+        name: page
+        type: integer
+      - description: Page Size
+        in: query
+        name: size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core_api.DashboardListUsersResp'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: List Users (用户列表)
+      tags:
+      - Dashboard
+  /unit/create_and_link_user:
+    post:
+      consumes:
+      - application/json
+      description: 批量导入用户并自动关联到本单位
+      parameters:
+      - description: Create And Link Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/core_api.UnitCreateAndLinkUserReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core_api.UnitCreateAndLinkUserResp'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Create And Link Users (批量创建并关联用户)
+      tags:
+      - Unit
+  /unit/get_info:
+    get:
+      consumes:
+      - application/json
+      description: 获取当前单位的详细信息
+      parameters:
+      - description: Unit ID
+        in: query
+        name: unitId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core_api.UnitGetInfoResp'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Get Unit Info (获取单位信息)
+      tags:
+      - Unit
+  /unit/link_user:
+    post:
+      consumes:
+      - application/json
+      description: 将现有用户关联到本单位
+      parameters:
+      - description: Link Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/core_api.UnitLinkUserReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/basic.Response'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Link User (关联用户)
+      tags:
+      - Unit
+  /unit/sign_in:
+    post:
+      consumes:
+      - application/json
+      description: B端单位账号登录
+      parameters:
+      - description: Login Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/core_api.UnitSignInReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core_api.UnitSignInResp'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Unit Sign In (单位登录)
+      tags:
+      - Unit
+  /unit/sign_up:
+    post:
+      consumes:
+      - application/json
+      description: B端单位账号注册
+      parameters:
+      - description: Register Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/core_api.UnitSignUpReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core_api.UnitSignUpResp'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Unit Sign Up (单位注册)
+      tags:
+      - Unit
+  /unit/update_info:
+    post:
+      consumes:
+      - application/json
+      description: 更新单位资料
+      parameters:
+      - description: Update Info Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/core_api.UnitUpdateInfoReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/basic.Response'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Update Unit Info (更新单位信息)
+      tags:
+      - Unit
+  /unit/update_password:
+    post:
+      consumes:
+      - application/json
+      description: 修改单位登录密码
+      parameters:
+      - description: Update Password Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/core_api.UnitUpdatePasswordReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/basic.Response'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Update Unit Password (修改单位密码)
+      tags:
+      - Unit
+  /user/get_info:
+    get:
+      consumes:
+      - application/json
+      description: 获取当前登录用户的详细信息
+      parameters:
+      - description: User ID
+        in: query
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core_api.UserGetInfoResp'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Get User Info (获取用户信息)
+      tags:
+      - User
+  /user/sign_in:
+    post:
+      consumes:
+      - application/json
+      description: C端用户登录
+      parameters:
+      - description: Login Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/core_api.UserSignInReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core_api.UserSignInResp'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: User Sign In (用户登录)
+      tags:
+      - User
+  /user/sign_up:
+    post:
+      consumes:
+      - application/json
+      description: C端用户注册
+      parameters:
+      - description: Register Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/core_api.UserSignUpReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core_api.UserSignUpResp'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: User Sign Up (用户注册)
+      tags:
+      - User
+  /user/update_info:
+    post:
+      consumes:
+      - application/json
+      description: 更新用户个人资料
+      parameters:
+      - description: Update Info Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/core_api.UserUpdateInfoReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/basic.Response'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Update User Info (更新用户信息)
+      tags:
+      - User
+  /user/update_password:
+    post:
+      consumes:
+      - application/json
+      description: 修改用户登录密码
+      parameters:
+      - description: Update Password Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/core_api.UserUpdatePasswordReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/basic.Response'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: Update User Password (修改用户密码)
+      tags:
+      - User
+swagger: "2.0"
