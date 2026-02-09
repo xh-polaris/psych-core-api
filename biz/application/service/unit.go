@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"time"
+
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
@@ -12,7 +14,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
-	"time"
 
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-idl/kitex_gen/basic"
@@ -117,6 +118,8 @@ func (u *UnitService) UnitSignUp(ctx context.Context, req *core_api.UnitSignUpRe
 			UpdateTime: unitDAO.UpdateTime,
 			DeleteTime: unitDAO.DeleteTime,
 		},
+		Code: 0,
+		Msg:  "success",
 	}, nil
 }
 
@@ -164,7 +167,11 @@ func (u *UnitService) UnitSignIn(ctx context.Context, req *core_api.UnitSignInRe
 	}
 
 	// 构造返回结果
-	return &core_api.UnitSignInResp{UnitId: unitDAO.ID.Hex()}, nil
+	return &core_api.UnitSignInResp{
+		UnitId: unitDAO.ID.Hex(),
+		Code:   0,
+		Msg:    "success",
+	}, nil
 }
 
 func (u *UnitService) UnitGetInfo(ctx context.Context, req *core_api.UnitGetInfoReq) (*core_api.UnitGetInfoResp, error) {
@@ -206,6 +213,8 @@ func (u *UnitService) UnitGetInfo(ctx context.Context, req *core_api.UnitGetInfo
 			UpdateTime: unitDAO.UpdateTime,
 			DeleteTime: unitDAO.DeleteTime,
 		},
+		Code: 0,
+		Msg:  "success",
 	}, nil
 }
 
@@ -245,7 +254,10 @@ func (u *UnitService) UnitUpdateInfo(ctx context.Context, req *core_api.UnitUpda
 	}
 
 	// 构造返回结果
-	return &basic.Response{}, nil
+	return &basic.Response{
+		Code: 0,
+		Msg:  "success",
+	}, nil
 }
 
 func (u *UnitService) UnitUpdatePassword(ctx context.Context, req *core_api.UnitUpdatePasswordReq) (*basic.Response, error) {
@@ -308,7 +320,10 @@ func (u *UnitService) UnitUpdatePassword(ctx context.Context, req *core_api.Unit
 	}
 
 	// 构造返回结果
-	return &basic.Response{}, nil
+	return &basic.Response{
+		Code: 0,
+		Msg:  "success",
+	}, nil
 }
 
 func (u *UnitService) UnitLinkUser(ctx context.Context, req *core_api.UnitLinkUserReq) (*basic.Response, error) {
@@ -338,7 +353,10 @@ func (u *UnitService) UnitLinkUser(ctx context.Context, req *core_api.UnitLinkUs
 		return nil, err
 	}
 
-	return &basic.Response{}, nil
+	return &basic.Response{
+		Code: 0,
+		Msg:  "success",
+	}, nil
 }
 
 func (u *UnitService) UnitCreateAndLinkUser(ctx context.Context, req *core_api.UnitCreateAndLinkUserReq) (*core_api.UnitCreateAndLinkUserResp, error) {
@@ -489,5 +507,7 @@ func (u *UnitService) UnitCreateAndLinkUser(ctx context.Context, req *core_api.U
 		AllCount:     int32(all),
 		SuccessCount: int32(success),
 		SkipCount:    int32(skip),
+		Code:         0,
+		Msg:          "success",
 	}, nil
 }

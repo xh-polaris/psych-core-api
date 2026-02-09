@@ -2,13 +2,14 @@ package service
 
 import (
 	"context"
+	"time"
+
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util/enum"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
-	"time"
 
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-idl/kitex_gen/basic"
@@ -79,7 +80,10 @@ func (c *ConfigService) ConfigCreate(ctx context.Context, req *core_api.ConfigCr
 		return nil, err
 	}
 	// 构造返回结果
-	return &basic.Response{}, nil
+	return &basic.Response{
+		Code: 0,
+		Msg:  "success",
+	}, nil
 }
 
 func (c *ConfigService) ConfigUpdateInfo(ctx context.Context, req *core_api.ConfigCreateOrUpdateReq) (resp *basic.Response, err error) {
@@ -110,7 +114,10 @@ func (c *ConfigService) ConfigUpdateInfo(ctx context.Context, req *core_api.Conf
 		return nil, err
 	}
 
-	return &basic.Response{}, nil
+	return &basic.Response{
+		Code: 0,
+		Msg:  "success",
+	}, nil
 }
 
 func (c *ConfigService) ConfigGetByUnitID(ctx context.Context, req *core_api.ConfigGetByUnitIdReq) (resp *core_api.ConfigGetByUnitIdResp, err error) {
@@ -135,10 +142,14 @@ func (c *ConfigService) ConfigGetByUnitID(ctx context.Context, req *core_api.Con
 	case true:
 		return &core_api.ConfigGetByUnitIdResp{
 			Config: adminConfig(configDAO),
+			Code:   0,
+			Msg:    "success",
 		}, nil
 	case false:
 		return &core_api.ConfigGetByUnitIdResp{
 			Config: publicConfig(configDAO), // 隐藏appID字段
+			Code:   0,
+			Msg:    "success",
 		}, nil
 	}
 

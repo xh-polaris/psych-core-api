@@ -2,6 +2,9 @@ package service
 
 import (
 	"context"
+	"sort"
+	"sync"
+
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
@@ -12,8 +15,6 @@ import (
 	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
 	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"sort"
-	"sync"
 )
 
 type IDashboardService interface {

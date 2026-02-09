@@ -2,6 +2,9 @@ package service
 
 import (
 	"context"
+	"sync"
+	"time"
+
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
@@ -16,8 +19,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
-	"sync"
-	"time"
 )
 
 type IAlarmService interface {

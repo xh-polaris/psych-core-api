@@ -32,6 +32,7 @@ require (
 	github.com/hertz-contrib/swagger v0.1.1
 	github.com/redis/go-redis/v9 v9.12.1
 	github.com/swaggo/files v1.0.1
+	github.com/swaggo/swag v1.16.1
 	go.mongodb.org/mongo-driver v1.12.0
 	go.mongodb.org/mongo-driver/v2 v2.3.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0
@@ -113,7 +114,6 @@ require (
 	github.com/slongfield/pyfmt v0.0.0-20220222012616-ea85ff4c361f // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
-	github.com/swaggo/swag v1.16.1 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
