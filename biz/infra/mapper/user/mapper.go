@@ -79,7 +79,7 @@ func (m *mongoMapper) BatchFindByIDs(ctx context.Context, userIds []primitive.Ob
 		return make(map[primitive.ObjectID]*User), nil
 	}
 
-	filter := bson.M{cst.Id: bson.M{"$in": userIds}}
+	filter := bson.M{cst.ID: bson.M{"$in": userIds}}
 	var users []*User
 	if err := m.conn.Find(ctx, &users, filter); err != nil {
 		logs.Errorf("[user mapper] aggregate user err:%s", errorx.ErrorWithoutStack(err))
@@ -123,7 +123,7 @@ func (m *mongoMapper) CountByClasses(ctx context.Context, unitId primitive.Objec
 		// group
 		{
 			"$group": bson.M{
-				cst.Id:    bson.M{cst.Grade: "$" + cst.Grade, cst.Class: "$" + cst.Class},
+				cst.ID:    bson.M{cst.Grade: "$" + cst.Grade, cst.Class: "$" + cst.Class},
 				"userNum": bson.M{"$sum": 1}, // 总人数
 				"alarmNum": bson.M{ // 风险人数
 					"$sum": bson.M{

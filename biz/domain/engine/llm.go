@@ -28,7 +28,7 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	}
 
 	// 创建用户消息
-	oids, err := util.ObjectIDsFromHex(e.uSession, e.info[cst.UserId].(string))
+	oids, err := util.ObjectIDsFromHex(e.uSession, e.info[cst.UserID].(string))
 	if err != nil {
 		return errorx.WrapByCode(err, errno.RetrieveHisErr)
 	}

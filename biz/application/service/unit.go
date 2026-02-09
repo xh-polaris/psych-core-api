@@ -181,8 +181,8 @@ func (u *UnitService) UnitGetInfo(ctx context.Context, req *core_api.UnitGetInfo
 	}
 
 	unitId, err := primitive.ObjectIDFromHex(req.UnitId)
-	logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
 	if err != nil {
+		logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}
 

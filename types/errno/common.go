@@ -50,7 +50,7 @@ func init() {
 	)
 	code.Register(
 		ErrMissingParams,
-		"未填写{filed}",
+		"未填写{field}",
 		code.WithAffectStability(false),
 	)
 	code.Register(

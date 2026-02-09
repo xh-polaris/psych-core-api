@@ -44,7 +44,7 @@ func (s *AuthService) UserSignIn(ctx context.Context, req *core_api.UserSignInRe
 
 	jwt, err := util.GenerateJwt(map[string]any{
 		cst.UnitId:   userResp.UnitId,
-		cst.UserId:   userResp.UserId,
+		cst.UserID:   userResp.UserId,
 		cst.Code:     userResp.Code,
 		cst.CodeType: userResp.CodeType,
 	})

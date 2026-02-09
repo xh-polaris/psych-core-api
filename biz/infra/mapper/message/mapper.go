@@ -48,7 +48,7 @@ func (m *mongoMapper) RetrieveMessage(ctx context.Context, conversation string, 
 	if size > 0 {
 		opts.SetLimit(int64(size))
 	}
-	if err = m.conn.Find(ctx, &msgs, bson.M{cst.ConversationId: oid, cst.Status: bson.M{cst.NE: cst.DeletedStatus}},
+	if err = m.conn.Find(ctx, &msgs, bson.M{cst.ConversationID: oid, cst.Status: bson.M{cst.NE: cst.DeletedStatus}},
 		opts); err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
 		logs.Errorf("[message mapper] find err:%s", errorx.ErrorWithoutStack(err))
 		return nil, err
@@ -74,14 +74,14 @@ func (m *mongoMapper) BatchMessageStats(ctx context.Context, userIds []primitive
 	pipeline := []bson.M{
 		{
 			"$match": bson.M{
-				cst.UserId: bson.M{cst.In: userIds},
+				cst.UserID: bson.M{cst.In: userIds},
 				cst.Role:   RoleStoI[cst.User],                // user角色
 				cst.Status: bson.M{cst.NE: cst.DeletedStatus}, // 非删除状态
 			},
 		},
 		{
 			"$group": bson.M{
-				cst.Id:       "$" + cst.UserId, // 按用户分组
+				cst.ID:       "$" + cst.UserID, // 按用户分组
 				"rounds":     bson.M{"$sum": 1},
 				"latestTime": bson.M{"$max": "$" + cst.CreateTime},
 			},

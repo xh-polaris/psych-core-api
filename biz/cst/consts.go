@@ -17,17 +17,29 @@ const (
 
 // mapper层字段枚举
 const (
-	Id             = "_id"
-	ConversationId = "conversation_id"
-	MessageId      = "message_id"
-	UserId         = "user_id"
-	CreateTime     = "create_time"
-	UpdateTime     = "update_time"
-	DeleteTime     = "delete_time"
-	UnitId         = "unit_id"
+	ID             = "_id"
+	ConversationID = "conversationId"
+	MessageID      = "messageId"
+	UserID         = "userId"
+	CreateTime     = "createTime"
+	UpdateTime     = "updateTime"
+	DeleteTime     = "deleteTime"
+	UnitId         = "unitId"
 	Code           = "code"
-	CodeType       = "code_type"
+	CodeType       = "codeType"
 	Role           = "role"
+	Phone          = "phone"
+	StudentID      = "studentId"
+	Name           = "name"
+	UnitID         = "unitId"
+	Gender         = "gender"
+	Birth          = "birth"
+	EnrollYear     = "enrollYear"
+	Grade          = "grade"
+	Class          = "class"
+	Address        = "address"
+	Contact        = "contact"
+	Password       = "password"
 
 	Status        = "status"
 	DeletedStatus = -1
@@ -58,23 +70,6 @@ const (
 	Low    = "low"
 )
 
-// 原profile相关mapper常量
-const (
-	ID         = "_id"
-	Phone      = "phone"
-	StudentID  = "student_id"
-	Name       = "name"
-	UnitID     = "unit_id"
-	Gender     = "gender"
-	Birth      = "birth"
-	EnrollYear = "enroll_year"
-	Grade      = "grade"
-	Class      = "class"
-	Address    = "address"
-	Contact    = "contact"
-	Password   = "password"
-)
-
 // 原profile 前端字段相关
 const (
 	AuthTypePassword = 0
@@ -101,7 +96,7 @@ const (
 
 // schema.Message 中Extra携带信息
 const (
-	EventMessageContentType = "event_message_content_type" // 模型消息
+	EventMessageContentType = "eventMessageContentType" // 模型消息
 )
 
 // 流式响应处理相关标签

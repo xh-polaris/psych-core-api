@@ -85,7 +85,7 @@ func (m *mongoMapper) CountByTime(ctx context.Context, unitID primitive.ObjectID
 }
 
 func (m *mongoMapper) Exists(ctx context.Context, userID primitive.ObjectID) (bool, error) {
-	c, err := m.conn.CountDocuments(ctx, bson.M{cst.UserId: userID, cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
+	c, err := m.conn.CountDocuments(ctx, bson.M{cst.UserID: userID, cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
 	if err != nil {
 		logs.Errorf("[alarm mapper] find err:%s", errorx.ErrorWithoutStack(err))
 		return false, err

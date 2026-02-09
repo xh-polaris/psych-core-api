@@ -278,7 +278,7 @@ func UserSignIn(ctx context.Context, c *app.RequestContext) {
 func UserGetInfo(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req core_api.UserGetInfoReq
-	err = c.BindAndValidate(&req)
+	err = c.BindQuery(&req)
 	if err != nil {
 		c.String(consts.StatusBadRequest, err.Error())
 		return
@@ -402,11 +402,8 @@ func UnitSignIn(ctx context.Context, c *app.RequestContext) {
 func UnitGetInfo(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req core_api.UnitGetInfoReq
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		c.String(consts.StatusBadRequest, err.Error())
-		return
-	}
+	unitId := c.Query("unitId")
+	req.UnitId = unitId
 
 	p := provider.Get()
 	resp, err := p.UnitService.UnitGetInfo(ctx, &req)

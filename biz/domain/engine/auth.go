@@ -28,7 +28,7 @@ func (e *Engine) auth(auth *core.Auth) (bool, error) {
 		return false, e.MWrite(core.MErr, merr)
 	}
 	e.info = alreadyAuth.Info
-	if cid, ok := alreadyAuth.Info[cst.ConversationId]; ok {
+	if cid, ok := alreadyAuth.Info[cst.ConversationID]; ok {
 		e.uSession = cid.(string)
 	} else {
 		e.uSession = primitive.NewObjectID().Hex()
@@ -48,7 +48,7 @@ func (e *Engine) already(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Er
 	alreadyAuth.Info = auth.Info
 	e.info = alreadyAuth.Info
 	e.info[cst.UnitId] = claims[cst.UnitId].(string)
-	e.info[cst.UserId] = claims[cst.UserId].(string)
+	e.info[cst.UserID] = claims[cst.UserID].(string)
 	e.info[cst.Code] = claims[cst.Code].(string)
 	return alreadyAuth, nil
 }
@@ -90,7 +90,7 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 		return
 	}
 	alreadyAuth.Info[cst.UnitId] = signResp.UnitId
-	alreadyAuth.Info[cst.UserId] = signResp.UserId
+	alreadyAuth.Info[cst.UserID] = signResp.UserId
 	alreadyAuth.Info[cst.Code] = getResp.User.Code
 	e.info = alreadyAuth.Info
 	return

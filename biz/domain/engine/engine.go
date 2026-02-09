@@ -171,7 +171,7 @@ func (e *Engine) MWrite(t core.MType, payload any) (err error) {
 // Lock 锁定
 func (e *Engine) Lock() error {
 	if e.lock == nil {
-		e.lock = lock.Mgr.NewLock(e.info[cst.UserId].(string))
+		e.lock = lock.Mgr.NewLock(e.info[cst.UserID].(string))
 	}
 	if ok, err := e.lock.TryLock(e.ctx, time.Minute*3, time.Second*90, time.Minute*2); err != nil {
 		return errorx.WrapByCode(err, errno.UnKnown)
