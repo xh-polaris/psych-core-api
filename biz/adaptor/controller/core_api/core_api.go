@@ -5,6 +5,7 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/pkg/httpx"
 	"github.com/xh-polaris/psych-core-api/provider"
 	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
@@ -278,11 +279,7 @@ func UserSignIn(ctx context.Context, c *app.RequestContext) {
 func UserGetInfo(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req core_api.UserGetInfoReq
-	err = c.BindQuery(&req)
-	if err != nil {
-		c.String(consts.StatusBadRequest, err.Error())
-		return
-	}
+	req.UserId = c.Query(cst.QueryUserID)
 
 	p := provider.Get()
 	resp, err := p.UserService.UserGetInfo(ctx, &req)
@@ -402,8 +399,7 @@ func UnitSignIn(ctx context.Context, c *app.RequestContext) {
 func UnitGetInfo(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req core_api.UnitGetInfoReq
-	unitId := c.Query("unitId")
-	req.UnitId = unitId
+	req.UnitId = c.Query(cst.QueryUnitID)
 
 	p := provider.Get()
 	resp, err := p.UnitService.UnitGetInfo(ctx, &req)

@@ -74,6 +74,8 @@ const (
 const (
 	AuthTypePassword = 0
 	AuthTypeCode     = 1
+	QueryUnitID      = "unitId"
+	QueryUserID      = "userId"
 )
 
 // Event中各种类型枚举值
