@@ -18,8 +18,9 @@ import (
 )
 
 type IDashboardService interface {
-	ListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (resp *core_api.DashboardListClassesResp, err error)
-	ListUsers(ctx context.Context, req *core_api.DashboardListUsersReq) (resp *core_api.DashboardListUsersResp, err error)
+	DashboardGetDataOverview(ctx context.Context, req *core_api.DashboardGetDataOverviewReq) (resp *core_api.DashboardGetDataOverviewResp, err error)
+	DashboardListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (resp *core_api.DashboardListClassesResp, err error)
+	DashboardListUsers(ctx context.Context, req *core_api.DashboardListUsersReq) (resp *core_api.DashboardListUsersResp, err error)
 }
 
 type DashboardService struct {
@@ -32,7 +33,11 @@ var DashboardServiceSet = wire.NewSet(
 	wire.Bind(new(IDashboardService), new(*DashboardService)),
 )
 
-func (s *DashboardService) ListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (resp *core_api.DashboardListClassesResp, err error) {
+func (s *DashboardService) DashboardGetDataOverview(ctx context.Context, req *core_api.DashboardGetDataOverviewReq) (resp *core_api.DashboardGetDataOverviewResp, err error) {
+	return nil, errorx.New(errno.ErrUnImplement)
+}
+
+func (s *DashboardService) DashboardListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (resp *core_api.DashboardListClassesResp, err error) {
 	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
@@ -97,7 +102,7 @@ func aggregateAndSort(mapperRes []*user.ClassStatResult) []*core_api.GradeInfo {
 	return grades
 }
 
-func (s *DashboardService) ListUsers(ctx context.Context, req *core_api.DashboardListUsersReq) (resp *core_api.DashboardListUsersResp, err error) {
+func (s *DashboardService) DashboardListUsers(ctx context.Context, req *core_api.DashboardListUsersReq) (resp *core_api.DashboardListUsersResp, err error) {
 	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))

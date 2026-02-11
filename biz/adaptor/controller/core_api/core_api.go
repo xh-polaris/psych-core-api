@@ -34,9 +34,9 @@ func DashboardGetDataOverview(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	// 实际业务中应调用 Service
-	resp := new(core_api.DashboardGetDataOverviewResp)
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.DashboardService.DashboardGetDataOverview(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // DashboardGetDataTrend
@@ -181,7 +181,7 @@ func DashboardListClasses(ctx context.Context, c *app.RequestContext) {
 	}
 
 	p := provider.Get()
-	resp, err := p.DashboardService.ListClasses(ctx, &req)
+	resp, err := p.DashboardService.DashboardListClasses(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
@@ -210,7 +210,7 @@ func DashboardListUsers(ctx context.Context, c *app.RequestContext) {
 	}
 
 	p := provider.Get()
-	resp, err := p.DashboardService.ListUsers(ctx, &req)
+	resp, err := p.DashboardService.DashboardListUsers(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
