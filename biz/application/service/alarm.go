@@ -57,6 +57,8 @@ func (s *AlarmService) Overview(ctx context.Context, req *core_api.DashboardGetA
 		ProcessedChange: st.ProcessedChange,
 		PendingChange:   st.PendingChange,
 		TrackChange:     st.TrackChange,
+		Code:            200,
+		Msg:             "success",
 	}, nil
 }
 

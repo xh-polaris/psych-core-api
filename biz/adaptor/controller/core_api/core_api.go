@@ -2,6 +2,7 @@ package core_api
 
 import (
 	"context"
+	"github.com/cloudwego/hertz/pkg/common/hlog"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
@@ -118,15 +119,21 @@ func DashboardGetPsychTrend(ctx context.Context, c *app.RequestContext) {
 // @Failure 400 {string} string "Bad Request"
 // @Router /dashboard/alarm_overview [GET]
 func DashboardGetAlarmOverview(ctx context.Context, c *app.RequestContext) {
+
+	queryArgs := c.Request.URI().QueryArgs()
+	hlog.CtxInfof(ctx, "Query参数数量: %d", queryArgs.Len())
+
+	// 遍历所有 Query 参数
+	queryArgs.VisitAll(func(key, value []byte) {
+		hlog.CtxInfof(ctx, "Query参数: %s = %s", string(key), string(value))
+	})
+
 	var err error
 	var req core_api.DashboardGetAlarmOverviewReq
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		c.String(consts.StatusBadRequest, err.Error())
-		return
-	}
+	req.UnitId = c.Query("unitId")
 
-	resp := new(core_api.DashboardGetAlarmOverviewResp)
+	p := provider.Get()
+	resp, err := p.AlarmService.Overview(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
@@ -179,6 +186,7 @@ func DashboardListClasses(ctx context.Context, c *app.RequestContext) {
 		c.String(consts.StatusBadRequest, err.Error())
 		return
 	}
+	req.UnitId = c.Query("unitId")
 
 	p := provider.Get()
 	resp, err := p.DashboardService.ListClasses(ctx, &req)

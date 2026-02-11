@@ -92,8 +92,7 @@ func (m *mongoMapper) BatchMessageStats(ctx context.Context, userIds []bson.Obje
 		Rounds     int32         `bson:"rounds"`
 		LatestTime time.Time     `bson:"latestTime"`
 	}
-	err := m.conn.Aggregate(ctx, &results, pipeline)
-	if err != nil {
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
 		logs.Errorf("[message mapper] aggregate user conversation statistic err:%s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}

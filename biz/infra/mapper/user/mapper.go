@@ -95,8 +95,10 @@ func (m *mongoMapper) BatchFindByIDs(ctx context.Context, userIds []bson.ObjectI
 
 // ClassStatResult 用户管理-班级统计返回结果
 type ClassStatResult struct {
-	Grade    int32 `bson:"_id.grade"`
-	Class    int32 `bson:"_id.class"`
+	Info struct {
+		Grade int32 `bson:"grade" json:"grade"`
+		Class int32 `bson:"class" json:"class"`
+	} `bson:"_id" json:"_id"`
 	UserNum  int32 `bson:"userNum"`
 	AlarmNum int32 `bson:"alarmNum"`
 }
@@ -140,7 +142,7 @@ func (m *mongoMapper) CountByClasses(ctx context.Context, unitId bson.ObjectID, 
 	}
 
 	var results []*ClassStatResult
-	if err := m.conn.Aggregate(ctx, pipeline, &results); err != nil {
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
 		logs.Errorf("[user mapper] aggregate classes err:%s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}

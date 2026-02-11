@@ -66,19 +66,22 @@ func aggregateAndSort(mapperRes []*user.ClassStatResult) []*core_api.GradeInfo {
 	gradeMap := make(map[int32]*core_api.GradeInfo)
 	// 将入参切片（有序）填充入有序map
 	for _, item := range mapperRes {
-		gradeInfo, exists := gradeMap[item.Grade]
+		gradeInfo, exists := gradeMap[item.Info.Grade]
+		// 响应中年级尚不存在 创建该年级
 		if !exists {
 			gradeInfo = &core_api.GradeInfo{
-				Grade:   item.Grade,
+				Grade:   item.Info.Grade,
 				Classes: make([]*core_api.ClassInfo, 0),
 			}
-			gradeMap[item.Grade] = gradeInfo
+			gradeMap[item.Info.Grade] = gradeInfo
 		}
-
+		// 年级已存在
+		uNum := item.UserNum
+		aNum := item.AlarmNum
 		gradeInfo.Classes = append(gradeInfo.Classes, &core_api.ClassInfo{
-			Class:        item.Class,
-			UserNum:      item.UserNum,
-			AlarmNum:     item.AlarmNum,
+			Class:        item.Info.Class,
+			UserNum:      uNum,
+			AlarmNum:     aNum,
 			TeacherName:  "",
 			TeacherPhone: "",
 		})
