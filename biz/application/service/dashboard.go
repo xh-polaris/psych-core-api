@@ -19,6 +19,9 @@ import (
 
 type IDashboardService interface {
 	DashboardGetDataOverview(ctx context.Context, req *core_api.DashboardGetDataOverviewReq) (resp *core_api.DashboardGetDataOverviewResp, err error)
+	DashboardGetDataTrend(ctx context.Context, req *core_api.DashboardGetDataTrendReq) (resp *core_api.DashboardGetDataTrendResp, err error)
+	DashboardListUnits(ctx context.Context, req *core_api.DashboardListUnitsReq) (resp *core_api.DashboardListUnitsResp, err error)
+	DashboardGetPsychTrend(ctx context.Context, req *core_api.DashboardGetPsychTrendReq) (resp *core_api.DashboardGetPsychTrendResp, err error)
 	DashboardListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (resp *core_api.DashboardListClassesResp, err error)
 	DashboardListUsers(ctx context.Context, req *core_api.DashboardListUsersReq) (resp *core_api.DashboardListUsersResp, err error)
 }
@@ -34,6 +37,18 @@ var DashboardServiceSet = wire.NewSet(
 )
 
 func (s *DashboardService) DashboardGetDataOverview(ctx context.Context, req *core_api.DashboardGetDataOverviewReq) (resp *core_api.DashboardGetDataOverviewResp, err error) {
+	return nil, errorx.New(errno.ErrUnImplement)
+}
+
+func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_api.DashboardGetDataTrendReq) (resp *core_api.DashboardGetDataTrendResp, err error) {
+	return nil, errorx.New(errno.ErrUnImplement)
+}
+
+func (s *DashboardService) DashboardListUnits(ctx context.Context, req *core_api.DashboardListUnitsReq) (resp *core_api.DashboardListUnitsResp, err error) {
+	return nil, errorx.New(errno.ErrUnImplement)
+}
+
+func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core_api.DashboardGetPsychTrendReq) (resp *core_api.DashboardGetPsychTrendResp, err error) {
 	return nil, errorx.New(errno.ErrUnImplement)
 }
 

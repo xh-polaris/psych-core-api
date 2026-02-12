@@ -58,8 +58,9 @@ func DashboardGetDataTrend(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.DashboardGetDataTrendResp)
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.DashboardService.DashboardGetDataTrend(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // DashboardListUnits
@@ -80,8 +81,9 @@ func DashboardListUnits(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.DashboardListUnitsResp)
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.DashboardService.DashboardListUnits(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // DashboardGetPsychTrend
@@ -103,8 +105,9 @@ func DashboardGetPsychTrend(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.DashboardGetPsychTrendResp)
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.DashboardService.DashboardGetPsychTrend(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // DashboardGetAlarmOverview
