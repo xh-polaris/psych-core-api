@@ -27,6 +27,7 @@ type IMongoMapper interface {
 	ExistsByPhone(ctx context.Context, phone string) (bool, error)
 	Count(ctx context.Context) (int64, error)
 	CountByPeriod(ctx context.Context, start, end time.Time) (int64, error)
+	FindAll(ctx context.Context) ([]*Unit, error)
 }
 
 type mongoMapper struct {
@@ -55,4 +56,13 @@ func (m *mongoMapper) ExistsByPhone(ctx context.Context, phone string) (bool, er
 // Count 统计单位数量
 func (m *mongoMapper) Count(ctx context.Context) (int64, error) {
 	return m.conn.CountDocuments(ctx, bson.M{})
+}
+
+// FindAll 查询所有单位（排除已删除）
+func (m *mongoMapper) FindAll(ctx context.Context) ([]*Unit, error) {
+	var units []*Unit
+	if err := m.conn.Find(ctx, &units, bson.M{cst.Status: bson.M{cst.NE: cst.DeletedStatus}}); err != nil {
+		return nil, err
+	}
+	return units, nil
 }

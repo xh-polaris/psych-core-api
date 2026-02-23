@@ -40,6 +40,7 @@ const (
 	Address        = "address"
 	Contact        = "contact"
 	Password       = "password"
+	RiskLevel      = "riskLevel"
 
 	Status        = "status"
 	DeletedStatus = -1

@@ -37,6 +37,7 @@ type IMongoMapper interface {
 	CountByUnitID(ctx context.Context, unitId bson.ObjectID) (int64, error)
 	CountByUnitIDAndPeriod(ctx context.Context, unitId bson.ObjectID, start, end time.Time) (int64, error)
 	CountAlarmUsers(ctx context.Context, unitId *bson.ObjectID) (int64, error)
+	CountAlarmUsersByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int64, error)
 }
 
 type mongoMapper struct {
@@ -198,5 +199,29 @@ func (m *mongoMapper) CountAlarmUsers(ctx context.Context, unitId *bson.ObjectID
 	if unitId != nil {
 		filter[cst.UnitID] = *unitId
 	}
+	return m.conn.CountDocuments(ctx, filter)
+}
+
+// CountAlarmUsersByPeriod 统计高风险用户数量（riskLevel == high），可选按单位和时间范围过滤
+func (m *mongoMapper) CountAlarmUsersByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int64, error) {
+	timeFilter := bson.M{}
+	if !start.IsZero() {
+		timeFilter["$gte"] = start
+	}
+	if !end.IsZero() {
+		timeFilter["$lte"] = end
+	}
+
+	filter := bson.M{
+		cst.RiskLevel: RiskLevelStoI[cst.High],
+		cst.Status:    bson.M{cst.NE: cst.DeletedStatus},
+	}
+	if unitId != nil {
+		filter[cst.UnitID] = *unitId
+	}
+	if len(timeFilter) > 0 {
+		filter[cst.CreateTime] = timeFilter
+	}
+
 	return m.conn.CountDocuments(ctx, filter)
 }

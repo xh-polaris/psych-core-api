@@ -10,6 +10,9 @@ const (
 	ErrDashboardActiveUserStat            = 5003 // 活跃用户统计失败
 	ErrDashboardConversationStat          = 5004 // 对话数量统计失败
 	ErrDashboardAvgDurationStat           = 5005 // 对话时长统计失败
+	ErrDashboardAlarmUserStat             = 5006
+	ErrDashboardTotalUserStat             = 5007
+	ErrDashboardUnitStat                  = 5008
 )
 
 func init() {
@@ -36,6 +39,21 @@ func init() {
 	code.Register(
 		ErrDashboardAvgDurationStat,
 		"对话时长统计失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrDashboardAlarmUserStat,
+		"预警用户统计失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrDashboardTotalUserStat,
+		"总用户统计失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrDashboardUnitStat,
+		"单位统计失败",
 		code.WithAffectStability(false),
 	)
 }
