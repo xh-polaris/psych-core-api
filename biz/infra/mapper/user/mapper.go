@@ -38,6 +38,7 @@ type IMongoMapper interface {
 	CountByUnitIDAndPeriod(ctx context.Context, unitId bson.ObjectID, start, end time.Time) (int64, error)
 	CountAlarmUsers(ctx context.Context, unitId *bson.ObjectID) (int64, error)
 	CountAlarmUsersByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int64, error)
+	RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID) ([]*RiskStat, error)
 }
 
 type mongoMapper struct {
@@ -224,4 +225,39 @@ func (m *mongoMapper) CountAlarmUsersByPeriod(ctx context.Context, unitId *bson.
 	}
 
 	return m.conn.CountDocuments(ctx, filter)
+}
+
+// RiskStat 风险等级 + 性别分布
+type RiskStat struct {
+	Level  int32 `bson:"_id.level"`
+	Gender int32 `bson:"_id.gender"`
+	Count  int64 `bson:"count"`
+}
+
+// RiskDistributionStats 统计风险等级分布（按性别拆分），unitId 为空表示全平台
+func (m *mongoMapper) RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID) ([]*RiskStat, error) {
+	match := bson.M{
+		cst.Status: bson.M{cst.NE: cst.DeletedStatus},
+	}
+	if unitId != nil {
+		match[cst.UnitID] = *unitId
+	}
+
+	pipeline := []bson.M{
+		{"$match": match},
+		{"$group": bson.M{
+			cst.ID: bson.M{
+				"level":  "$" + cst.RiskLevel,
+				"gender": "$" + cst.Gender,
+			},
+			"count": bson.M{"$sum": 1},
+		}},
+	}
+
+	var results []*RiskStat
+	if err := m.conn.Aggregate(ctx, pipeline, &results); err != nil {
+		logs.Errorf("[user mapper] aggregate risk distribution err:%s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+	return results, nil
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/wire"
+	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
@@ -479,7 +480,88 @@ func (s *DashboardService) DashboardListUnits(ctx context.Context, req *core_api
 }
 
 func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core_api.DashboardGetPsychTrendReq) (*core_api.DashboardGetPsychTrendResp, error) {
-	return nil, errorx.New(errno.ErrUnImplement)
+	unitIdStr := req.GetUnitId()
+	var unitOID *bson.ObjectID
+	if unitIdStr != "" {
+		id, err := bson.ObjectIDFromHex(unitIdStr)
+		if err != nil {
+			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
+		}
+		unitOID = &id
+	}
+
+	// 统计风险等级分布（按性别拆分）
+	riskStats, err := s.UserMapper.RiskDistributionStats(ctx, unitOID)
+	if err != nil {
+		logs.Errorf("aggregate risk distribution error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardAlarmUserStat)
+	}
+
+	// level: 0=正常 1=低危 2=中危 3=高危
+	// user.RiskLevel: High=1, Medium=2, Low=3, Normal=4
+	levelMap := func(dbLevel int32) int32 {
+		switch dbLevel {
+		case user.RiskLevelStoI[cst.High]:
+			return 3
+		case user.RiskLevelStoI[cst.Medium]:
+			return 2
+		case user.RiskLevelStoI[cst.Low]:
+			return 1
+		case user.RiskLevelStoI[cst.Normal]:
+			return 0
+		default:
+			return 0
+		}
+	}
+
+	// 先按 (level, gender) 聚合，再额外算 gender=0（all）
+	type key struct {
+		level  int32
+		gender int32
+	}
+	counts := make(map[key]int64)
+	levelTotals := make(map[int32]int64)
+
+	for _, rs := range riskStats {
+		l := levelMap(rs.Level)
+		g := rs.Gender // 约定：1=男 2=女
+		k := key{level: l, gender: g}
+		counts[k] += rs.Count
+		levelTotals[l] += rs.Count
+	}
+
+	riskDistributions := make([]*core_api.RiskDistribution, 0, len(counts)+4)
+
+	// 先输出按性别拆分的统计（gender=1,2）
+	for k, c := range counts {
+		if k.gender != 1 && k.gender != 2 {
+			continue
+		}
+		riskDistributions = append(riskDistributions, &core_api.RiskDistribution{
+			Level:  k.level,
+			Gender: k.gender,
+			Count:  c,
+		})
+	}
+
+	// 再输出 gender=0（all）
+	for lvl, total := range levelTotals {
+		riskDistributions = append(riskDistributions, &core_api.RiskDistribution{
+			Level:  lvl,
+			Gender: 0,
+			Count:  total,
+		})
+	}
+
+	// 关键词词云：暂时留空（由 psych-post 后续补充）
+	keywords := make([]*core_api.Keyword, 0)
+
+	return &core_api.DashboardGetPsychTrendResp{
+		Risks:    riskDistributions,
+		Keywords: keywords,
+		Code:     0,
+		Msg:      "success",
+	}, nil
 }
 
 func (s *DashboardService) DashboardListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (*core_api.DashboardListClassesResp, error) {
