@@ -1,6 +1,8 @@
 package config
 
 import (
+	"time"
+
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
@@ -34,7 +36,7 @@ type Config struct {
 	TTS        *TTS          `json:"tts,omitempty" bson:"tts,omitempty"`
 	Report     *Report       `json:"report,omitempty" bson:"report,omitempty"`
 	Status     int           `json:"status,omitempty" bson:"status,omitempty"`
-	CreateTime int64         `json:"createTime,omitempty" bson:"createTime,omitempty"`
-	UpdateTime int64         `json:"updateTime,omitempty" bson:"updateTime,omitempty"`
-	DeleteTime int64         `json:"deleteTime,omitempty" bson:"deleteTime,omitempty"`
+	CreateTime time.Time     `json:"createTime,omitempty" bson:"createTime,omitempty"`
+	UpdateTime time.Time     `json:"updateTime,omitempty" bson:"updateTime,omitempty"`
+	DeleteTime time.Time     `json:"deleteTime,omitempty" bson:"deleteTime,omitempty"`
 }
