@@ -16,7 +16,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-idl/kitex_gen/basic"
 	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
-	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
@@ -98,12 +97,12 @@ func (s *DashboardService) dashboardOverviewAdmin(ctx context.Context, twoWeeksB
 	activeThisWeek, err := s.ConversationMapper.CountActiveUsers(ctx, nil, weekBefore, now)
 	if err != nil {
 		logs.Errorf("count active users error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.WrapByCode(err, errno.ErrUserCount)
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardActiveUserStat)
 	}
 	activeLastWeek, err := s.ConversationMapper.CountActiveUsers(ctx, nil, twoWeeksBefore, weekBefore)
 	if err != nil {
 		logs.Errorf("count active users last week error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.WrapByCode(err, errno.ErrUserCount)
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardActiveUserStat)
 	}
 	weeklyIncreaseActiveUsers := activeThisWeek - activeLastWeek
 	var weeklyIncreaseActiveUsersRate float64
@@ -115,17 +114,17 @@ func (s *DashboardService) dashboardOverviewAdmin(ctx context.Context, twoWeeksB
 	totalConversations, err := s.ConversationMapper.Count(ctx, nil)
 	if err != nil {
 		logs.Errorf("count conversations error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrInternalError)
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 	}
 	conversationsThisWeek, err := s.ConversationMapper.CountByPeriod(ctx, nil, weekBefore, now)
 	if err != nil {
 		logs.Errorf("count conversations this week error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrInternalError)
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 	}
 	conversationsLastWeek, err := s.ConversationMapper.CountByPeriod(ctx, nil, twoWeeksBefore, weekBefore)
 	if err != nil {
 		logs.Errorf("count conversations last week error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrInternalError)
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 	}
 	weeklyIncreaseConversations := conversationsThisWeek - conversationsLastWeek
 	var weeklyIncreaseConversationsRate float64
@@ -137,12 +136,12 @@ func (s *DashboardService) dashboardOverviewAdmin(ctx context.Context, twoWeeksB
 	avgThisWeek, err := s.ConversationMapper.AverageDurationByPeriod(ctx, nil, weekBefore, now)
 	if err != nil {
 		logs.Errorf("avg duration this week error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrInternalError)
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardAvgDurationStat)
 	}
 	avgLastWeek, err := s.ConversationMapper.AverageDurationByPeriod(ctx, nil, twoWeeksBefore, weekBefore)
 	if err != nil {
 		logs.Errorf("avg duration last week error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrInternalError)
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardAvgDurationStat)
 	}
 	weeklyIncreaseAvgDuration := avgThisWeek - avgLastWeek
 	var weeklyIncreaseAvgDurationRate float64
@@ -221,17 +220,17 @@ func (s *DashboardService) dashboardOverviewUnit(ctx context.Context, unitOID bs
 	totalConversations, err := s.ConversationMapper.Count(ctx, &unitOID)
 	if err != nil {
 		logs.Errorf("count unit conversations error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrInternalError)
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 	}
 	conversationsThisWeek, err := s.ConversationMapper.CountByPeriod(ctx, &unitOID, weekBefore, now)
 	if err != nil {
 		logs.Errorf("count unit conversations this week error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrInternalError)
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 	}
 	conversationsLastWeek, err := s.ConversationMapper.CountByPeriod(ctx, &unitOID, twoWeeksBefore, weekBefore)
 	if err != nil {
 		logs.Errorf("count unit conversations last week error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrInternalError)
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 	}
 	weeklyIncreaseConversations := conversationsThisWeek - conversationsLastWeek
 	var weeklyIncreaseConversationsRate float64
@@ -243,12 +242,12 @@ func (s *DashboardService) dashboardOverviewUnit(ctx context.Context, unitOID bs
 	avgThisWeek, err := s.ConversationMapper.AverageDurationByPeriod(ctx, &unitOID, weekBefore, now)
 	if err != nil {
 		logs.Errorf("unit avg duration this week error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrInternalError)
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardAvgDurationStat)
 	}
 	avgLastWeek, err := s.ConversationMapper.AverageDurationByPeriod(ctx, &unitOID, twoWeeksBefore, weekBefore)
 	if err != nil {
 		logs.Errorf("unit avg duration last week error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrInternalError)
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardAvgDurationStat)
 	}
 	weeklyIncreaseAvgDuration := avgThisWeek - avgLastWeek
 	var weeklyIncreaseAvgDurationRate float64
@@ -441,17 +440,17 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 	wg.Wait()
 
 	if kwErr != nil {
-		return nil, errorx.New(errno.ErrGetUserKeywords)
+		return nil, errorx.New(errno.ErrDashboardGetUserKeywords)
 	}
 	if msgErr != nil || msgStats == nil {
-		return nil, errorx.New(errno.ErrGetUserConversationStatic)
+		return nil, errorx.New(errno.ErrDashboardGetUserConversationStatic)
 	}
 
 	// 构建响应列表
 	riskUsers := make([]*core_api.RiskUser, end-start+1)
 	for i, dbUser := range targetUsers {
 		riskUsers[i] = &core_api.RiskUser{
-			User: &profile.User{
+			User: &core_api.User{
 				Code:  dbUser.Code,
 				Name:  dbUser.Name,
 				Grade: dbUser.Grade,
