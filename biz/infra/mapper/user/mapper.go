@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
@@ -31,6 +32,11 @@ type IMongoMapper interface {
 	FindAllByUnitID(ctx context.Context, unitId bson.ObjectID) ([]*User, error)
 	BatchFindByIDs(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*User, error)
 	CountByClasses(ctx context.Context, unitId bson.ObjectID, grade, class []int32) ([]*ClassStatResult, error)
+	Count(ctx context.Context) (int64, error)
+	CountByPeriod(ctx context.Context, start, end time.Time) (int64, error)
+	CountByUnitID(ctx context.Context, unitId bson.ObjectID) (int64, error)
+	CountByUnitIDAndPeriod(ctx context.Context, unitId bson.ObjectID, start, end time.Time) (int64, error)
+	CountAlarmUsers(ctx context.Context, unitId *bson.ObjectID) (int64, error)
 }
 
 type mongoMapper struct {
@@ -69,6 +75,36 @@ func (m *mongoMapper) ExistsByCodeAndUnitID(ctx context.Context, code string, un
 // FindAllByUnitID 根据UnitID查询所有用户
 func (m *mongoMapper) FindAllByUnitID(ctx context.Context, unitId bson.ObjectID) ([]*User, error) {
 	return m.FindAllByFields(ctx, bson.M{cst.UnitID: unitId, cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
+}
+
+// CountByUnitID 按单位统计用户数量（排除已删除）
+func (m *mongoMapper) CountByUnitID(ctx context.Context, unitId bson.ObjectID) (int64, error) {
+	filter := bson.M{
+		cst.UnitID: unitId,
+		cst.Status: bson.M{cst.NE: cst.DeletedStatus},
+	}
+	return m.conn.CountDocuments(ctx, filter)
+}
+
+// CountByUnitIDAndPeriod 按单位及时间范围统计用户数量（排除已删除）
+func (m *mongoMapper) CountByUnitIDAndPeriod(ctx context.Context, unitId bson.ObjectID, start, end time.Time) (int64, error) {
+	timeFilter := bson.M{}
+	if !start.IsZero() {
+		timeFilter[cst.GT] = start
+	}
+	if !end.IsZero() {
+		timeFilter[cst.LT] = end
+	}
+
+	filter := bson.M{
+		cst.UnitID: unitId,
+		cst.Status: bson.M{cst.NE: cst.DeletedStatus},
+	}
+	if len(timeFilter) > 0 {
+		filter[cst.CreateTime] = timeFilter
+	}
+
+	return m.conn.CountDocuments(ctx, filter)
 }
 
 // BatchFindByIDs 根据UserID切片批量查询用户
@@ -146,4 +182,21 @@ func (m *mongoMapper) CountByClasses(ctx context.Context, unitId bson.ObjectID, 
 	}
 
 	return results, nil
+}
+
+// Count 统计用户数量
+func (m *mongoMapper) Count(ctx context.Context) (int64, error) {
+	return m.conn.CountDocuments(ctx, bson.M{})
+}
+
+// CountAlarmUsers 统计高风险用户数量（riskLevel == high），可选按单位过滤
+func (m *mongoMapper) CountAlarmUsers(ctx context.Context, unitId *bson.ObjectID) (int64, error) {
+	filter := bson.M{
+		"riskLevel": RiskLevelStoI[cst.High],
+		cst.Status:  bson.M{cst.NE: cst.DeletedStatus},
+	}
+	if unitId != nil {
+		filter[cst.UnitID] = *unitId
+	}
+	return m.conn.CountDocuments(ctx, filter)
 }

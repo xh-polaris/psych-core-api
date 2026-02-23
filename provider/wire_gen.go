@@ -11,6 +11,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
@@ -32,15 +33,18 @@ func NewProvider() (*Provider, error) {
 		UserMapper:    userIMongoMapper,
 		MessageMapper: mongoMapper,
 	}
+	unitIMongoMapper := unit.NewUnitMongoMapper(confConfig)
+	conversationIMongoMapper := conversation.NewConversationMongoMapper(confConfig)
 	dashboardService := service.DashboardService{
-		UserMapper:    userIMongoMapper,
-		MessageMapper: mongoMapper,
+		UserMapper:         userIMongoMapper,
+		UnitMapper:         unitIMongoMapper,
+		MessageMapper:      mongoMapper,
+		ConversationMapper: conversationIMongoMapper,
 	}
 	configIMongoMapper := config.NewConfigMongoMapper(confConfig)
 	configService := service.ConfigService{
 		ConfigMapper: configIMongoMapper,
 	}
-	unitIMongoMapper := unit.NewUnitMongoMapper(confConfig)
 	userService := service.UserService{
 		UserMapper: userIMongoMapper,
 		UnitMapper: unitIMongoMapper,
@@ -50,14 +54,15 @@ func NewProvider() (*Provider, error) {
 		UserMapper: userIMongoMapper,
 	}
 	providerProvider := &Provider{
-		Config:           confConfig,
-		AuthService:      authService,
-		AlarmService:     alarmService,
-		DashboardService: dashboardService,
-		ConfigService:    configService,
-		UserService:      userService,
-		UnitService:      unitService,
-		MessageMapper:    mongoMapper,
+		Config:             confConfig,
+		AuthService:        authService,
+		AlarmService:       alarmService,
+		DashboardService:   dashboardService,
+		ConfigService:      configService,
+		UserService:        userService,
+		UnitService:        unitService,
+		MessageMapper:      mongoMapper,
+		ConversationMapper: conversationIMongoMapper,
 	}
 	return providerProvider, nil
 }

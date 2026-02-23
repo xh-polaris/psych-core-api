@@ -7,6 +7,7 @@ import "github.com/xh-polaris/psych-core-api/pkg/errorx/code"
 const (
 	ErrStudentIDAlreadyExist = 3000
 	ErrCountUserByClasses    = 3001
+	ErrUserCount             = 3002
 )
 
 func init() {

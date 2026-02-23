@@ -4,9 +4,12 @@ import (
 	"context"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/google/wire"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
@@ -18,17 +21,19 @@ import (
 )
 
 type IDashboardService interface {
-	DashboardGetDataOverview(ctx context.Context, req *core_api.DashboardGetDataOverviewReq) (resp *core_api.DashboardGetDataOverviewResp, err error)
-	DashboardGetDataTrend(ctx context.Context, req *core_api.DashboardGetDataTrendReq) (resp *core_api.DashboardGetDataTrendResp, err error)
-	DashboardListUnits(ctx context.Context, req *core_api.DashboardListUnitsReq) (resp *core_api.DashboardListUnitsResp, err error)
-	DashboardGetPsychTrend(ctx context.Context, req *core_api.DashboardGetPsychTrendReq) (resp *core_api.DashboardGetPsychTrendResp, err error)
-	DashboardListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (resp *core_api.DashboardListClassesResp, err error)
-	DashboardListUsers(ctx context.Context, req *core_api.DashboardListUsersReq) (resp *core_api.DashboardListUsersResp, err error)
+	DashboardGetDataOverview(ctx context.Context, req *core_api.DashboardGetDataOverviewReq) (*core_api.DashboardGetDataOverviewResp, error)
+	DashboardGetDataTrend(ctx context.Context, req *core_api.DashboardGetDataTrendReq) (*core_api.DashboardGetDataTrendResp, error)
+	DashboardListUnits(ctx context.Context, req *core_api.DashboardListUnitsReq) (*core_api.DashboardListUnitsResp, error)
+	DashboardGetPsychTrend(ctx context.Context, req *core_api.DashboardGetPsychTrendReq) (*core_api.DashboardGetPsychTrendResp, error)
+	DashboardListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (*core_api.DashboardListClassesResp, error)
+	DashboardListUsers(ctx context.Context, req *core_api.DashboardListUsersReq) (*core_api.DashboardListUsersResp, error)
 }
 
 type DashboardService struct {
-	UserMapper    user.IMongoMapper
-	MessageMapper message.MongoMapper
+	UserMapper         user.IMongoMapper
+	UnitMapper         unit.IMongoMapper
+	MessageMapper      message.MongoMapper
+	ConversationMapper conversation.IMongoMapper
 }
 
 var DashboardServiceSet = wire.NewSet(
@@ -36,23 +41,262 @@ var DashboardServiceSet = wire.NewSet(
 	wire.Bind(new(IDashboardService), new(*DashboardService)),
 )
 
-func (s *DashboardService) DashboardGetDataOverview(ctx context.Context, req *core_api.DashboardGetDataOverviewReq) (resp *core_api.DashboardGetDataOverviewResp, err error) {
+func (s *DashboardService) DashboardGetDataOverview(ctx context.Context, req *core_api.DashboardGetDataOverviewReq) (*core_api.DashboardGetDataOverviewResp, error) {
+	now := time.Now()
+	weekBefore := now.AddDate(0, 0, -7)
+	twoWeeksBefore := now.AddDate(0, 0, -14)
+
+	// 区分管理端 / 单位端
+	if req.UnitId == nil || req.GetUnitId() == "" {
+		return s.dashboardOverviewAdmin(ctx, twoWeeksBefore, weekBefore, now)
+	}
+
+	unitOID, err := bson.ObjectIDFromHex(req.GetUnitId())
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
+	}
+	return s.dashboardOverviewUnit(ctx, unitOID, twoWeeksBefore, weekBefore, now)
+}
+
+// 管理端数据概览
+func (s *DashboardService) dashboardOverviewAdmin(ctx context.Context, twoWeeksBefore, weekBefore, now time.Time) (*core_api.DashboardGetDataOverviewResp, error) {
+	// 单位数量（累计）
+	totalUnits, err := s.UnitMapper.Count(ctx)
+	if err != nil {
+		logs.Errorf("count unit error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.WrapByCode(err, errno.ErrUnitCount)
+	}
+	beforeUnits, err := s.UnitMapper.CountByPeriod(ctx, time.Time{}, weekBefore)
+	if err != nil {
+		logs.Errorf("count unit by period error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.WrapByCode(err, errno.ErrUnitCount)
+	}
+	weeklyIncreaseUnits := totalUnits - beforeUnits
+	var weeklyIncreaseUnitsRate float64
+	if beforeUnits > 0 {
+		weeklyIncreaseUnitsRate = float64(weeklyIncreaseUnits) / float64(beforeUnits)
+	}
+
+	// 用户数量（累计）
+	totalUsers, err := s.UserMapper.Count(ctx)
+	if err != nil {
+		logs.Errorf("count user error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.WrapByCode(err, errno.ErrUserCount)
+	}
+	beforeUsers, err := s.UserMapper.CountByPeriod(ctx, time.Time{}, weekBefore)
+	if err != nil {
+		logs.Errorf("count user by period error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.WrapByCode(err, errno.ErrUserCount)
+	}
+	weeklyIncreaseUsers := totalUsers - beforeUsers
+	var weeklyIncreaseUsersRate float64
+	if beforeUsers > 0 {
+		weeklyIncreaseUsersRate = float64(weeklyIncreaseUsers) / float64(beforeUsers)
+	}
+
+	// 活跃用户（过去 7 天内有对话的用户数）
+	activeThisWeek, err := s.ConversationMapper.CountActiveUsers(ctx, nil, weekBefore, now)
+	if err != nil {
+		logs.Errorf("count active users error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.WrapByCode(err, errno.ErrUserCount)
+	}
+	activeLastWeek, err := s.ConversationMapper.CountActiveUsers(ctx, nil, twoWeeksBefore, weekBefore)
+	if err != nil {
+		logs.Errorf("count active users last week error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.WrapByCode(err, errno.ErrUserCount)
+	}
+	weeklyIncreaseActiveUsers := activeThisWeek - activeLastWeek
+	var weeklyIncreaseActiveUsersRate float64
+	if activeLastWeek > 0 {
+		weeklyIncreaseActiveUsersRate = float64(weeklyIncreaseActiveUsers) / float64(activeLastWeek)
+	}
+
+	// 对话数量（总对话数 + 本周/上周新增）
+	totalConversations, err := s.ConversationMapper.Count(ctx, nil)
+	if err != nil {
+		logs.Errorf("count conversations error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrInternalError)
+	}
+	conversationsThisWeek, err := s.ConversationMapper.CountByPeriod(ctx, nil, weekBefore, now)
+	if err != nil {
+		logs.Errorf("count conversations this week error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrInternalError)
+	}
+	conversationsLastWeek, err := s.ConversationMapper.CountByPeriod(ctx, nil, twoWeeksBefore, weekBefore)
+	if err != nil {
+		logs.Errorf("count conversations last week error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrInternalError)
+	}
+	weeklyIncreaseConversations := conversationsThisWeek - conversationsLastWeek
+	var weeklyIncreaseConversationsRate float64
+	if conversationsLastWeek > 0 {
+		weeklyIncreaseConversationsRate = float64(weeklyIncreaseConversations) / float64(conversationsLastWeek)
+	}
+
+	// 平均单次对话时长（分钟）：本周 vs 上周
+	avgThisWeek, err := s.ConversationMapper.AverageDurationByPeriod(ctx, nil, weekBefore, now)
+	if err != nil {
+		logs.Errorf("avg duration this week error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrInternalError)
+	}
+	avgLastWeek, err := s.ConversationMapper.AverageDurationByPeriod(ctx, nil, twoWeeksBefore, weekBefore)
+	if err != nil {
+		logs.Errorf("avg duration last week error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrInternalError)
+	}
+	weeklyIncreaseAvgDuration := avgThisWeek - avgLastWeek
+	var weeklyIncreaseAvgDurationRate float64
+	if avgLastWeek > 0 {
+		weeklyIncreaseAvgDurationRate = weeklyIncreaseAvgDuration / avgLastWeek
+	}
+
+	// 高风险用户数（riskLevel == high），暂不做周环比（无时间维度）
+	alarmUsers, err := s.UserMapper.CountAlarmUsers(ctx, nil)
+	if err != nil {
+		logs.Errorf("count alarm users error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.WrapByCode(err, errno.ErrUserCount)
+	}
+
+	return &core_api.DashboardGetDataOverviewResp{
+		TotalUnits:                                   &totalUnits,
+		WeeklyIncreaseUnits:                          &weeklyIncreaseUnits,
+		WeeklyIncreaseUnitsRate:                      &weeklyIncreaseUnitsRate,
+		TotalUsers:                                   totalUsers,
+		WeeklyIncreaseUsers:                          weeklyIncreaseUsers,
+		WeeklyIncreaseUsersRate:                      weeklyIncreaseUsersRate,
+		ActiveUsers:                                  &activeThisWeek,
+		WeeklyIncreaseActiveUsers:                    &weeklyIncreaseActiveUsers,
+		WeeklyIncreaseActiveUsersRate:                &weeklyIncreaseActiveUsersRate,
+		TotalConversations:                           totalConversations,
+		WeeklyIncreaseConversations:                  weeklyIncreaseConversations,
+		WeeklyIncreaseConversationsRate:              weeklyIncreaseConversationsRate,
+		AverageTimePerConversation:                   avgThisWeek,
+		WeeklyIncreaseAverageTimePerConversation:     weeklyIncreaseAvgDuration,
+		WeeklyIncreaseAverageTimePerConversationRate: weeklyIncreaseAvgDurationRate,
+		AlarmUsers:                                   alarmUsers,
+		WeeklyIncreaseAlarmUsers:                     0,
+		WeeklyIncreaseAlarmUsersRate:                 0,
+		Code:                                         0,
+		Msg:                                          "success",
+	}, nil
+}
+
+// 单位端数据概览
+func (s *DashboardService) dashboardOverviewUnit(ctx context.Context, unitOID bson.ObjectID, twoWeeksBefore, weekBefore, now time.Time) (*core_api.DashboardGetDataOverviewResp, error) {
+	// 学生总数（当前单位）
+	totalUsers, err := s.UserMapper.CountByUnitID(ctx, unitOID)
+	if err != nil {
+		logs.Errorf("count unit users error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.WrapByCode(err, errno.ErrUserCount)
+	}
+	beforeUsers, err := s.UserMapper.CountByUnitIDAndPeriod(ctx, unitOID, time.Time{}, weekBefore)
+	if err != nil {
+		logs.Errorf("count unit users by period error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.WrapByCode(err, errno.ErrUserCount)
+	}
+	weeklyIncreaseUsers := totalUsers - beforeUsers
+	var weeklyIncreaseUsersRate float64
+	if beforeUsers > 0 {
+		weeklyIncreaseUsersRate = float64(weeklyIncreaseUsers) / float64(beforeUsers)
+	}
+
+	// 活跃用户（当前单位，过去 7 天）
+	activeThisWeek, err := s.ConversationMapper.CountActiveUsers(ctx, &unitOID, weekBefore, now)
+	if err != nil {
+		logs.Errorf("count unit active users error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.WrapByCode(err, errno.ErrUserCount)
+	}
+	activeLastWeek, err := s.ConversationMapper.CountActiveUsers(ctx, &unitOID, twoWeeksBefore, weekBefore)
+	if err != nil {
+		logs.Errorf("count unit active users last week error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.WrapByCode(err, errno.ErrUserCount)
+	}
+	weeklyIncreaseActiveUsers := activeThisWeek - activeLastWeek
+	var weeklyIncreaseActiveUsersRate float64
+	if activeLastWeek > 0 {
+		weeklyIncreaseActiveUsersRate = float64(weeklyIncreaseActiveUsers) / float64(activeLastWeek)
+	}
+
+	// 对话数量（当前单位）
+	totalConversations, err := s.ConversationMapper.Count(ctx, &unitOID)
+	if err != nil {
+		logs.Errorf("count unit conversations error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrInternalError)
+	}
+	conversationsThisWeek, err := s.ConversationMapper.CountByPeriod(ctx, &unitOID, weekBefore, now)
+	if err != nil {
+		logs.Errorf("count unit conversations this week error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrInternalError)
+	}
+	conversationsLastWeek, err := s.ConversationMapper.CountByPeriod(ctx, &unitOID, twoWeeksBefore, weekBefore)
+	if err != nil {
+		logs.Errorf("count unit conversations last week error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrInternalError)
+	}
+	weeklyIncreaseConversations := conversationsThisWeek - conversationsLastWeek
+	var weeklyIncreaseConversationsRate float64
+	if conversationsLastWeek > 0 {
+		weeklyIncreaseConversationsRate = float64(weeklyIncreaseConversations) / float64(conversationsLastWeek)
+	}
+
+	// 平均单次对话时长（当前单位，本周 vs 上周）
+	avgThisWeek, err := s.ConversationMapper.AverageDurationByPeriod(ctx, &unitOID, weekBefore, now)
+	if err != nil {
+		logs.Errorf("unit avg duration this week error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrInternalError)
+	}
+	avgLastWeek, err := s.ConversationMapper.AverageDurationByPeriod(ctx, &unitOID, twoWeeksBefore, weekBefore)
+	if err != nil {
+		logs.Errorf("unit avg duration last week error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrInternalError)
+	}
+	weeklyIncreaseAvgDuration := avgThisWeek - avgLastWeek
+	var weeklyIncreaseAvgDurationRate float64
+	if avgLastWeek > 0 {
+		weeklyIncreaseAvgDurationRate = weeklyIncreaseAvgDuration / avgLastWeek
+	}
+
+	// 高风险用户数（当前单位）
+	alarmUsers, err := s.UserMapper.CountAlarmUsers(ctx, &unitOID)
+	if err != nil {
+		logs.Errorf("count unit alarm users error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.WrapByCode(err, errno.ErrUserCount)
+	}
+
+	return &core_api.DashboardGetDataOverviewResp{
+		TotalUsers:                                   totalUsers,
+		WeeklyIncreaseUsers:                          weeklyIncreaseUsers,
+		WeeklyIncreaseUsersRate:                      weeklyIncreaseUsersRate,
+		ActiveUsers:                                  &activeThisWeek,
+		WeeklyIncreaseActiveUsers:                    &weeklyIncreaseActiveUsers,
+		WeeklyIncreaseActiveUsersRate:                &weeklyIncreaseActiveUsersRate,
+		TotalConversations:                           totalConversations,
+		WeeklyIncreaseConversations:                  weeklyIncreaseConversations,
+		WeeklyIncreaseConversationsRate:              weeklyIncreaseConversationsRate,
+		AverageTimePerConversation:                   avgThisWeek,
+		WeeklyIncreaseAverageTimePerConversation:     weeklyIncreaseAvgDuration,
+		WeeklyIncreaseAverageTimePerConversationRate: weeklyIncreaseAvgDurationRate,
+		AlarmUsers:                                   alarmUsers,
+		WeeklyIncreaseAlarmUsers:                     0,
+		WeeklyIncreaseAlarmUsersRate:                 0,
+		Code:                                         0,
+		Msg:                                          "success",
+	}, nil
+}
+
+func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_api.DashboardGetDataTrendReq) (*core_api.DashboardGetDataTrendResp, error) {
 	return nil, errorx.New(errno.ErrUnImplement)
 }
 
-func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_api.DashboardGetDataTrendReq) (resp *core_api.DashboardGetDataTrendResp, err error) {
+func (s *DashboardService) DashboardListUnits(ctx context.Context, req *core_api.DashboardListUnitsReq) (*core_api.DashboardListUnitsResp, error) {
 	return nil, errorx.New(errno.ErrUnImplement)
 }
 
-func (s *DashboardService) DashboardListUnits(ctx context.Context, req *core_api.DashboardListUnitsReq) (resp *core_api.DashboardListUnitsResp, err error) {
+func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core_api.DashboardGetPsychTrendReq) (*core_api.DashboardGetPsychTrendResp, error) {
 	return nil, errorx.New(errno.ErrUnImplement)
 }
 
-func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core_api.DashboardGetPsychTrendReq) (resp *core_api.DashboardGetPsychTrendResp, err error) {
-	return nil, errorx.New(errno.ErrUnImplement)
-}
-
-func (s *DashboardService) DashboardListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (resp *core_api.DashboardListClassesResp, err error) {
+func (s *DashboardService) DashboardListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (*core_api.DashboardListClassesResp, error) {
 	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
@@ -117,7 +361,7 @@ func aggregateAndSort(mapperRes []*user.ClassStatResult) []*core_api.GradeInfo {
 	return grades
 }
 
-func (s *DashboardService) DashboardListUsers(ctx context.Context, req *core_api.DashboardListUsersReq) (resp *core_api.DashboardListUsersResp, err error) {
+func (s *DashboardService) DashboardListUsers(ctx context.Context, req *core_api.DashboardListUsersReq) (*core_api.DashboardListUsersResp, error) {
 	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))

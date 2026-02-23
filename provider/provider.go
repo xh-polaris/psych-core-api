@@ -6,6 +6,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
@@ -24,14 +25,15 @@ func Init() {
 
 // Provider 依赖的对象
 type Provider struct {
-	Config           *conf.Config
-	AuthService      service.AuthService
-	AlarmService     service.AlarmService
-	DashboardService service.DashboardService
-	ConfigService    service.ConfigService
-	UserService      service.UserService
-	UnitService      service.UnitService
-	MessageMapper    message.MongoMapper
+	Config             *conf.Config
+	AuthService        service.AuthService
+	AlarmService       service.AlarmService
+	DashboardService   service.DashboardService
+	ConfigService      service.ConfigService
+	UserService        service.UserService
+	UnitService        service.UnitService
+	MessageMapper      message.MongoMapper
+	ConversationMapper conversation.IMongoMapper
 }
 
 func Get() *Provider {
@@ -57,7 +59,7 @@ var InfrastructureSet = wire.NewSet(
 	user.NewUserMongoMapper,
 	unit.NewUnitMongoMapper,
 	config.NewConfigMongoMapper,
-
+	conversation.NewConversationMongoMapper,
 	alarm.NewAlarmMongoMapper,
 	RpcSet,
 )
