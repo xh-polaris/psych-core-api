@@ -35,7 +35,7 @@ func ParseJwt(jwtStr string, options ...jwt.ParserOption) (jwt.MapClaims, error)
 	}
 	// 校验 Claims 对象是否有效，基于 exp（过期时间），nbf（不早于），iat（签发时间）等进行判断（如果有这些声明的话）。
 	if !token.Valid {
-		return nil, errorx.New(errno.JWTParseErr)
+		return nil, errorx.New(errno.ErrJWTPrase)
 	}
 	return token.Claims.(jwt.MapClaims), nil
 }

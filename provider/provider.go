@@ -10,7 +10,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
-	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
 )
 
 var provider *Provider
@@ -26,7 +25,6 @@ func Init() {
 // Provider 依赖的对象
 type Provider struct {
 	Config             *conf.Config
-	AuthService        service.AuthService
 	AlarmService       service.AlarmService
 	DashboardService   service.DashboardService
 	ConfigService      service.ConfigService
@@ -40,12 +38,9 @@ func Get() *Provider {
 	return provider
 }
 
-var RpcSet = wire.NewSet(
-	rpc.NewPsychProfile,
-)
+var RpcSet = wire.NewSet()
 
 var ApplicationSet = wire.NewSet(
-	service.AuthServiceSet,
 	service.AlarmServiceSet,
 	service.DashboardServiceSet,
 	service.ConfigServiceSet,

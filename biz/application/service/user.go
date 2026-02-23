@@ -15,7 +15,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
-	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
 	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/google/wire"
@@ -247,7 +246,7 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 	}
 
 	return &core_api.UserGetInfoResp{
-		User: &profile.User{
+		User: &core_api.User{
 			Id:         userDAO.ID.Hex(),
 			CodeType:   codeTypeStr,
 			Code:       userDAO.Code,

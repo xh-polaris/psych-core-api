@@ -21,4 +21,9 @@ func init() {
 		"学生人数统计失败",
 		code.WithAffectStability(false),
 	)
+	code.Register(
+		ErrUserCount,
+		"用户数量统计失败",
+		code.WithAffectStability(false),
+	)
 }

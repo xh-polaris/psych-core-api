@@ -15,7 +15,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-idl/kitex_gen/basic"
 	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
-	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
@@ -137,7 +136,7 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 		return nil, errorx.New(errno.ErrUserNotFound)
 	}
 	if msgErr != nil {
-		return nil, errorx.New(errno.ErrGetUserConversationStatic)
+		return nil, errorx.New(errno.ErrDashboardGetUserConversationStatic)
 	}
 
 	// 构建响应
@@ -151,7 +150,7 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 				Emotion:  alarm.EmotionItoS[al.Emotion],
 				Keywords: al.Keywords,
 				Status:   alarm.StatusItoS[al.Status],
-				User: &profile.User{
+				User: &core_api.User{
 					Code:  dbUser.Code,
 					Name:  dbUser.Name,
 					Grade: dbUser.Grade,
