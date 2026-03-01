@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/hertz-contrib/websocket"
+	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/lock"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mq"
@@ -63,7 +65,7 @@ type Engine struct {
 // NewEngine 创建一个新的对话引擎
 func NewEngine(ctx context.Context, conn *websocket.Conn) *Engine {
 	ctx, cancel := context.WithCancel(ctx)
-	e := &Engine{ctx: ctx, cancel: cancel, wsx: wsx.NewHZWSClient(conn), usage: &core.Usage{},
+	e := &Engine{ctx: ctx, cancel: cancel, wsx: wsx.NewHZWSClient(conn), usage: &core.Usage{}, heartbeatTicker: time.NewTicker(heartbeatTimeout),
 		start: time.Now(), meta: meta, info: make(map[string]any), errs: make(chan error, 3)}
 	//e.wsx.SetCloseHandler(func(code int, text string) (err error) { // 处理close消息
 	//	if err = e.wsx.ControlClose(websocket.FormatCloseMessage(code, text)); err != nil { // 给客户端写回一个close消息
@@ -124,12 +126,15 @@ func (e *Engine) unexpected(err error, cause string) bool {
 			e.unexpected(err, cause)
 		}
 		if custom.IsAffectStability() {
-			util.DPrint("[engine] [unexpected] cause: %s\n", cause)
+			util.DPrint("%s [engine] [unexpected] at: %s err: %s, cause: %s\n", time.Now().String(),
+				util.CallerInfo(2), err, cause)
 			_ = e.Close()
 			return true
 		}
 	} else if (err != nil && !wsx.IsNormal(err)) || strings.HasPrefix(cause, must) { // 错误或影响稳定性
-		util.DPrint("[engine] [unexpected] err: %s,cause: %s\n", err, cause)
+		util.DPrint("%s [engine] [unexpected] at: %s err: %s,cause: %s\n", time.Now().String(),
+			util.CallerInfo(2), err, cause)
+		fmt.Println(err)
 		_ = e.Close()
 		return true
 	}
@@ -170,6 +175,9 @@ func (e *Engine) MWrite(t core.MType, payload any) (err error) {
 
 // Lock 锁定
 func (e *Engine) Lock() error {
+	if conf.GetConfig().State == "test" {
+		return nil
+	}
 	if e.lock == nil {
 		e.lock = lock.Mgr.NewLock(e.info[cst.UserId].(string))
 	}
@@ -182,6 +190,9 @@ func (e *Engine) Lock() error {
 }
 
 func (e *Engine) Unlock() error {
+	if conf.GetConfig().State == "test" {
+		return nil
+	}
 	if err := e.lock.TryUnlock(e.ctx); err != nil {
 		return errorx.WrapByCode(err, errno.UnKnown)
 	}
@@ -190,6 +201,7 @@ func (e *Engine) Unlock() error {
 
 // Close 释放engine的资源
 func (e *Engine) Close() (err error) {
+	util.DPrint("[engine] %s closed by %s", e.uSession, util.CallerInfo(2))
 	e.once.Do(func() {
 		// 关闭各个应用, llm无需关闭
 		appClose(e.asr, e.tts)

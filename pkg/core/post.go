@@ -7,6 +7,7 @@ type (
 	PostNotify struct {
 		Session string         `json:"session"` // 对话标识
 		UserId  string         `json:"userId"`  // 用户id
+		UnitId  string         `json:"unitId"`  // 单位id
 		Usage   *Usage         `json:"usage"`   // 用量
 		Info    map[string]any `json:"info"`    // 额外信息
 		Start   int64          `json:"start"`   // 对话开始时间戳(s)

@@ -97,6 +97,7 @@ func (h *HistoryManager) AddMessage(ctx context.Context, id string, msg *message
 	// add to storage
 	if err = h.mapper.Insert(ctx, msg); err != nil {
 		logs.Errorf("add message err: %s", err)
+		return
 	}
 	// add to cache
 	if err = h.CacheMessage(ctx, cachePrefix+id, []*message.Message{msg}); err != nil {

@@ -41,6 +41,7 @@ func (e *Engine) config() error {
 		logs.Error("[workflow] [config] new chatApp err: %v", err)
 		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "llm"))
 	}
+	util.DPrint("llm: %+v", e.llm)
 	// 构造asr
 	if e.asr, err = app.NewASRApp(e.uSession, wfc.ASRConfig); err != nil {
 		logs.Error("[workflow] [config] new asrApp err: %v", err)
@@ -51,7 +52,7 @@ func (e *Engine) config() error {
 		logs.Error("[workflow] [config] new asrApp err: %v", err)
 		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "tts"))
 	}
-
+	util.DPrint("tts: %+v", e.tts)
 	// 返回前端
 	util.DPrint("[engine] [config] workflow config: %+v\n conf: %+v\n", wfc, cf)
 	return e.MWrite(core.MConfig, cf)

@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"runtime"
 )
 
 func Convert[T any](in any) (out T, ok bool) {
@@ -62,4 +63,13 @@ func BuildBytes(data ...[]byte) []byte {
 		b.Write(d)
 	}
 	return b.Bytes()
+}
+
+func CallerInfo(skip int) string {
+	pc, file, line, ok := runtime.Caller(skip)
+	if !ok {
+		return "unknown"
+	}
+	fn := runtime.FuncForPC(pc)
+	return fmt.Sprintf("%s:%d %s", file, line, fn.Name())
 }
