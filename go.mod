@@ -4,7 +4,7 @@ go 1.24.6
 
 require (
 	github.com/avast/retry-go v3.0.0+incompatible
-	github.com/cloudwego/hertz v0.10.2
+	github.com/cloudwego/hertz v0.10.4
 	github.com/cloudwego/kitex v0.14.1
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/wire v0.6.0
@@ -14,7 +14,7 @@ require (
 	github.com/hertz-contrib/websocket v0.2.0
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/xh-polaris/gopkg v0.0.0-20250312141711-7327267f4ea6
-	github.com/xh-polaris/psych-idl v0.0.0-20260129124121-430704d919ed
+	github.com/xh-polaris/psych-idl v0.0.0-20260211160405-98e714b84e9e
 	github.com/zeromicro/go-zero v1.9.0
 	go.opentelemetry.io/contrib/propagators/b3 v1.37.0
 	go.opentelemetry.io/otel v1.38.0
@@ -24,7 +24,7 @@ require (
 )
 
 require (
-	github.com/bytedance/sonic v1.14.1
+	github.com/bytedance/sonic v1.15.0
 	github.com/cloudwego/eino v0.5.12
 	github.com/coze-dev/coze-go v0.0.0-20251029161603-312b7fd62d20
 	github.com/golang/glog v1.2.5
@@ -46,7 +46,7 @@ require (
 	github.com/bufbuild/protocompile v0.14.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
-	github.com/bytedance/sonic/loader v0.3.0 // indirect
+	github.com/bytedance/sonic/loader v0.5.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
@@ -57,7 +57,7 @@ require (
 	github.com/cloudwego/gopkg v0.1.5 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/cloudwego/localsession v0.1.2 // indirect
-	github.com/cloudwego/netpoll v0.7.1 // indirect
+	github.com/cloudwego/netpoll v0.7.2 // indirect
 	github.com/cloudwego/prutal v0.1.2 // indirect
 	github.com/cloudwego/runtimex v0.1.1 // indirect
 	github.com/cloudwego/thriftgo v0.4.2 // indirect
