@@ -2,13 +2,12 @@ package engine
 
 import (
 	"github.com/xh-polaris/psych-core-api/biz/cst"
-	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/core"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
-	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
+	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
@@ -42,7 +41,8 @@ func (e *Engine) already(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Er
 	alreadyAuth = &core.Auth{}
 	claims, err := util.ParseJwt(auth.VerifyCode)
 	if err != nil {
-		return nil, core.ToErr(errorx.WrapByCode(err, errno.InvalidAuth))
+		// ParseJwt 已返回带 code 的错误（如 ErrUnAuth），这里直接透传
+		return nil, core.ToErr(err)
 	}
 	// 提取字段
 	alreadyAuth.Info = auth.Info
@@ -53,45 +53,37 @@ func (e *Engine) already(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Er
 	return alreadyAuth, nil
 }
 
+// 通过注入的 UserService 进行未登录校验
 func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err) {
 	var err error
-	var signResp *profile.UserSignInResp
-	var getResp *profile.UserGetInfoResp
-	pp, alreadyAuth := rpc.GetPsychProfile(), &core.Auth{}
+	alreadyAuth = &core.Auth{}
 
-	// 用户登录
-	sign := &profile.UserSignInReq{
+	// 调用注入的 UserService 做登录校验
+	if e.usrSvc == nil {
+		logs.Error("[engine] [unAuth] user service is nil")
+		return nil, core.ToErr(errorx.New(errno.ErrInternalError))
+	}
+	signReq := &core_api.UserSignInReq{
 		UnitId:     auth.Info[cst.UnitId].(string),
 		AuthType:   auth.AuthType,
 		AuthId:     auth.AuthID,
 		VerifyCode: auth.VerifyCode,
 	}
-	if signResp, err = pp.UserSignIn(e.ctx, sign); err != nil {
-		logs.Error("[engine] [%s] UserSignIn err: %v", core.AAuth, err)
-		merr = core.ToErr(errorx.WrapByCode(err, errno.InvalidAuth))
-		return
-	}
-
-	// 获取用户信息
-	get := &profile.UserGetInfoReq{
-		UserId: signResp.UserId,
-	}
-	if getResp, err = pp.UserGetInfo(e.ctx, get); err != nil {
-		logs.Error("[engine] [%s] UserGetInfo err: %v", core.AAuth, err)
-		merr = core.ToErr(errorx.WrapByCode(err, errno.InvalidAuth))
-		return
-	}
-
-	// 转换Options
-	alreadyAuth.Info, err = util.Anypb2Any(getResp.User.Options)
+	signResp, err := e.usrSvc.UserSignIn(e.ctx, signReq)
 	if err != nil {
-		logs.Error("[engine] [%s] UserGetInfo err: %v", core.AAuth, err)
-		merr = core.ToErr(errorx.WrapByCode(err, errno.InvalidAuth))
+		logs.Error("[engine] [%s] UserSignIn err: %v", core.AAuth, err)
+		// UserService 已返回带业务 code 的错误，直接透传
+		merr = core.ToErr(err)
 		return
+	}
+
+	alreadyAuth.Info = auth.Info
+	if alreadyAuth.Info == nil {
+		alreadyAuth.Info = make(map[string]any)
 	}
 	alreadyAuth.Info[cst.UnitId] = signResp.UnitId
 	alreadyAuth.Info[cst.UserID] = signResp.UserId
-	alreadyAuth.Info[cst.Code] = getResp.User.Code
+	alreadyAuth.Info[cst.Code] = signResp.CodeValue
 	e.info = alreadyAuth.Info
 	return
 }

@@ -3,6 +3,7 @@ package mapper
 
 import (
 	"context"
+	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -17,6 +18,7 @@ type IMongoMapper[T any] interface {
 	Insert(ctx context.Context, data *T) error
 	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
 	ExistsByFields(ctx context.Context, filter bson.M) (bool, error)
+	CountByPeriod(ctx context.Context, start, end time.Time) (int64, error)
 }
 
 type mongoMapper[T any] struct {
@@ -66,4 +68,25 @@ func (m *mongoMapper[T]) UpdateFields(ctx context.Context, id bson.ObjectID, upd
 func (m *mongoMapper[T]) ExistsByFields(ctx context.Context, filter bson.M) (bool, error) {
 	count, err := m.conn.CountDocuments(ctx, filter)
 	return count > 0, err
+}
+
+// CountByPeriod 统计指定时间段内的数量
+func (m *mongoMapper[T]) CountByPeriod(ctx context.Context, start, end time.Time) (int64, error) {
+	timeFilter := bson.M{}
+
+	// start 为空，只限制上界：createTime < end
+	if !start.IsZero() {
+		timeFilter[cst.GT] = start
+	}
+	// end 为空，只限制下界：createTime > start
+	if !end.IsZero() {
+		timeFilter[cst.LT] = end
+	}
+
+	filter := bson.M{}
+	if len(timeFilter) > 0 {
+		filter[cst.CreateTime] = timeFilter
+	}
+
+	return m.conn.CountDocuments(ctx, filter)
 }

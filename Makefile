@@ -39,3 +39,5 @@ clean:
 	rm -r ./output
 swag:
 	swag init -g main.go --parseDependency --parseInternal
+idl:
+	go get github.com/xh-polaris/psych-idl@main

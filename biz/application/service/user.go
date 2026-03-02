@@ -15,7 +15,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
-	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
 	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/google/wire"
@@ -102,7 +101,7 @@ func (u *UserService) UserSignUp(ctx context.Context, req *core_api.UserSignUpRe
 		Code:       req.User.Code,
 		Password:   hashedPwd,
 		Name:       req.User.Name,
-		Birth:      req.User.Birth,
+		Birth:      time.Unix(req.User.Birth, 0),
 		Gender:     gender,
 		Status:     enum.Active,
 		Class:      req.User.Class,
@@ -141,7 +140,7 @@ func (u *UserService) UserSignUp(ctx context.Context, req *core_api.UserSignUpRe
 			Code:       userDAO.Code,
 			Name:       userDAO.Name,
 			Gender:     genderStr,
-			Birth:      userDAO.Birth,
+			Birth:      userDAO.Birth.Unix(),
 			Class:      userDAO.Class,
 			Grade:      userDAO.Grade,
 			EnrollYear: userDAO.EnrollYear,
@@ -247,14 +246,14 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 	}
 
 	return &core_api.UserGetInfoResp{
-		User: &profile.User{
+		User: &core_api.User{
 			Id:         userDAO.ID.Hex(),
 			CodeType:   codeTypeStr,
 			Code:       userDAO.Code,
 			UnitId:     userDAO.UnitID.Hex(),
 			Name:       userDAO.Name,
 			Gender:     genderStr,
-			Birth:      userDAO.Birth,
+			Birth:      userDAO.Birth.Unix(),
 			Status:     statusStr,
 			EnrollYear: userDAO.EnrollYear,
 			Class:      userDAO.Class,

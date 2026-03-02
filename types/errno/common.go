@@ -20,6 +20,7 @@ const (
 	ErrInternalError          = 1008
 	ErrPhoneAlreadyExist      = 1009
 	ErrWrongPassword          = 1010
+	ErrJWTPrase               = 1011
 )
 
 func init() {
@@ -86,6 +87,11 @@ func init() {
 	code.Register(
 		ErrWrongPassword,
 		"密码错误",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrJWTPrase,
+		"JWT解析错误",
 		code.WithAffectStability(false),
 	)
 }

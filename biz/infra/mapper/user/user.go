@@ -1,6 +1,8 @@
 package user
 
 import (
+	"time"
+
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"time"
@@ -18,7 +20,7 @@ type User struct {
 	Password   string         `json:"password,omitempty" bson:"password,omitempty"`
 	UnitID     bson.ObjectID  `json:"unitId,omitempty" bson:"unitId,omitempty"`
 	Name       string         `json:"name,omitempty" bson:"name,omitempty"`
-	Birth      int64          `json:"birth,omitempty" bson:"birth,omitempty"`
+	Birth      time.Time      `json:"birth,omitempty" bson:"birth,omitempty"`
 	Gender     int            `json:"gender,omitempty" bson:"gender,omitempty"`
 	RiskLevel  int            `json:"riskLevel,omitempty" bson:"riskLevel,omitempty"`
 	Status     int            `json:"status,omitempty" bson:"status,omitempty"`

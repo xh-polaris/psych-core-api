@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
@@ -31,6 +32,13 @@ type IMongoMapper interface {
 	FindAllByUnitID(ctx context.Context, unitId bson.ObjectID) ([]*User, error)
 	BatchFindByIDs(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*User, error)
 	CountByClasses(ctx context.Context, unitId bson.ObjectID, grade, class []int32) ([]*ClassStatResult, error)
+	Count(ctx context.Context) (int64, error)
+	CountByPeriod(ctx context.Context, start, end time.Time) (int64, error)
+	CountByUnitID(ctx context.Context, unitId bson.ObjectID) (int64, error)
+	CountByUnitIDAndPeriod(ctx context.Context, unitId bson.ObjectID, start, end time.Time) (int64, error)
+	CountAlarmUsers(ctx context.Context, unitId *bson.ObjectID) (int64, error)
+	CountAlarmUsersByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int64, error)
+	RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID) ([]*RiskStat, error)
 }
 
 type mongoMapper struct {
@@ -69,6 +77,36 @@ func (m *mongoMapper) ExistsByCodeAndUnitID(ctx context.Context, code string, un
 // FindAllByUnitID 根据UnitID查询所有用户
 func (m *mongoMapper) FindAllByUnitID(ctx context.Context, unitId bson.ObjectID) ([]*User, error) {
 	return m.FindAllByFields(ctx, bson.M{cst.UnitID: unitId, cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
+}
+
+// CountByUnitID 按单位统计用户数量（排除已删除）
+func (m *mongoMapper) CountByUnitID(ctx context.Context, unitId bson.ObjectID) (int64, error) {
+	filter := bson.M{
+		cst.UnitID: unitId,
+		cst.Status: bson.M{cst.NE: cst.DeletedStatus},
+	}
+	return m.conn.CountDocuments(ctx, filter)
+}
+
+// CountByUnitIDAndPeriod 按单位及时间范围统计用户数量（排除已删除）
+func (m *mongoMapper) CountByUnitIDAndPeriod(ctx context.Context, unitId bson.ObjectID, start, end time.Time) (int64, error) {
+	timeFilter := bson.M{}
+	if !start.IsZero() {
+		timeFilter[cst.GT] = start
+	}
+	if !end.IsZero() {
+		timeFilter[cst.LT] = end
+	}
+
+	filter := bson.M{
+		cst.UnitID: unitId,
+		cst.Status: bson.M{cst.NE: cst.DeletedStatus},
+	}
+	if len(timeFilter) > 0 {
+		filter[cst.CreateTime] = timeFilter
+	}
+
+	return m.conn.CountDocuments(ctx, filter)
 }
 
 // BatchFindByIDs 根据UserID切片批量查询用户
@@ -147,5 +185,81 @@ func (m *mongoMapper) CountByClasses(ctx context.Context, unitId bson.ObjectID, 
 		return nil, err
 	}
 
+	return results, nil
+}
+
+// Count 统计用户数量
+func (m *mongoMapper) Count(ctx context.Context) (int64, error) {
+	return m.conn.CountDocuments(ctx, bson.M{})
+}
+
+// CountAlarmUsers 统计高风险用户数量（riskLevel == high），可选按单位过滤
+func (m *mongoMapper) CountAlarmUsers(ctx context.Context, unitId *bson.ObjectID) (int64, error) {
+	filter := bson.M{
+		"riskLevel": RiskLevelStoI[cst.High],
+		cst.Status:  bson.M{cst.NE: cst.DeletedStatus},
+	}
+	if unitId != nil {
+		filter[cst.UnitID] = *unitId
+	}
+	return m.conn.CountDocuments(ctx, filter)
+}
+
+// CountAlarmUsersByPeriod 统计高风险用户数量（riskLevel == high），可选按单位和时间范围过滤
+func (m *mongoMapper) CountAlarmUsersByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int64, error) {
+	timeFilter := bson.M{}
+	if !start.IsZero() {
+		timeFilter["$gte"] = start
+	}
+	if !end.IsZero() {
+		timeFilter["$lte"] = end
+	}
+
+	filter := bson.M{
+		cst.RiskLevel: RiskLevelStoI[cst.High],
+		cst.Status:    bson.M{cst.NE: cst.DeletedStatus},
+	}
+	if unitId != nil {
+		filter[cst.UnitID] = *unitId
+	}
+	if len(timeFilter) > 0 {
+		filter[cst.CreateTime] = timeFilter
+	}
+
+	return m.conn.CountDocuments(ctx, filter)
+}
+
+// RiskStat 风险等级 + 性别分布
+type RiskStat struct {
+	Level  int32 `bson:"_id.level"`
+	Gender int32 `bson:"_id.gender"`
+	Count  int64 `bson:"count"`
+}
+
+// RiskDistributionStats 统计风险等级分布（按性别拆分），unitId 为空表示全平台
+func (m *mongoMapper) RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID) ([]*RiskStat, error) {
+	match := bson.M{
+		cst.Status: bson.M{cst.NE: cst.DeletedStatus},
+	}
+	if unitId != nil {
+		match[cst.UnitID] = *unitId
+	}
+
+	pipeline := []bson.M{
+		{"$match": match},
+		{"$group": bson.M{
+			cst.ID: bson.M{
+				"level":  "$" + cst.RiskLevel,
+				"gender": "$" + cst.Gender,
+			},
+			"count": bson.M{"$sum": 1},
+		}},
+	}
+
+	var results []*RiskStat
+	if err := m.conn.Aggregate(ctx, pipeline, &results); err != nil {
+		logs.Errorf("[user mapper] aggregate risk distribution err:%s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
 	return results, nil
 }

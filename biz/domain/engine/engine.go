@@ -20,9 +20,20 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/pkg/wsx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
+	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
 )
 
 // 目前当websocket层出现问题, engine会直接结束, 并未处理可恢复错误而是强制由客户端尝试重连
+
+// IUserService 定义 engine 所需的用户服务接口
+type IUserService interface {
+	UserSignIn(ctx context.Context, req *core_api.UserSignInReq) (*core_api.UserSignInResp, error)
+}
+
+// IConfigService 定义 engine 所需的配置服务接口
+type IConfigService interface {
+	ConfigGetByUnitID(ctx context.Context, req *core_api.ConfigGetByUnitIdReq) (*core_api.ConfigGetByUnitIdResp, error)
+}
 
 var meta = &core.Meta{
 	Version:       core.Version,
@@ -58,19 +69,27 @@ type Engine struct {
 	uSession string         // uSession 对话ID
 	usage    *core.Usage    // 用量
 	conf     *core.Config
+
+	// 注入的依赖
+	usrSvc IUserService
+	cfgSvc IConfigService
 }
 
-// NewEngine 创建一个新的对话引擎
-func NewEngine(ctx context.Context, conn *websocket.Conn) *Engine {
+// NewEngine 创建一个新的对话引擎，显式传入依赖
+func NewEngine(ctx context.Context, conn *websocket.Conn, usrSvc IUserService, cfgSvc IConfigService) *Engine {
 	ctx, cancel := context.WithCancel(ctx)
-	e := &Engine{ctx: ctx, cancel: cancel, wsx: wsx.NewHZWSClient(conn), usage: &core.Usage{},
-		start: time.Now(), meta: meta, info: make(map[string]any), errs: make(chan error, 3)}
-	//e.wsx.SetCloseHandler(func(code int, text string) (err error) { // 处理close消息
-	//	if err = e.wsx.ControlClose(websocket.FormatCloseMessage(code, text)); err != nil { // 给客户端写回一个close消息
-	//		logs.Error("[engine] [close] err: %s", err)
-	//	}
-	//	return e.Close()
-	//})
+	e := &Engine{
+		ctx:    ctx,
+		cancel: cancel,
+		wsx:    wsx.NewHZWSClient(conn),
+		usage:  &core.Usage{},
+		start:  time.Now(),
+		meta:   meta,
+		info:   make(map[string]any),
+		errs:   make(chan error, 3),
+		usrSvc: usrSvc,
+		cfgSvc: cfgSvc,
+	}
 	util.DPrint("[engine] [new] with session %s\n", e.uSession) // debug
 	return e
 }

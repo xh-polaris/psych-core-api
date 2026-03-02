@@ -45,7 +45,7 @@ func (c *ConfigService) ConfigCreate(ctx context.Context, req *core_api.ConfigCr
 	}
 
 	// 构造并插入数据库
-	now := time.Now().Unix()
+	now := time.Now()
 	confDAO := &config.Config{
 		ID:     bson.NewObjectID(),
 		Type:   confType,
@@ -332,8 +332,8 @@ func adminConfig(configDAO *config.Config) *core_api.Config {
 		},
 
 		Status:     st,
-		CreateTime: configDAO.CreateTime,
-		UpdateTime: configDAO.UpdateTime,
+		CreateTime: configDAO.CreateTime.Unix(),
+		UpdateTime: configDAO.UpdateTime.Unix(),
 	}
 }
 
