@@ -45,7 +45,7 @@ func newCli(ctx context.Context, provider, url, sk, model, botId, uid string) (_
 
 func (m *ChatModel) Generate(ctx context.Context, in []*schema.Message, opts ...model.Option) (_ *schema.Message, err error) {
 	in = reverse(in) // 翻转历史记录
-	return m.Generate(ctx, in, opts...)
+	return m.cli.Generate(ctx, in, opts...)
 }
 
 func (m *ChatModel) Stream(ctx context.Context, in []*schema.Message, opts ...model.Option) (_ *schema.StreamReader[*schema.Message], err error) {
