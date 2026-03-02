@@ -13,6 +13,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 )
@@ -27,10 +28,12 @@ func NewProvider() (*Provider, error) {
 	iMongoMapper := alarm.NewAlarmMongoMapper(confConfig)
 	userIMongoMapper := user.NewUserMongoMapper(confConfig)
 	conversationIMongoMapper := conversation.NewConversationMongoMapper(confConfig)
+	reportIMongoMapper := report.NewReportMongoMapper(confConfig)
 	alarmService := service.AlarmService{
 		AlarmMapper:        iMongoMapper,
 		UserMapper:         userIMongoMapper,
 		ConversationMapper: conversationIMongoMapper,
+		ReportMapper:       reportIMongoMapper,
 	}
 	unitIMongoMapper := unit.NewUnitMongoMapper(confConfig)
 	mongoMapper := message.NewMessageMongoMapper(confConfig)
@@ -61,6 +64,7 @@ func NewProvider() (*Provider, error) {
 		UnitService:        unitService,
 		MessageMapper:      mongoMapper,
 		ConversationMapper: conversationIMongoMapper,
+		ReportMapper:       reportIMongoMapper,
 	}
 	return providerProvider, nil
 }

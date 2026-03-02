@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"sync"
 	"time"
 
@@ -28,6 +29,7 @@ type AlarmService struct {
 	AlarmMapper        alarm.IMongoMapper
 	UserMapper         user.IMongoMapper
 	ConversationMapper conversation.IMongoMapper
+	ReportMapper       report.IMongoMapper
 }
 
 var AlarmServiceSet = wire.NewSet(
@@ -120,10 +122,11 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 	// 并行处理：获取user基础信息和对话情况
 	var userInfo map[bson.ObjectID]*user.User
 	var msgStats map[bson.ObjectID]*conversation.ConvStats
-	var userErr, msgErr error
+	var keyWords map[bson.ObjectID][]string
+	var userErr, msgErr, kwErr error
 
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
 	go func() { // 获取user基础信息
 		defer wg.Done()
 		userInfo, userErr = s.UserMapper.BatchFindByIDs(ctx, userIds)
@@ -135,7 +138,14 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 		defer wg.Done()
 		msgStats, msgErr = s.ConversationMapper.BatchConvStats(ctx, userIds)
 		if msgErr != nil {
-			logs.Warnf("查询对话统计失败: %v", errorx.ErrorWithoutStack(msgErr))
+			logs.Errorf("查询对话统计失败: %v", errorx.ErrorWithoutStack(msgErr))
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		keyWords, kwErr = s.ReportMapper.BatchGetKeyWords(ctx, userIds)
+		if kwErr != nil {
+			logs.Errorf("查询关键词失败: %v", errorx.ErrorWithoutStack(kwErr))
 		}
 	}()
 	wg.Wait()
@@ -146,12 +156,16 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 	if msgErr != nil {
 		return nil, errorx.New(errno.ErrDashboardConversationStat)
 	}
+	if kwErr != nil {
+		return nil, errorx.New(errno.ErrGetReportKeyWord)
+	}
 
 	// 构建响应
 	records := make([]*core_api.AlarmRecord, len(dbAlarms))
 	for i, al := range dbAlarms {
 		dbUser, userExists := userInfo[al.UserID]
 		msgStats, msgExists := msgStats[al.UserID]
+		kw, kwExists := keyWords[al.UserID]
 		if userExists {
 			records[i] = &core_api.AlarmRecord{
 				Id:       al.ID.String(),
@@ -169,6 +183,9 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 		if msgExists {
 			records[i].TotalConversationRounds = msgStats.Rounds
 			records[i].LastConversationTime = msgStats.LatestTime
+		}
+		if kwExists {
+			records[i].Keywords = kw
 		}
 	}
 
