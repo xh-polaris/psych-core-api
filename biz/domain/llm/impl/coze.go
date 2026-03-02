@@ -2,6 +2,7 @@ package impl
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
@@ -28,7 +29,7 @@ type CozeModel struct {
 }
 
 func NewCozeModel(ctx context.Context, url, sk, uid, botId string) (_ model.ToolCallingChatModel, err error) {
-	cozeCli := coze.NewCozeAPI(coze.NewTokenAuth(sk), coze.WithBaseURL(url))
+	cozeCli := coze.NewCozeAPI(coze.NewTokenAuth(sk), coze.WithBaseURL(url), coze.WithHttpClient(http.DefaultClient))
 	return &CozeModel{Coze, &cozeCli, uid, botId}, nil
 }
 

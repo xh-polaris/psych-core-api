@@ -5,114 +5,79 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/pkg/app"
 	"github.com/xh-polaris/psych-core-api/pkg/app/volc/tts"
-	"github.com/xh-polaris/psych-core-api/pkg/core"
-	"github.com/xh-polaris/psych-core-api/pkg/logs"
 )
 
-type TestTTSPipe struct {
-	ctx        context.Context
-	unexpected func(error)
-
-	in   *core.Channel[*core.Cmd] // 命令输入
-	test chan *core.Cmd
-	out  *core.Channel[*core.Resp] // 输出
-}
-
-func NewTestTTSPipe(ctx context.Context, unexpected func(error), close chan struct{}, out *core.Channel[*core.Resp]) *TestTTSPipe {
-	return &TestTTSPipe{
-		ctx:        ctx,
-		unexpected: unexpected,
-		out:        out,
-		test:       make(chan *core.Cmd),
-		in:         core.NewChannel[*core.Cmd](3, close),
-	}
-}
-
-// In 上传text, 由in关闭
-func (p *TestTTSPipe) In() {
-	for cmd := range p.in.C {
-		p.test <- cmd
-		logs.Info("[tts pipe] send cmd:%v", cmd)
-	}
-
-}
-
-// Out 获取audio, 由out关闭
-func (p *TestTTSPipe) Out() {
-	for cmd := range p.test {
-		resp := &core.Resp{
-			ID:      0, // Optimize tts输出应该也和cmd的ID对应上
-			Type:    core.RModelAudio,
-			Content: cmd.Content,
-		}
-		p.out.Send(resp)
-	}
-}
-
-func (p *TestTTSPipe) Run() {
-	go p.In()
-	go p.Out()
-}
-
-func (p *TestTTSPipe) Close() {
-	p.in.Close()
-}
-
 func TestVolcTTSApp(t *testing.T) {
-	strs := []string{
-		app.FirstTTS,
-		"我是张",
-		"薇老师的",
-		"数字分身",
-		"，你可以",
-		"叫我小薇老师",
-		app.LastTTS,
-		app.FirstTTS,
-		"我是张",
-		"薇老师的",
-		"数字分身",
-		"，你可以",
-		"叫我小薇老师",
-		app.LastTTS,
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	ttsApp := GetVolcTTSApp()
+
+	// 1️⃣ 必须先 Dial
+	if err := ttsApp.Dial(ctx); err != nil {
+		t.Fatalf("[tts app] dial err: %v", err)
 	}
-	ctx := context.Background()
-	closeCh := make(chan struct{})
-	tts := GetVolcTTSApp()
-	go func() { // 接受
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	// 2️⃣ 启动接收协程（等价于 execTTSRecv）
+	go func() {
+		defer wg.Done()
 		for {
 			select {
-			case <-closeCh:
+			case <-ctx.Done():
 				return
 			default:
-				frame, end, err := tts.Receive(ctx)
+				frame, last, err := ttsApp.Receive(ctx)
 				if err != nil {
-					t.Errorf("[tts app] receive err:%s", err)
+					t.Errorf("[tts app] receive err: %v", err)
 					return
 				}
-				fmt.Printf("[tts app] receive frame:%+v\n", frame)
-				if end {
-					t.Log("[tts app] end")
+
+				fmt.Printf("[tts app] receive frame len: %d\n", len(frame))
+
+				if last {
+					t.Log("[tts app] receive last frame")
 					return
 				}
 			}
 		}
 	}()
-	for _, str := range strs {
-		if str == app.FirstTTS {
-			time.Sleep(3 * time.Second)
-		}
-		if err := tts.Send(ctx, str); err != nil {
-			t.Errorf("[tts app] send err:%s", err)
-			time.Sleep(100 * time.Millisecond)
+
+	// 3️⃣ 发送首包
+	if err := ttsApp.Send(ctx, app.FirstTTS); err != nil {
+		t.Fatalf("[tts app] first send err: %v", err)
+	}
+
+	// 4️⃣ 发送文本内容
+	texts := []string{
+		"我是张",
+		"薇老师的",
+		"数字分身",
+		"，你可以",
+		"叫我小薇老师",
+	}
+
+	for _, str := range texts {
+		if err := ttsApp.Send(ctx, str); err != nil {
+			t.Fatalf("[tts app] send err: %v", err)
 		}
 	}
-	time.Sleep(30 * time.Second)
 
+	// 5️⃣ 发送尾包
+	if err := ttsApp.Send(ctx, app.LastTTS); err != nil {
+		t.Fatalf("[tts app] last send err: %v", err)
+	}
+
+	// 等待接收完成
+	wg.Wait()
 }
 
 func GetVolcTTSApp() app.TTSApp {
