@@ -2,13 +2,13 @@ package service
 
 import (
 	"context"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"sync"
 	"time"
 
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
-	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
@@ -25,9 +25,9 @@ type IAlarmService interface {
 }
 
 type AlarmService struct {
-	AlarmMapper   alarm.IMongoMapper
-	UserMapper    user.IMongoMapper
-	MessageMapper message.MongoMapper
+	AlarmMapper        alarm.IMongoMapper
+	UserMapper         user.IMongoMapper
+	ConversationMapper conversation.IMongoMapper
 }
 
 var AlarmServiceSet = wire.NewSet(
@@ -119,7 +119,7 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 
 	// 并行处理：获取user基础信息和对话情况
 	var userInfo map[bson.ObjectID]*user.User
-	var msgStats map[bson.ObjectID]*message.MsgStats // TODO 改用conversation mapper
+	var msgStats map[bson.ObjectID]*conversation.ConvStats
 	var userErr, msgErr error
 
 	var wg sync.WaitGroup
@@ -133,7 +133,7 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 	}()
 	go func() { // 对话情况
 		defer wg.Done()
-		msgStats, msgErr = s.MessageMapper.BatchMessageStats(ctx, userIds)
+		msgStats, msgErr = s.ConversationMapper.BatchConvStats(ctx, userIds)
 		if msgErr != nil {
 			logs.Warnf("查询对话统计失败: %v", errorx.ErrorWithoutStack(msgErr))
 		}

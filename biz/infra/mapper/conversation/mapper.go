@@ -25,6 +25,7 @@ type IMongoMapper interface {
 	Exists(ctx context.Context, conversationId bson.ObjectID) (bool, error)
 	Count(ctx context.Context, unitId *bson.ObjectID) (int64, error)
 	CountByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int64, error)
+	BatchConvStats(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*ConvStats, error)
 	AverageDuration(ctx context.Context, unitId *bson.ObjectID) (float64, error)
 	AverageDurationByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (float64, error)
 	CountActiveUsers(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int64, error)
@@ -233,4 +234,52 @@ func (m *mongoMapper) CountActiveUsers(ctx context.Context, unitId *bson.ObjectI
 		return 0, nil
 	}
 	return result[0].Count, nil
+}
+
+type ConvStats struct {
+	Rounds     int32 `bson:"rounds"`
+	LatestTime int64 `bson:"latestTime"` // mapper层就转为时间戳
+}
+
+func (m *mongoMapper) BatchConvStats(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*ConvStats, error) {
+	if len(userIds) == 0 {
+		return make(map[bson.ObjectID]*ConvStats), nil
+	}
+
+	pipeline := []bson.M{
+		{
+			"$match": bson.M{
+				cst.UserID: bson.M{cst.In: userIds},
+				cst.Status: bson.M{cst.NE: cst.DeletedStatus}, // 非删除状态
+			},
+		},
+		{
+			"$group": bson.M{
+				cst.ID:       "$" + cst.UserID,                     // 按用户分组
+				"rounds":     bson.M{"$sum": 1},                    // 统计每个用户的对话数量
+				"latestTime": bson.M{"$max": "$" + cst.CreateTime}, // 取最新的创建时间
+			},
+		},
+	}
+
+	var results []struct {
+		UserID     bson.ObjectID `bson:"_id"`
+		Rounds     int32         `bson:"rounds"`
+		LatestTime time.Time     `bson:"latestTime"`
+	}
+
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
+		logs.Errorf("[conversation mapper] batch conversation stats err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	stats := make(map[bson.ObjectID]*ConvStats, len(results))
+	for _, r := range results {
+		stats[r.UserID] = &ConvStats{
+			Rounds:     r.Rounds,
+			LatestTime: r.LatestTime.Unix(),
+		}
+	}
+
+	return stats, nil
 }
