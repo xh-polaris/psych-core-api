@@ -71,7 +71,7 @@ func makeResponse(resp any) map[string]any {
 		field := v.Type().Field(i)
 		if jsonTag := field.Tag.Get("json"); jsonTag != "" && field.Name != "Code" && field.Name != "Msg" {
 			if fieldValue := v.Field(i).Interface(); !reflect.ValueOf(fieldValue).IsZero() || !strings.Contains(jsonTag, "omitempty") {
-				data[jsonTag] = fieldValue
+				data[strings.Split(jsonTag, ",")[0]] = fieldValue
 			}
 		}
 	}
