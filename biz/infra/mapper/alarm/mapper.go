@@ -48,7 +48,7 @@ func (m *mongoMapper) Insert(ctx context.Context, msg *Alarm) error {
 
 // RetrieveByTime 返回某Unit下一段时间内的所有预警信息 如时间范围传入零值time.Time{} 则查询所有
 func (m *mongoMapper) RetrieveByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time, opt *options.FindOptionsBuilder) (alarms []*Alarm, err error) {
-	tf := bson.M{}
+	var tf bson.M
 	if !start.IsZero() {
 		tf[cst.GT] = start
 	}
@@ -56,11 +56,7 @@ func (m *mongoMapper) RetrieveByTime(ctx context.Context, unitID bson.ObjectID, 
 		tf[cst.LT] = end
 	}
 
-	f := bson.M{cst.UnitId: unitID, cst.Status: bson.M{cst.NE: cst.DeletedStatus}}
-	if len(tf) > 0 {
-		f[cst.CreateTime] = tf
-	}
-
+	f := bson.M{cst.UnitId: unitID, cst.CreateTime: tf, cst.Status: bson.M{cst.NE: cst.DeletedStatus}}
 	if err = m.conn.Find(ctx, &alarms, f, opt); err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
 		logs.Errorf("[alarm mapper] find err:%s", errorx.ErrorWithoutStack(err))
 		return nil, err
@@ -70,19 +66,15 @@ func (m *mongoMapper) RetrieveByTime(ctx context.Context, unitID bson.ObjectID, 
 
 // CountByTime 计数某Unit下一段时间内的所有预警信息 如时间范围传入零值time.Time{} 则查询所有
 func (m *mongoMapper) CountByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (int64, error) {
-	tf := bson.M{}
+	var tf bson.M
 	if !start.IsZero() {
 		tf[cst.GT] = start
 	}
 	if !end.IsZero() {
 		tf[cst.LT] = end
 	}
-	// 若有传入时间限制 将时间过滤器tf，填入filter
-	f := bson.M{cst.UnitId: unitID, cst.Status: bson.M{cst.NE: cst.DeletedStatus}}
-	if len(tf) != 0 {
-		f[cst.CreateTime] = tf
-	}
 
+	f := bson.M{cst.UnitId: unitID, cst.CreateTime: tf, cst.Status: bson.M{cst.NE: cst.DeletedStatus}}
 	c, err := m.conn.CountDocuments(ctx, f)
 	if err != nil {
 		logs.Errorf("[alarm mapper] count err:%s", errorx.ErrorWithoutStack(err))

@@ -2,14 +2,14 @@ package core_api
 
 import (
 	"context"
+	"github.com/cloudwego/hertz/pkg/common/hlog"
+
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/pkg/httpx"
 	"github.com/xh-polaris/psych-core-api/provider"
-	"github.com/xh-polaris/psych-idl/kitex_gen/basic"
 	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
-	"strconv"
 )
 
 // ==========================================
@@ -122,13 +122,18 @@ func DashboardGetPsychTrend(ctx context.Context, c *app.RequestContext) {
 // @Failure 400 {string} string "Bad Request"
 // @Router /dashboard/alarm_overview [GET]
 func DashboardGetAlarmOverview(ctx context.Context, c *app.RequestContext) {
+
+	queryArgs := c.Request.URI().QueryArgs()
+	hlog.CtxInfof(ctx, "Query参数数量: %d", queryArgs.Len())
+
+	// 遍历所有 Query 参数
+	queryArgs.VisitAll(func(key, value []byte) {
+		hlog.CtxInfof(ctx, "Query参数: %s = %s", string(key), string(value))
+	})
+
 	var err error
 	var req core_api.DashboardGetAlarmOverviewReq
-	err = c.BindQuery(&req)
-	if err != nil {
-		c.String(consts.StatusBadRequest, err.Error())
-		return
-	}
+	req.UnitId = c.Query("unitId")
 
 	p := provider.Get()
 	resp, err := p.AlarmService.Overview(ctx, &req)
@@ -153,20 +158,10 @@ func DashboardGetAlarmOverview(ctx context.Context, c *app.RequestContext) {
 func DashboardListAlarmRecords(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req core_api.DashboardListAlarmRecordsReq
-	//err = c.BindQuery(&req)
-	//if err != nil {
-	//	c.String(consts.StatusBadRequest, err.Error())
-	//	return
-	//}
-	pa, _ := strconv.Atoi(c.Query("page"))
-	page := int64(pa)
-	l, _ := strconv.Atoi(c.Query("limit"))
-	limit := int64(l)
-
-	req.UnitId = c.Query("unitId")
-	req.PaginationOptions = &basic.PaginationOptions{
-		Page:  &page,
-		Limit: &limit,
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
 	}
 
 	p := provider.Get()
@@ -189,7 +184,7 @@ func DashboardListAlarmRecords(ctx context.Context, c *app.RequestContext) {
 func DashboardListClasses(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req core_api.DashboardListClassesReq
-	err = c.BindQuery(&req)
+	err = c.BindAndValidate(&req)
 	if err != nil {
 		c.String(consts.StatusBadRequest, err.Error())
 		return
@@ -219,20 +214,10 @@ func DashboardListClasses(ctx context.Context, c *app.RequestContext) {
 func DashboardListUsers(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req core_api.DashboardListUsersReq
-	//err = c.BindQuery(&req)
-	//if err != nil {
-	//	c.String(consts.StatusBadRequest, err.Error())
-	//	return
-	//}
-	pa, _ := strconv.Atoi(c.Query("page"))
-	page := int64(pa)
-	l, _ := strconv.Atoi(c.Query("limit"))
-	limit := int64(l)
-
-	req.UnitId = c.Query("unitId")
-	req.PaginationOptions = &basic.PaginationOptions{
-		Page:  &page,
-		Limit: &limit,
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
 	}
 
 	p := provider.Get()

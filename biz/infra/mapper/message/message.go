@@ -15,23 +15,23 @@ var (
 
 // Message 一条消息, 可能归属于用户或模型
 type Message struct {
-	MessageId      bson.ObjectID  `json:"messageId" bson:"Id"`                              // 主键
-	ConversationId bson.ObjectID  `json:"conversationId" bson:"conversationId"`             // 归属的对话id
-	SectionId      bson.ObjectID  `json:"sectionId" bson:"sectionId"`                       // 归属的段落id
-	UserId         bson.ObjectID  `json:"userId" bson:"userId"`                             // 用户id
-	Index          int32          `json:"index" bson:"index"`                               // 消息索引
-	ReplyId        bson.ObjectID  `json:"replyId,omitempty" bson:"replyId,omitempty"`       // 回复id, 只有模型消息有
-	Content        string         `json:"content" bson:"content"`                           // 消息内容, json字符串
-	ContentType    int32          `json:"contentType" bson:"contentType"`                   // 内容类型, text/think/suggest, 依次为0,1,2
-	MessageType    int32          `json:"messageType" bson:"messageType"`                   // 消息类型, 默认为text, 0
-	Usage          *core.LLMUsage `json:"usage,omitempty" bson:"usage,omitempty"`           // 用量
-	Ext            *Ext           `json:"ext,omitempty" bson:"ext,omitempty"`               // 额外信息
-	Feedback       int32          `json:"feedback,omitempty" bson:"feedback,omitempty"`     // 反馈, 无/喜欢/踩/删除, 依次为0,1,2,3
-	Role           int32          `json:"role" bson:"role"`                                 // 角色, system/assistant/user/tool, 依次为0,1,2,3,4
-	CreateTime     time.Time      `json:"createTime" bson:"createTime"`                     // 创建时间
-	UpdateTime     time.Time      `json:"updateTime" bson:"updateTime"`                     // 更新时间
-	DeleteTime     time.Time      `json:"deleteTime,omitempty" bson:"deleteTime,omitempty"` // 删除时间
-	Status         int32          `json:"status" bson:"status"`                             // 状态, 默认/regen未选择/regen被选择/替换过/中断, 依次是0,1,2,3
+	MessageId      bson.ObjectID  `json:"message_id" bson:"_id"`                              // 主键
+	ConversationId bson.ObjectID  `json:"conversation_id" bson:"conversation_id"`             // 归属的对话id
+	SectionId      bson.ObjectID  `json:"section_id" bson:"section_id"`                       // 归属的段落id
+	UserId         bson.ObjectID  `json:"user_id" bson:"user_id"`                             // 用户id
+	Index          int32          `json:"index" bson:"index"`                                 // 消息索引
+	ReplyId        bson.ObjectID  `json:"reply_id,omitempty" bson:"reply_id,omitempty"`       // 回复id, 只有模型消息有
+	Content        string         `json:"content" bson:"content"`                             // 消息内容, json字符串
+	ContentType    int32          `json:"content_type" bson:"content_type"`                   // 内容类型, text/think/suggest, 依次为0,1,2
+	MessageType    int32          `json:"message_type" bson:"message_type"`                   // 消息类型, 默认为text, 0
+	Usage          *core.LLMUsage `json:"usage,omitempty" bson:"usage,omitempty"`             // 用量
+	Ext            *Ext           `json:"ext,omitempty" bson:"ext,omitempty"`                 // 额外信息
+	Feedback       int32          `json:"feedback,omitempty" bson:"feedback,omitempty"`       // 反馈, 无/喜欢/踩/删除, 依次为0,1,2,3
+	Role           int32          `json:"role" bson:"role"`                                   // 角色, system/assistant/user/tool, 依次为0,1,2,3,4
+	CreateTime     time.Time      `json:"create_time" bson:"create_time"`                     // 创建时间
+	UpdateTime     time.Time      `json:"update_time" bson:"update_time"`                     // 更新时间
+	DeleteTime     time.Time      `json:"delete_time,omitempty" bson:"delete_time,omitempty"` // 删除时间
+	Status         int32          `json:"status" bson:"status"`                               // 状态, 默认/regen未选择/regen被选择/替换过/中断, 依次是0,1,2,3
 }
 
 type Ext struct {
@@ -58,7 +58,7 @@ type Cite struct {
 
 type Code struct {
 	Index    int32  `json:"index" bson:"index"`
-	CodeType string `json:"codeType" bson:"codeType"`
+	CodeType string `json:"codeType" bson:"code_type"`
 	Code     string `json:"code" bson:"code"`
 }
 

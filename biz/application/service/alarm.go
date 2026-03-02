@@ -72,11 +72,8 @@ func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardL
 	if total == 0 {
 		return &core_api.DashboardListAlarmRecordsResp{
 			Pagination: &basic.Pagination{
-				Total:   0,
-				HasNext: false,
+				Total: 0,
 			},
-			Code: 200,
-			Msg:  "success",
 		}, nil
 	}
 
@@ -85,27 +82,24 @@ func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardL
 	alarms, err := s.AlarmMapper.RetrieveByTime(ctx, unitOID, time.Time{}, time.Time{}, opt)
 	if err != nil || len(alarms) == 0 {
 		logs.Errorf("retrieve alarms error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrInternalError)
+		return nil, err
 	}
 	completeAlarm, err2 := s.completeAlarm(ctx, alarms)
 
 	// 构建响应
-	hasNext := req.PaginationOptions.GetPage()*req.PaginationOptions.GetLimit() < total
 	return &core_api.DashboardListAlarmRecordsResp{
 		Records: completeAlarm,
 		Pagination: &basic.Pagination{
 			Total:   total,
 			Page:    req.PaginationOptions.GetPage(),
 			Limit:   req.PaginationOptions.GetLimit(),
-			HasNext: hasNext,
+			HasNext: req.PaginationOptions.GetPage()*req.PaginationOptions.GetLimit() < total,
 		},
-		Code: 200,
-		Msg:  "success",
 	}, err2
 }
 
 func findPageOption(reqOpt *basic.PaginationOptions) *options.FindOptionsBuilder {
-	p := reqOpt.GetPage() - 1
+	p := reqOpt.GetPage()
 	l := reqOpt.GetLimit()
 	return options.Find().SetSkip(p * l).SetLimit(l)
 }
@@ -119,7 +113,7 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 
 	// 并行处理：获取user基础信息和对话情况
 	var userInfo map[bson.ObjectID]*user.User
-	var msgStats map[bson.ObjectID]*message.MsgStats // TODO 改用conversation mapper
+	var msgStats map[bson.ObjectID]*message.MsgStats
 	var userErr, msgErr error
 
 	var wg sync.WaitGroup
