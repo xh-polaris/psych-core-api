@@ -69,18 +69,11 @@ func makeResponse(resp any) map[string]any {
 	data := make(map[string]any)
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Type().Field(i)
-		jsonTag := field.Tag.Get("json")
-		if jsonTag == "" || field.Name == "Code" || field.Name == "Msg" {
-			continue
+		if jsonTag := field.Tag.Get("json"); jsonTag != "" && field.Name != "Code" && field.Name != "Msg" {
+			if fieldValue := v.Field(i).Interface(); !reflect.ValueOf(fieldValue).IsZero() || !strings.Contains(jsonTag, "omitempty") {
+				data[strings.Split(jsonTag, ",")[0]] = fieldValue
+			}
 		}
-
-		jsonKey := strings.Split(jsonTag, ",")[0]
-		fieldValue := v.Field(i).Interface()
-
-		if !reflect.ValueOf(fieldValue).IsZero() || !strings.Contains(jsonTag, "omitempty") {
-			data[jsonKey] = fieldValue
-		}
-
 	}
 	if len(data) > 0 {
 		response["data"] = data

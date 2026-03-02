@@ -14,6 +14,10 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/core"
 )
 
+var baseURL = "ws://127.0.0.1:8080"
+
+//var baseURL = "wss://api.xhpolaris.com/psych"
+
 var authType2Int32 = map[string]int32{
 	"Already":             -1,
 	"AuthStudentIdAndPwd": 1,
@@ -45,7 +49,7 @@ func start() bool {
 
 func connectWebSocket() (conn *websocket.Conn, meta *core.Meta, err error) {
 	var message []byte
-	if conn, _, err = websocket.DefaultDialer.Dial("ws://127.0.0.1:8080/chat", nil); err != nil {
+	if conn, _, err = websocket.DefaultDialer.Dial(baseURL+"/chat", nil); err != nil {
 		return conn, meta, fmt.Errorf("连接服务器失败: %w", err)
 	}
 	// 读取元信息
