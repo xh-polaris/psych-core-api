@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"runtime"
 )
 
 func Convert[T any](in any) (out T, ok bool) {
@@ -64,13 +65,11 @@ func BuildBytes(data ...[]byte) []byte {
 	return b.Bytes()
 }
 
-// CalculateChange 计算统计数据变化率
-func CalculateChange(current, lastWeek float64) float64 {
-	if lastWeek == 0 {
-		if current == 0 {
-			return 0
-		}
-		return 100.0 // 上周为0，本周有数据，增长100%
+func CallerInfo(skip int) string {
+	pc, file, line, ok := runtime.Caller(skip)
+	if !ok {
+		return "unknown"
 	}
-	return ((current - lastWeek) / lastWeek) * 100
+	fn := runtime.FuncForPC(pc)
+	return fmt.Sprintf("%s:%d %s", file, line, fn.Name())
 }

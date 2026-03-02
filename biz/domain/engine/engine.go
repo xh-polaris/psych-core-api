@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/hertz-contrib/websocket"
+	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/lock"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mq"
@@ -20,20 +22,9 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/pkg/wsx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
-	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
 )
 
 // 目前当websocket层出现问题, engine会直接结束, 并未处理可恢复错误而是强制由客户端尝试重连
-
-// IUserService 定义 engine 所需的用户服务接口
-type IUserService interface {
-	UserSignIn(ctx context.Context, req *core_api.UserSignInReq) (*core_api.UserSignInResp, error)
-}
-
-// IConfigService 定义 engine 所需的配置服务接口
-type IConfigService interface {
-	ConfigGetByUnitID(ctx context.Context, req *core_api.ConfigGetByUnitIdReq) (*core_api.ConfigGetByUnitIdResp, error)
-}
 
 var meta = &core.Meta{
 	Version:       core.Version,
@@ -69,27 +60,19 @@ type Engine struct {
 	uSession string         // uSession 对话ID
 	usage    *core.Usage    // 用量
 	conf     *core.Config
-
-	// 注入的依赖
-	usrSvc IUserService
-	cfgSvc IConfigService
 }
 
-// NewEngine 创建一个新的对话引擎，显式传入依赖
-func NewEngine(ctx context.Context, conn *websocket.Conn, usrSvc IUserService, cfgSvc IConfigService) *Engine {
+// NewEngine 创建一个新的对话引擎
+func NewEngine(ctx context.Context, conn *websocket.Conn) *Engine {
 	ctx, cancel := context.WithCancel(ctx)
-	e := &Engine{
-		ctx:    ctx,
-		cancel: cancel,
-		wsx:    wsx.NewHZWSClient(conn),
-		usage:  &core.Usage{},
-		start:  time.Now(),
-		meta:   meta,
-		info:   make(map[string]any),
-		errs:   make(chan error, 3),
-		usrSvc: usrSvc,
-		cfgSvc: cfgSvc,
-	}
+	e := &Engine{ctx: ctx, cancel: cancel, wsx: wsx.NewHZWSClient(conn), usage: &core.Usage{}, heartbeatTicker: time.NewTicker(heartbeatTimeout),
+		start: time.Now(), meta: meta, info: make(map[string]any), errs: make(chan error, 3)}
+	//e.wsx.SetCloseHandler(func(code int, text string) (err error) { // 处理close消息
+	//	if err = e.wsx.ControlClose(websocket.FormatCloseMessage(code, text)); err != nil { // 给客户端写回一个close消息
+	//		logs.Error("[engine] [close] err: %s", err)
+	//	}
+	//	return e.Close()
+	//})
 	util.DPrint("[engine] [new] with session %s\n", e.uSession) // debug
 	return e
 }
@@ -143,12 +126,15 @@ func (e *Engine) unexpected(err error, cause string) bool {
 			e.unexpected(err, cause)
 		}
 		if custom.IsAffectStability() {
-			util.DPrint("[engine] [unexpected] cause: %s\n", cause)
+			util.DPrint("%s [engine] [unexpected] at: %s err: %s, cause: %s\n", time.Now().String(),
+				util.CallerInfo(2), err, cause)
 			_ = e.Close()
 			return true
 		}
 	} else if (err != nil && !wsx.IsNormal(err)) || strings.HasPrefix(cause, must) { // 错误或影响稳定性
-		util.DPrint("[engine] [unexpected] err: %s,cause: %s\n", err, cause)
+		util.DPrint("%s [engine] [unexpected] at: %s err: %s,cause: %s\n", time.Now().String(),
+			util.CallerInfo(2), err, cause)
+		fmt.Println(err)
 		_ = e.Close()
 		return true
 	}
@@ -189,8 +175,11 @@ func (e *Engine) MWrite(t core.MType, payload any) (err error) {
 
 // Lock 锁定
 func (e *Engine) Lock() error {
+	if conf.GetConfig().State == "test" {
+		return nil
+	}
 	if e.lock == nil {
-		e.lock = lock.Mgr.NewLock(e.info[cst.UserID].(string))
+		e.lock = lock.Mgr.NewLock(e.info[cst.UserId].(string))
 	}
 	if ok, err := e.lock.TryLock(e.ctx, time.Minute*3, time.Second*90, time.Minute*2); err != nil {
 		return errorx.WrapByCode(err, errno.UnKnown)
@@ -201,6 +190,9 @@ func (e *Engine) Lock() error {
 }
 
 func (e *Engine) Unlock() error {
+	if conf.GetConfig().State == "test" {
+		return nil
+	}
 	if err := e.lock.TryUnlock(e.ctx); err != nil {
 		return errorx.WrapByCode(err, errno.UnKnown)
 	}
@@ -209,6 +201,7 @@ func (e *Engine) Unlock() error {
 
 // Close 释放engine的资源
 func (e *Engine) Close() (err error) {
+	util.DPrint("[engine] %s closed by %s", e.uSession, util.CallerInfo(2))
 	e.once.Do(func() {
 		// 关闭各个应用, llm无需关闭
 		appClose(e.asr, e.tts)

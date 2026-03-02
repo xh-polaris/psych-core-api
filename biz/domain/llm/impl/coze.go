@@ -9,6 +9,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
+	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 )
 
@@ -70,6 +71,7 @@ func process(ctx context.Context, reader coze.Stream[coze.ChatEvent], writer *sc
 			return
 		default:
 			if event, err = reader.Recv(); err != nil {
+				logs.Errorf("[coze] process recv err: %s", err)
 				writer.Send(nil, err)
 				return
 			}

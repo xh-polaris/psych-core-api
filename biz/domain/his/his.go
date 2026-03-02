@@ -104,6 +104,7 @@ func (h *HistoryManager) AddMessage(ctx context.Context, id string, msg *message
 	// add to storage
 	if err = h.msgMapper.Insert(ctx, msg); err != nil {
 		logs.Errorf("add message err: %s", err)
+		return
 	}
 
 	// upsert conversation meta
