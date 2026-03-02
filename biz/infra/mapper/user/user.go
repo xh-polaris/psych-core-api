@@ -27,7 +27,7 @@ type User struct {
 	Grade      int32          `json:"grade,omitempty" bson:"grade,omitempty"`
 	Class      int32          `json:"class,omitempty" bson:"class,omitempty"`
 	Options    map[string]any `json:"option,omitempty" bson:"option,omitempty"`
-	CreateTime int64          `json:"createTime,omitempty" bson:"createTime,omitempty"`
-	UpdateTime int64          `json:"updateTime,omitempty" bson:"updateTime,omitempty"`
-	DeleteTime int64          `json:"deleteTime,omitempty" bson:"deleteTime,omitempty"`
+	CreateTime time.Time      `json:"createTime,omitempty" bson:"createTime,omitempty"`
+	UpdateTime time.Time      `json:"updateTime,omitempty" bson:"updateTime,omitempty"`
+	DeleteTime time.Time      `json:"deleteTime,omitempty" bson:"deleteTime,omitempty"`
 }
