@@ -26,14 +26,14 @@ func NewProvider() (*Provider, error) {
 	}
 	iMongoMapper := alarm.NewAlarmMongoMapper(confConfig)
 	userIMongoMapper := user.NewUserMongoMapper(confConfig)
-	mongoMapper := message.NewMessageMongoMapper(confConfig)
+	conversationIMongoMapper := conversation.NewConversationMongoMapper(confConfig)
 	alarmService := service.AlarmService{
-		AlarmMapper:   iMongoMapper,
-		UserMapper:    userIMongoMapper,
-		MessageMapper: mongoMapper,
+		AlarmMapper:        iMongoMapper,
+		UserMapper:         userIMongoMapper,
+		ConversationMapper: conversationIMongoMapper,
 	}
 	unitIMongoMapper := unit.NewUnitMongoMapper(confConfig)
-	conversationIMongoMapper := conversation.NewConversationMongoMapper(confConfig)
+	mongoMapper := message.NewMessageMongoMapper(confConfig)
 	dashboardService := service.DashboardService{
 		UserMapper:         userIMongoMapper,
 		UnitMapper:         unitIMongoMapper,

@@ -2,8 +2,6 @@ package core_api
 
 import (
 	"context"
-	"github.com/cloudwego/hertz/pkg/common/hlog"
-
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
@@ -25,7 +23,7 @@ import (
 // @Param unitId query string false "Unit ID"
 // @Success 200 {object} core_api.DashboardGetDataOverviewResp
 // @Failure 400 {string} string "Bad Request"
-// @Router /dashboard/overview [GET]
+// @Router /dashboard/overview [POST]
 func DashboardGetDataOverview(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req core_api.DashboardGetDataOverviewReq
@@ -49,7 +47,7 @@ func DashboardGetDataOverview(ctx context.Context, c *app.RequestContext) {
 // @Param unitId query string false "Unit ID"
 // @Success 200 {object} core_api.DashboardGetDataTrendResp
 // @Failure 400 {string} string "Bad Request"
-// @Router /dashboard/trend [GET]
+// @Router /dashboard/trend [POST]
 func DashboardGetDataTrend(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req core_api.DashboardGetDataTrendReq
@@ -72,7 +70,7 @@ func DashboardGetDataTrend(ctx context.Context, c *app.RequestContext) {
 // @Produce application/json
 // @Success 200 {object} core_api.DashboardListUnitsResp
 // @Failure 400 {string} string "Bad Request"
-// @Router /dashboard/units [GET]
+// @Router /dashboard/units [POST]
 func DashboardListUnits(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req core_api.DashboardListUnitsReq
@@ -96,7 +94,7 @@ func DashboardListUnits(ctx context.Context, c *app.RequestContext) {
 // @Param unitId query string true "Unit ID"
 // @Success 200 {object} core_api.DashboardGetPsychTrendResp
 // @Failure 400 {string} string "Bad Request"
-// @Router /dashboard/psych_trend [GET]
+// @Router /dashboard/psych_trend [POST]
 func DashboardGetPsychTrend(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req core_api.DashboardGetPsychTrendReq
@@ -120,20 +118,15 @@ func DashboardGetPsychTrend(ctx context.Context, c *app.RequestContext) {
 // @Param unitId query string true "Unit ID"
 // @Success 200 {object} core_api.DashboardGetAlarmOverviewResp
 // @Failure 400 {string} string "Bad Request"
-// @Router /dashboard/alarm_overview [GET]
+// @Router /dashboard/alarm_overview [POST]
 func DashboardGetAlarmOverview(ctx context.Context, c *app.RequestContext) {
-
-	queryArgs := c.Request.URI().QueryArgs()
-	hlog.CtxInfof(ctx, "Query参数数量: %d", queryArgs.Len())
-
-	// 遍历所有 Query 参数
-	queryArgs.VisitAll(func(key, value []byte) {
-		hlog.CtxInfof(ctx, "Query参数: %s = %s", string(key), string(value))
-	})
-
 	var err error
 	var req core_api.DashboardGetAlarmOverviewReq
-	req.UnitId = c.Query("unitId")
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
 
 	p := provider.Get()
 	resp, err := p.AlarmService.Overview(ctx, &req)
@@ -154,7 +147,7 @@ func DashboardGetAlarmOverview(ctx context.Context, c *app.RequestContext) {
 // @Param size query int false "Page Size"
 // @Success 200 {object} core_api.DashboardListAlarmRecordsResp
 // @Failure 400 {string} string "Bad Request"
-// @Router /dashboard/alarm_records [GET]
+// @Router /dashboard/alarm_records [POST]
 func DashboardListAlarmRecords(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req core_api.DashboardListAlarmRecordsReq
@@ -180,7 +173,7 @@ func DashboardListAlarmRecords(ctx context.Context, c *app.RequestContext) {
 // @Param class query int false "Class"
 // @Success 200 {object} core_api.DashboardListClassesResp
 // @Failure 400 {string} string "Bad Request"
-// @Router /dashboard/classes [GET]
+// @Router /dashboard/classes [POST]
 func DashboardListClasses(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req core_api.DashboardListClassesReq
@@ -189,7 +182,6 @@ func DashboardListClasses(ctx context.Context, c *app.RequestContext) {
 		c.String(consts.StatusBadRequest, err.Error())
 		return
 	}
-	req.UnitId = c.Query("unitId")
 
 	p := provider.Get()
 	resp, err := p.DashboardService.DashboardListClasses(ctx, &req)
@@ -210,7 +202,7 @@ func DashboardListClasses(ctx context.Context, c *app.RequestContext) {
 // @Param size query int false "Page Size"
 // @Success 200 {object} core_api.DashboardListUsersResp
 // @Failure 400 {string} string "Bad Request"
-// @Router /dashboard/users [GET]
+// @Router /dashboard/users [POST]
 func DashboardListUsers(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req core_api.DashboardListUsersReq
