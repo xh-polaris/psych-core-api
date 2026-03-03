@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/xh-polaris/psych-core-api/biz/domain/wordcld"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 
@@ -48,6 +49,7 @@ type DashboardService struct {
 	ConversationMapper conversation.IMongoMapper
 	ReportMapper       report.IMongoMapper
 	AlarmMapper        alarm.IMongoMapper
+	WordCloudExtractor *wordcld.WordCloudExtractor
 }
 
 var DashboardServiceSet = wire.NewSet(
@@ -631,56 +633,10 @@ func (s *DashboardService) getEmotionRatio(ctx context.Context, unitOID *bson.Ob
 }
 
 func (s *DashboardService) getKeywords(ctx context.Context, unitOID *bson.ObjectID) (*core_api.Keywords, error) {
-	var (
-		total int64
-		kws   map[string]int32
-		err   error
-	)
-
 	if unitOID != nil {
-		// 返回某一单位关键词云的情况
-		total, err = s.UserMapper.CountByUnitID(ctx, *unitOID)
-		if err != nil {
-			logs.Errorf("count users in unit %s error: %s", unitOID.Hex(), errorx.ErrorWithoutStack(err))
-			return nil, err
-		}
-
-		if total == 0 {
-			return &core_api.Keywords{KeywordMap: make(map[string]int32), KeyTotal: 0}, nil
-		}
-
-		kws, err = s.ReportMapper.GetUnitKW(ctx, *unitOID)
-		if err != nil {
-			logs.Errorf("get keywords of unit %s error: %s", unitOID.Hex(), errorx.ErrorWithoutStack(err))
-			return nil, err
-		}
-	} else {
-		// 返回全部关键词云的情况
-		total, err = s.UserMapper.Count(ctx)
-		if err != nil {
-			logs.Errorf("count all users error: %s", errorx.ErrorWithoutStack(err))
-			return nil, err
-		}
-
-		if total == 0 {
-			return &core_api.Keywords{KeywordMap: make(map[string]int32), KeyTotal: 0}, nil
-		}
-
-		kws, err = s.ReportMapper.GetAllUnitsKW(ctx)
-		if err != nil {
-			logs.Errorf("get keywords of all units error: %s", errorx.ErrorWithoutStack(err))
-			return nil, err
-		}
+		return s.WordCloudExtractor.FromUnitKWs(ctx, *unitOID)
 	}
-
-	if kws == nil {
-		kws = make(map[string]int32)
-	}
-
-	return &core_api.Keywords{
-		KeywordMap: kws,
-		KeyTotal:   int32(len(kws)),
-	}, nil
+	return s.WordCloudExtractor.FromAllUnitsKWs(ctx)
 }
 
 func (s *DashboardService) DashboardListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (*core_api.DashboardListClassesResp, error) {
