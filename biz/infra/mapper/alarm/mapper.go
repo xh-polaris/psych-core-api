@@ -30,6 +30,7 @@ type IMongoMapper interface {
 	CountByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (int64, error)
 	Exists(ctx context.Context, id bson.ObjectID) (bool, error)
 	AggregateStats(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (*OverviewStats, error)
+	EmotionDistribution(ctx context.Context, unitId *bson.ObjectID) (*EmotionDistribution, error)
 }
 
 type mongoMapper struct {
@@ -201,4 +202,42 @@ func parseWeekData(weekData weekData) (map[int32]int32, int32) {
 		}
 	}
 	return statusMap, total
+}
+
+type EmotionDistribution map[string]int32
+
+// EmotionDistribution 计算某Unit的情绪分布
+// unitId传入零值bson.ObjectID{}则计算所有Unit的情绪分布
+func (m *mongoMapper) EmotionDistribution(ctx context.Context, unitId *bson.ObjectID) (*EmotionDistribution, error) {
+	match := bson.M{
+		cst.Status: bson.M{cst.NE: cst.DeletedStatus},
+	}
+	if unitId != nil {
+		match[cst.UnitId] = *unitId
+	}
+
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: match}},
+		{{Key: "$group", Value: bson.M{
+			"_id":   "$emotion",
+			"count": bson.M{"$sum": 1},
+		}}},
+	}
+
+	var results []struct {
+		Emotion string `bson:"_id"`
+		Count   int32  `bson:"count"`
+	}
+
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
+		logs.Errorf("[alarm mapper] emotion distribution aggregate err:%s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	distribution := make(EmotionDistribution)
+	for _, result := range results {
+		distribution[result.Emotion] = result.Count
+	}
+
+	return &distribution, nil
 }

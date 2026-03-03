@@ -143,7 +143,7 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 	}()
 	go func() {
 		defer wg.Done()
-		keyWords, kwErr = s.ReportMapper.BatchGetKeyWords(ctx, userIds)
+		keyWords, kwErr = s.ReportMapper.BatchGetUserKeyWords(ctx, userIds)
 		if kwErr != nil {
 			logs.Errorf("查询关键词失败: %v", errorx.ErrorWithoutStack(kwErr))
 		}

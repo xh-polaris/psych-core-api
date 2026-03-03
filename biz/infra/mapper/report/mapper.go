@@ -2,6 +2,7 @@ package report
 
 import (
 	"context"
+
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
@@ -23,10 +24,15 @@ const (
 
 type IMongoMapper interface {
 	InsertOne(ctx context.Context, report *Report) error
-	Exist(ctx context.Context, userId bson.ObjectID) (bool, error)
-	FindLatest(ctx context.Context, userId bson.ObjectID) (*Report, error)
-	BatchFindLatest(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*Report, error)
-	BatchGetKeyWords(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID][]string, error)
+	FindOne(ctx context.Context, id bson.ObjectID) (*Report, error)
+	ExistByUser(ctx context.Context, userId bson.ObjectID) (bool, error)
+	FindUserLatest(ctx context.Context, userId bson.ObjectID) (*Report, error)
+	FindAllByUser(ctx context.Context, userId bson.ObjectID) ([]*Report, error)
+	BatchFindUserLatest(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*Report, error)
+	BatchGetUserKeyWords(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID][]string, error)
+	// 词云相关接口
+	GetAllUnitsKW(ctx context.Context) (map[string]int32, error)
+	GetUnitKW(ctx context.Context, unitId bson.ObjectID) (map[string]int32, error)
 }
 
 type mongoMapper struct {
@@ -45,12 +51,16 @@ func (m *mongoMapper) InsertOne(ctx context.Context, report *Report) error {
 	return err
 }
 
-func (m *mongoMapper) Exist(ctx context.Context, userId bson.ObjectID) (bool, error) {
+func (m *mongoMapper) FindOne(ctx context.Context, id bson.ObjectID) (*Report, error) {
+	return m.FindOne(ctx, id)
+}
+
+func (m *mongoMapper) ExistByUser(ctx context.Context, userId bson.ObjectID) (bool, error) {
 	return m.ExistsByFields(ctx, bson.M{cst.UserID: userId})
 }
 
-// FindLatest 查找某单位某用户的最新报表，注意报表可能不存在
-func (m *mongoMapper) FindLatest(ctx context.Context, userId bson.ObjectID) (*Report, error) {
+// FindUserLatest 查找某单位某用户的最新报表，注意报表可能不存在
+func (m *mongoMapper) FindUserLatest(ctx context.Context, userId bson.ObjectID) (*Report, error) {
 	report := &Report{}
 	if err := m.conn.FindOneNoCache(ctx, report, bson.M{cst.UserID: userId}, options.FindOne().SetSort(bson.M{"end": -1})); err != nil {
 		return nil, err
@@ -60,7 +70,7 @@ func (m *mongoMapper) FindLatest(ctx context.Context, userId bson.ObjectID) (*Re
 }
 
 // BatchFindLatest 查找某单位下一批用户的最新报表，注意报表有可能不存在
-func (m *mongoMapper) BatchFindLatest(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*Report, error) {
+func (m *mongoMapper) BatchFindUserLatest(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*Report, error) {
 	if len(userIds) == 0 {
 		return make(map[bson.ObjectID]*Report), nil
 	}
@@ -105,9 +115,9 @@ func (m *mongoMapper) BatchFindLatest(ctx context.Context, userIds []bson.Object
 	return result, nil
 }
 
-// BatchGetKeyWords 获取某单位一批用户的近期关键词，注意关键词可能为空/不存在
-func (m *mongoMapper) BatchGetKeyWords(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID][]string, error) {
-	reports, err := m.BatchFindLatest(ctx, userIds)
+// BatchGetUserKeyWords 获取某单位一批用户的近期关键词，注意关键词可能为空/不存在
+func (m *mongoMapper) BatchGetUserKeyWords(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID][]string, error) {
+	reports, err := m.BatchFindUserLatest(ctx, userIds)
 	if err != nil {
 		return nil, err
 	}
@@ -115,15 +125,137 @@ func (m *mongoMapper) BatchGetKeyWords(ctx context.Context, userIds []bson.Objec
 	result := make(map[bson.ObjectID][]string, len(reports))
 	for _, userId := range userIds {
 		report := reports[userId]
-
 		// 没有报表或报表结果为 nil，关键词为空切片
 		if report == nil || report.Result == nil {
 			result[userId] = []string{}
 			continue
 		}
 		// 若存在report，则应存在关键词
-		result[userId] = report.GetKeywords()
+		result[userId] = report.Keywords
 	}
 
 	return result, nil
+}
+
+func (m *mongoMapper) FindAllByUser(ctx context.Context, userId bson.ObjectID) ([]*Report, error) {
+	return m.FindAllByFields(ctx, bson.M{cst.UserID: userId})
+}
+
+// GetAllUnitsKW 统计所有unit的报表的关键词以及它们的个数，优先考虑性能
+func (m *mongoMapper) GetAllUnitsKW(ctx context.Context) (map[string]int32, error) {
+	pipeline := mongo.Pipeline{
+		// 过滤：只处理有关键词的报表
+		{{
+			Key: "$match", Value: bson.M{
+				"keywords": bson.M{
+					"$exists": true,
+					"$ne":     nil,
+					"$not":    bson.M{"$size": 0},
+				},
+			},
+		}},
+		// 展开关键词数组，每个关键词成为一个文档
+		{{
+			Key: "$unwind", Value: "$keywords",
+		}},
+		// 按关键词分组并计数
+		{{
+			Key: "$group", Value: bson.M{
+				"_id":   "$keywords",
+				"count": bson.M{"$sum": 1},
+			},
+		}},
+		// 输出格式化
+		{{
+			Key: "$project", Value: bson.M{
+				"_id":     0,
+				"keyword": "$_id",
+				"count":   1,
+			},
+		}},
+		// 按计数倒序排列，便于查看高频词汇
+		{{
+			Key: "$sort", Value: bson.M{
+				"count": -1,
+			},
+		}},
+	}
+
+	var results []struct {
+		Keyword string `bson:"keyword"`
+		Count   int32  `bson:"count"`
+	}
+
+	err := m.conn.Aggregate(ctx, &results, pipeline)
+	if err != nil {
+		return nil, err
+	}
+
+	// 转换为map结构
+	wordCloud := make(map[string]int32, len(results))
+	for _, result := range results {
+		wordCloud[result.Keyword] = result.Count
+	}
+
+	return wordCloud, nil
+}
+
+// GetUnitKW 统计某个unit下报表的关键词及个数，优先考虑性能
+func (m *mongoMapper) GetUnitKW(ctx context.Context, unitId bson.ObjectID) (map[string]int32, error) {
+	pipeline := mongo.Pipeline{
+		// 过滤：匹配指定unit且有关键词的报表
+		{{
+			Key: "$match", Value: bson.M{
+				"unit_id": unitId,
+				"keywords": bson.M{
+					"$exists": true,
+					"$ne":     nil,
+					"$not":    bson.M{"$size": 0},
+				},
+			},
+		}},
+		// 展开关键词数组，每个关键词成为一个文档
+		{{
+			Key: "$unwind", Value: "$keywords",
+		}},
+		// 按关键词分组并计数
+		{{
+			Key: "$group", Value: bson.M{
+				"_id":   "$keywords",
+				"count": bson.M{"$sum": 1},
+			},
+		}},
+		// 输出格式化
+		{{
+			Key: "$project", Value: bson.M{
+				"_id":     0,
+				"keyword": "$_id",
+				"count":   1,
+			},
+		}},
+		// 按计数倒序排列，便于查看高频词汇
+		{{
+			Key: "$sort", Value: bson.M{
+				"count": -1,
+			},
+		}},
+	}
+
+	var results []struct {
+		Keyword string `bson:"keyword"`
+		Count   int32  `bson:"count"`
+	}
+
+	err := m.conn.Aggregate(ctx, &results, pipeline)
+	if err != nil {
+		return nil, err
+	}
+
+	// 转换为map结构
+	wordCloud := make(map[string]int32, len(results))
+	for _, result := range results {
+		wordCloud[result.Keyword] = result.Count
+	}
+
+	return wordCloud, nil
 }

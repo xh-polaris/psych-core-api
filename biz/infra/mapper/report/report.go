@@ -2,7 +2,6 @@ package report
 
 import (
 	"github.com/xh-polaris/psych-core-api/pkg/core"
-	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"time"
 )
@@ -24,7 +23,8 @@ type Report struct {
 	Info        map[string]interface{} `bson:"info"`                // 额外信息
 
 	// 报表结果
-	Result *Result `bson:"result"` // 报表结果
+	Result   *Result  `bson:"result"`   // 报表结果
+	Keywords []string `bson:"keywords"` // 关键词
 }
 
 type Result struct {
@@ -70,18 +70,4 @@ func (t *Item) GetTextArray() (v []string, ok bool) {
 func (t *Item) GetNumberArray() (v []float64, ok bool) {
 	v, ok = t.Value.([]float64)
 	return
-}
-
-// GetKeywords 从报表结果中获取关键词数组
-func (r *Report) GetKeywords() []string {
-	// post服务中 应确保存储合法的Report（有非空result）
-	for _, item := range r.Result.Items {
-		if item.Key == "keywords" {
-			if keywords, ok := item.GetTextArray(); ok {
-				return keywords
-			}
-		}
-	}
-	logs.Errorf("[report mapper] get keywords failed for Report[id=%s] ", r.ID.String())
-	return nil
 }

@@ -13,6 +13,8 @@ const (
 	ErrDashboardAlarmUserStat             = 5006
 	ErrDashboardTotalUserStat             = 5007
 	ErrDashboardUnitStat                  = 5008
+	ErrDashboardEmotionRatio              = 5009
+	ErrDashboardGetUnitKeywords           = 5010
 )
 
 func init() {
@@ -24,6 +26,11 @@ func init() {
 	code.Register(
 		ErrDashboardGetUserKeywords,
 		"获取学生关键词失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrDashboardGetUnitKeywords,
+		"获取单位关键词云失败",
 		code.WithAffectStability(false),
 	)
 	code.Register(
@@ -54,6 +61,11 @@ func init() {
 	code.Register(
 		ErrDashboardUnitStat,
 		"单位统计失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrDashboardEmotionRatio,
+		"获取情绪分布失败",
 		code.WithAffectStability(false),
 	)
 }

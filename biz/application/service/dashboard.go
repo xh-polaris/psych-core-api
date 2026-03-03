@@ -6,6 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
+
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
@@ -21,12 +24,21 @@ import (
 )
 
 type IDashboardService interface {
+
+	// 管理端
+	DashboardListUnits(ctx context.Context, req *core_api.DashboardListUnitsReq) (*core_api.DashboardListUnitsResp, error)
+
+	// 数据看板
 	DashboardGetDataOverview(ctx context.Context, req *core_api.DashboardGetDataOverviewReq) (*core_api.DashboardGetDataOverviewResp, error)
 	DashboardGetDataTrend(ctx context.Context, req *core_api.DashboardGetDataTrendReq) (*core_api.DashboardGetDataTrendResp, error)
-	DashboardListUnits(ctx context.Context, req *core_api.DashboardListUnitsReq) (*core_api.DashboardListUnitsResp, error)
 	DashboardGetPsychTrend(ctx context.Context, req *core_api.DashboardGetPsychTrendReq) (*core_api.DashboardGetPsychTrendResp, error)
+
+	// 用户管理
 	DashboardListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (*core_api.DashboardListClassesResp, error)
 	DashboardListUsers(ctx context.Context, req *core_api.DashboardListUsersReq) (*core_api.DashboardListUsersResp, error)
+
+	// 对话记录
+
 }
 
 type DashboardService struct {
@@ -34,6 +46,8 @@ type DashboardService struct {
 	UnitMapper         unit.IMongoMapper
 	MessageMapper      message.MongoMapper
 	ConversationMapper conversation.IMongoMapper
+	ReportMapper       report.IMongoMapper
+	AlarmMapper        alarm.IMongoMapper
 }
 
 var DashboardServiceSet = wire.NewSet(
@@ -553,14 +567,119 @@ func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core
 		})
 	}
 
-	// 关键词词云：暂时留空（由 psych-post 后续补充）
-	keywords := make([]*core_api.Keyword, 0)
+	// 关键词词云
+	keywords, err := s.getKeywords(ctx, unitOID)
+	if err != nil {
+		logs.Errorf("get keywords error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrDashboardGetUserKeywords)
+	}
+
+	emoRatio, err := s.getEmotionRatio(ctx, unitOID)
+	if err != nil {
+		logs.Errorf("get emotion distribution error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrDashboardAlarmUserStat)
+	}
 
 	return &core_api.DashboardGetPsychTrendResp{
-		Risks:    riskDistributions,
-		Keywords: keywords,
-		Code:     0,
-		Msg:      "success",
+		EmotionRatio: emoRatio,
+		Risks:        riskDistributions,
+		Keywords:     keywords,
+		Code:         200,
+		Msg:          "success",
+	}, nil
+}
+
+func (s *DashboardService) getEmotionRatio(ctx context.Context, unitOID *bson.ObjectID) (*core_api.EmotionRatio, error) {
+	var (
+		total int64
+		err   error
+	)
+
+	if unitOID == nil {
+		total, err = s.UserMapper.Count(ctx)
+	} else {
+		total, err = s.UserMapper.CountByUnitID(ctx, *unitOID)
+	}
+
+	if err != nil {
+		logs.Errorf("count users error: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	if total == 0 {
+		return &core_api.EmotionRatio{Total: 0, Ratio: make(map[string]float64)}, nil
+	}
+
+	emotionDistribution, err := s.AlarmMapper.EmotionDistribution(ctx, unitOID)
+	if err != nil {
+		logs.Errorf("[AlarmMapper] get emotion distribution error: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+	if emotionDistribution == nil {
+		return &core_api.EmotionRatio{Total: total, Ratio: make(map[string]float64)}, nil
+	}
+
+	ratio := make(map[string]float64, len(*emotionDistribution))
+	for emo, cnt := range *emotionDistribution {
+		ratio[emo] = float64(cnt) // TODO cnt改为int32类型
+	}
+
+	return &core_api.EmotionRatio{
+		Ratio: ratio,
+		Total: total,
+	}, nil
+}
+
+func (s *DashboardService) getKeywords(ctx context.Context, unitOID *bson.ObjectID) (*core_api.Keywords, error) {
+	var (
+		total int64
+		kws   map[string]int32
+		err   error
+	)
+
+	if unitOID != nil {
+		// 返回某一单位关键词云的情况
+		total, err = s.UserMapper.CountByUnitID(ctx, *unitOID)
+		if err != nil {
+			logs.Errorf("count users in unit %s error: %s", unitOID.Hex(), errorx.ErrorWithoutStack(err))
+			return nil, err
+		}
+
+		if total == 0 {
+			return &core_api.Keywords{KeywordMap: make(map[string]int32), KeyTotal: 0}, nil
+		}
+
+		kws, err = s.ReportMapper.GetUnitKW(ctx, *unitOID)
+		if err != nil {
+			logs.Errorf("get keywords of unit %s error: %s", unitOID.Hex(), errorx.ErrorWithoutStack(err))
+			return nil, err
+		}
+	} else {
+		// 返回全部关键词云的情况
+		total, err = s.UserMapper.Count(ctx)
+		if err != nil {
+			logs.Errorf("count all users error: %s", errorx.ErrorWithoutStack(err))
+			return nil, err
+		}
+
+		if total == 0 {
+			return &core_api.Keywords{KeywordMap: make(map[string]int32), KeyTotal: 0}, nil
+		}
+
+		kws, err = s.ReportMapper.GetAllUnitsKW(ctx)
+		if err != nil {
+			logs.Errorf("get keywords of all units error: %s", errorx.ErrorWithoutStack(err))
+			return nil, err
+		}
+	}
+
+	if kws == nil {
+		kws = make(map[string]int32)
+	}
+
+	return &core_api.Keywords{
+		KeywordMap: kws,
+		KeyTotal:   int32(len(kws)),
 	}, nil
 }
 
@@ -685,16 +804,17 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 	}
 
 	// 补全dbUser相关信息
-	var msgStats map[bson.ObjectID]*message.MsgStats
+	var msgStats map[bson.ObjectID]*conversation.ConvStats
+	var keyWords map[bson.ObjectID][]string
 	var msgErr, kwErr error
 
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
 
 	// 获取对话统计信息
 	go func() {
 		defer wg.Done()
-		msgStats, msgErr = s.MessageMapper.BatchMessageStats(ctx, uids)
+		msgStats, msgErr = s.ConversationMapper.BatchConvStats(ctx, uids)
 		if msgErr != nil {
 			logs.Warnf("查询对话统计失败: %v", errorx.ErrorWithoutStack(msgErr))
 		}
@@ -703,9 +823,9 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 	// 获取keywords
 	go func() {
 		defer wg.Done()
-		// TODO 调用Post服务，获得所有用户的关键词
+		keyWords, kwErr = s.ReportMapper.BatchGetUserKeyWords(ctx, uids)
 		if kwErr != nil {
-			logs.Warnf("查询Post信息失败: %v", errorx.ErrorWithoutStack(kwErr))
+			logs.Errorf("查询关键词失败: %v", errorx.ErrorWithoutStack(kwErr))
 		}
 	}()
 
@@ -734,6 +854,9 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 		if msgStats[dbUser.ID] != nil {
 			riskUsers[i].TotalConversationRounds = msgStats[dbUser.ID].Rounds
 			riskUsers[i].LastConversationTime = msgStats[dbUser.ID].LatestTime
+		}
+		if keyWords[dbUser.ID] != nil {
+			riskUsers[i].Keywords = keyWords[dbUser.ID]
 		}
 	}
 
