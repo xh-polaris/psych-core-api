@@ -3,6 +3,7 @@ package mapper
 
 import (
 	"context"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/cst"
@@ -15,10 +16,11 @@ type IMongoMapper[T any] interface {
 	FindOneByFields(ctx context.Context, filter bson.M) (*T, error)
 	FindOne(ctx context.Context, id bson.ObjectID) (*T, error)
 	FindAllByFields(ctx context.Context, filter bson.M) ([]*T, error)
+	OrderedFindAllByFields(ctx context.Context, filter bson.M, opts options.Lister[options.FindOptions]) ([]*T, error)
 	Insert(ctx context.Context, data *T) error
 	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
 	ExistsByFields(ctx context.Context, filter bson.M) (bool, error)
-	CountByPeriod(ctx context.Context, start, end time.Time) (int64, error)
+	CountByPeriod(ctx context.Context, start, end time.Time) (int32, error)
 }
 
 type mongoMapper[T any] struct {
@@ -52,6 +54,14 @@ func (m *mongoMapper[T]) FindAllByFields(ctx context.Context, filter bson.M) ([]
 	return result, nil
 }
 
+func (m *mongoMapper[T]) OrderedFindAllByFields(ctx context.Context, filter bson.M, opts options.Lister[options.FindOptions]) ([]*T, error) {
+	var result []*T
+	if err := m.conn.Find(ctx, &result, filter, opts); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 // Insert 插入实体
 func (m *mongoMapper[T]) Insert(ctx context.Context, data *T) error {
 	_, err := m.conn.InsertOneNoCache(ctx, data)
@@ -71,7 +81,7 @@ func (m *mongoMapper[T]) ExistsByFields(ctx context.Context, filter bson.M) (boo
 }
 
 // CountByPeriod 统计指定时间段内的数量
-func (m *mongoMapper[T]) CountByPeriod(ctx context.Context, start, end time.Time) (int64, error) {
+func (m *mongoMapper[T]) CountByPeriod(ctx context.Context, start, end time.Time) (int32, error) {
 	timeFilter := bson.M{}
 
 	// start 为空，只限制上界：createTime < end
@@ -88,5 +98,6 @@ func (m *mongoMapper[T]) CountByPeriod(ctx context.Context, start, end time.Time
 		filter[cst.CreateTime] = timeFilter
 	}
 
-	return m.conn.CountDocuments(ctx, filter)
+	cnt, err := m.conn.CountDocuments(ctx, filter)
+	return int32(cnt), err
 }

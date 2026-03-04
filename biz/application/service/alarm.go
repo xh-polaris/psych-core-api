@@ -92,11 +92,11 @@ func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardL
 	completeAlarm, err2 := s.completeAlarm(ctx, alarms)
 
 	// 构建响应
-	hasNext := req.PaginationOptions.GetPage()*req.PaginationOptions.GetLimit() < total
+	hasNext := req.PaginationOptions.GetPage()*req.PaginationOptions.GetLimit() < int64(total)
 	return &core_api.DashboardListAlarmRecordsResp{
 		Records: completeAlarm,
 		Pagination: &basic.Pagination{
-			Total:   total,
+			Total:   int64(total),
 			Page:    req.PaginationOptions.GetPage(),
 			Limit:   req.PaginationOptions.GetLimit(),
 			HasNext: hasNext,

@@ -15,6 +15,11 @@ const (
 	ErrDashboardUnitStat                  = 5008
 	ErrDashboardEmotionRatio              = 5009
 	ErrDashboardGetUnitKeywords           = 5010
+	ErrDashboardGetUserInfo               = 5011 // 获取用户信息失败
+	ErrDashboardGetConversations          = 5012 // 获取用户对话记录失败
+	ErrDashboardGetConvMessages           = 5013 // 获取对话消息失败
+	ErrDashboardGetConvReports            = 5014 // 获取对话报表失败
+	ErrDashboardGenerateWordCloud         = 5015 // 生成词云失败
 )
 
 func init() {
@@ -31,6 +36,31 @@ func init() {
 	code.Register(
 		ErrDashboardGetUnitKeywords,
 		"获取单位关键词云失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrDashboardGetUserInfo,
+		"获取用户信息失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrDashboardGetConversations,
+		"获取用户对话记录失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrDashboardGetConvMessages,
+		"获取对话消息失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrDashboardGetConvReports,
+		"获取对话报表失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrDashboardGenerateWordCloud,
+		"生成词云失败",
 		code.WithAffectStability(false),
 	)
 	code.Register(

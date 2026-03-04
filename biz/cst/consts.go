@@ -69,6 +69,10 @@ const (
 	High   = "high"
 	Medium = "medium"
 	Low    = "low"
+
+	// 报表内容相关字段 应严格和psych-post字段统一
+	Keywords = "keywords"
+	Digest   = "digest"
 )
 
 // 原profile 前端字段相关

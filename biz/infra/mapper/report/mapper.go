@@ -30,6 +30,8 @@ type IMongoMapper interface {
 	FindAllByUser(ctx context.Context, userId bson.ObjectID) ([]*Report, error)
 	BatchFindUserLatest(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*Report, error)
 	BatchGetUserKeyWords(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID][]string, error)
+	FindByConversation(ctx context.Context, sessionId bson.ObjectID) (*Report, error)
+	BatchFindBySession(ctx context.Context, sessionIds []bson.ObjectID) (map[bson.ObjectID]*Report, error)
 	// 词云相关接口
 	GetAllUnitsKW(ctx context.Context) (map[string]int32, error)
 	GetUnitKW(ctx context.Context, unitId bson.ObjectID) (map[string]int32, error)
@@ -258,4 +260,39 @@ func (m *mongoMapper) GetUnitKW(ctx context.Context, unitId bson.ObjectID) (map[
 	}
 
 	return wordCloud, nil
+}
+
+// FindByConversation 根据对话ID查找报表
+func (m *mongoMapper) FindByConversation(ctx context.Context, sessionId bson.ObjectID) (*Report, error) {
+	var report Report
+	err := m.conn.FindOne(ctx, cacheKeyPrefix+sessionId.Hex(), &report, bson.M{"session": sessionId, cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
+	if err != nil {
+		return nil, err
+	}
+	return &report, nil
+}
+
+// BatchFindBySession 批量根据会话ID查找报表
+func (m *mongoMapper) BatchFindBySession(ctx context.Context, sessionIds []bson.ObjectID) (map[bson.ObjectID]*Report, error) {
+	if len(sessionIds) == 0 {
+		return make(map[bson.ObjectID]*Report), nil
+	}
+
+	var reports []*Report
+	filter := bson.M{
+		"session":  bson.M{cst.In: sessionIds},
+		cst.Status: bson.M{cst.NE: cst.DeletedStatus},
+	}
+
+	err := m.conn.Find(ctx, &reports, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[bson.ObjectID]*Report, len(reports))
+	for _, report := range reports {
+		result[report.Session] = report
+	}
+
+	return result, nil
 }

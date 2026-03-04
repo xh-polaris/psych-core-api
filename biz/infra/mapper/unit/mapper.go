@@ -25,8 +25,8 @@ type IMongoMapper interface {
 	Insert(ctx context.Context, unit *Unit) error
 	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
 	ExistsByPhone(ctx context.Context, phone string) (bool, error)
-	Count(ctx context.Context) (int64, error)
-	CountByPeriod(ctx context.Context, start, end time.Time) (int64, error)
+	Count(ctx context.Context) (int32, error)
+	CountByPeriod(ctx context.Context, start, end time.Time) (int32, error)
 	FindAll(ctx context.Context) ([]*Unit, error)
 }
 
@@ -54,8 +54,9 @@ func (m *mongoMapper) ExistsByPhone(ctx context.Context, phone string) (bool, er
 }
 
 // Count 统计单位数量
-func (m *mongoMapper) Count(ctx context.Context) (int64, error) {
-	return m.conn.CountDocuments(ctx, bson.M{})
+func (m *mongoMapper) Count(ctx context.Context) (int32, error) {
+	cnt, err := m.conn.CountDocuments(ctx, bson.M{})
+	return int32(cnt), err
 }
 
 // FindAll 查询所有单位（排除已删除）

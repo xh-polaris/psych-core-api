@@ -2,6 +2,8 @@ package conversation
 
 import (
 	"context"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/conf"
@@ -23,16 +25,19 @@ type IMongoMapper interface {
 	Insert(ctx context.Context, conv *Conversation) error
 	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
 	Exists(ctx context.Context, conversationId bson.ObjectID) (bool, error)
-	Count(ctx context.Context, unitId *bson.ObjectID) (int64, error)
-	CountByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int64, error)
+	Count(ctx context.Context, unitId *bson.ObjectID) (int32, error)
+	CountUnitConvByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
+	CountUserDailyConv(ctx context.Context, userId bson.ObjectID) (map[int32]int32, error)
 	BatchConvStats(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*ConvStats, error)
 	AverageDuration(ctx context.Context, unitId *bson.ObjectID) (float64, error)
 	AverageDurationByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (float64, error)
-	CountActiveUsers(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int64, error)
+	CountActiveUsers(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
+	FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error)
 }
 
 type mongoMapper struct {
 	conn *monc.Model
+	mapper.IMongoMapper[Conversation]
 }
 
 func NewConversationMongoMapper(config *conf.Config) IMongoMapper {
@@ -60,19 +65,24 @@ func (m *mongoMapper) Exists(ctx context.Context, conversationId bson.ObjectID) 
 }
 
 // Count 统计对话数量，unitId 为空表示全平台
-func (m *mongoMapper) Count(ctx context.Context, unitId *bson.ObjectID) (int64, error) {
+func (m *mongoMapper) Count(ctx context.Context, unitId *bson.ObjectID) (int32, error) {
 	if unitId == nil {
-		return m.conn.CountDocuments(ctx, bson.M{cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
+		cnt, err := m.conn.CountDocuments(ctx, bson.M{cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
+		return int32(cnt), err
 	}
 	return m.countWithUnitFilter(ctx, unitId, nil, nil)
 }
 
-// CountByPeriod 按时间范围统计对话数量
-func (m *mongoMapper) CountByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int64, error) {
+// CountUnitByPeriod 按时间范围统计对话数量
+func (m *mongoMapper) CountUnitConvByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error) {
 	return m.countWithUnitFilter(ctx, unitId, &start, &end)
 }
 
-func (m *mongoMapper) countWithUnitFilter(ctx context.Context, unitId *bson.ObjectID, start, end *time.Time) (int64, error) {
+func (m *mongoMapper) CountUserConvByPeriod(ctx context.Context, userId *bson.ObjectID, start, end time.Time) (int32, error) {
+	return 0, nil
+}
+
+func (m *mongoMapper) countWithUnitFilter(ctx context.Context, unitId *bson.ObjectID, start, end *time.Time) (int32, error) {
 	matchStage := bson.M{cst.Status: bson.M{cst.NE: cst.DeletedStatus}}
 	if start != nil && !start.IsZero() || end != nil && !end.IsZero() {
 		ct := bson.M{}
@@ -104,7 +114,7 @@ func (m *mongoMapper) countWithUnitFilter(ctx context.Context, unitId *bson.Obje
 	pipeline = append(pipeline, bson.M{"$count": "count"})
 
 	var result []struct {
-		Count int64 `bson:"count"`
+		Count int32 `bson:"count"`
 	}
 	if err := m.conn.Aggregate(ctx, &result, pipeline); err != nil {
 		logs.Errorf("[conversation mapper] count err: %s", errorx.ErrorWithoutStack(err))
@@ -174,7 +184,7 @@ func (m *mongoMapper) averageDurationWithFilter(ctx context.Context, unitId *bso
 
 	var result []struct {
 		Avg   float64 `bson:"avg"`
-		Count int64   `bson:"count"`
+		Count int32   `bson:"count"`
 	}
 	if err := m.conn.Aggregate(ctx, &result, pipeline); err != nil {
 		logs.Errorf("[conversation mapper] average duration err: %s", errorx.ErrorWithoutStack(err))
@@ -187,7 +197,7 @@ func (m *mongoMapper) averageDurationWithFilter(ctx context.Context, unitId *bso
 }
 
 // CountActiveUsers 统计活跃用户数：在给定时间段内（根据 endTime）有对话的去重用户数
-func (m *mongoMapper) CountActiveUsers(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int64, error) {
+func (m *mongoMapper) CountActiveUsers(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error) {
 	matchStage := bson.M{cst.Status: bson.M{cst.NE: cst.DeletedStatus}}
 
 	timeFilter := bson.M{}
@@ -224,7 +234,7 @@ func (m *mongoMapper) CountActiveUsers(ctx context.Context, unitId *bson.ObjectI
 	)
 
 	var result []struct {
-		Count int64 `bson:"count"`
+		Count int32 `bson:"count"`
 	}
 	if err := m.conn.Aggregate(ctx, &result, pipeline); err != nil {
 		logs.Errorf("[conversation mapper] count active users err: %s", errorx.ErrorWithoutStack(err))
@@ -282,4 +292,64 @@ func (m *mongoMapper) BatchConvStats(ctx context.Context, userIds []bson.ObjectI
 	}
 
 	return stats, nil
+}
+
+// CountUserDailyConv 查找某用户过去一周内每天的对话数量
+// 返回一个map[int32]int32 (周1~7 → conv count的映射)
+func (m *mongoMapper) CountUserDailyConv(ctx context.Context, userId bson.ObjectID) (map[int32]int32, error) {
+	now := time.Now()
+	// 获取一周前的时间
+	oneWeekAgo := now.AddDate(0, 0, -7)
+
+	// 聚合管道
+	pipeline := []bson.M{
+		// 匹配特定用户和时间范围的对话记录
+		{"$match": bson.M{
+			cst.UserID: userId,
+			cst.Status: bson.M{cst.NE: cst.DeletedStatus},
+			cst.CreateTime: bson.M{
+				cst.GT: oneWeekAgo,
+				cst.LT: now,
+			},
+		}},
+		// 按照星期几分组并计数
+		{"$group": bson.M{
+			"_id":   bson.M{"$dayOfWeek": "$" + cst.CreateTime}, // 提取星期几 (1=周日, 2=周一, ..., 7=周六)
+			"count": bson.M{"$sum": 1},
+		}},
+		// 排序
+		{"$sort": bson.M{"_id": 1}},
+	}
+
+	// 执行聚合查询
+	var results []struct {
+		DayOfWeek int32 `bson:"_id"`
+		Count     int32 `bson:"count"`
+	}
+
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
+		logs.Errorf("[conversation mapper] weekly conversation stats aggregate err:%s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	// 构建结果映射，将MongoDB的星期几转换为标准星期几（1=周一，7=周日）
+	stats := make(map[int32]int32)
+	for _, result := range results {
+		// MongoDB的$dayOfWeek: 1=周日, 2=周一, ..., 7=周六
+		// 转换为: 1=周一, 2=周二, ..., 7=周日
+		var standardDay int32
+		if result.DayOfWeek == 1 {
+			standardDay = 7 // 周日
+		} else {
+			standardDay = result.DayOfWeek - 1 // 周一到周六
+		}
+		stats[standardDay] = result.Count
+	}
+
+	return stats, nil
+}
+
+func (m *mongoMapper) FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error) {
+	// 要过滤已删除的
+	return m.OrderedFindAllByFields(ctx, bson.M{cst.UserID: userId, cst.Status: bson.M{cst.NE: cst.DeletedStatus}}, options.Find().SetSort(bson.M{cst.UpdateTime: -1}))
 }

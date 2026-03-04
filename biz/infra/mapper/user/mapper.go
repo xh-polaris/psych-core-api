@@ -32,12 +32,12 @@ type IMongoMapper interface {
 	FindAllByUnitID(ctx context.Context, unitId bson.ObjectID) ([]*User, error)
 	BatchFindByIDs(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*User, error)
 	CountByClasses(ctx context.Context, unitId bson.ObjectID, grade, class []int32) ([]*ClassStatResult, error)
-	Count(ctx context.Context) (int64, error)
-	CountByPeriod(ctx context.Context, start, end time.Time) (int64, error)
-	CountByUnitID(ctx context.Context, unitId bson.ObjectID) (int64, error)
-	CountByUnitIDAndPeriod(ctx context.Context, unitId bson.ObjectID, start, end time.Time) (int64, error)
-	CountAlarmUsers(ctx context.Context, unitId *bson.ObjectID) (int64, error)
-	CountAlarmUsersByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int64, error)
+	Count(ctx context.Context) (int32, error)
+	CountByPeriod(ctx context.Context, start, end time.Time) (int32, error)
+	CountByUnitID(ctx context.Context, unitId bson.ObjectID) (int32, error)
+	CountByUnitIDAndPeriod(ctx context.Context, unitId bson.ObjectID, start, end time.Time) (int32, error)
+	CountAlarmUsers(ctx context.Context, unitId *bson.ObjectID) (int32, error)
+	CountAlarmUsersByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 	RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID) ([]*RiskStat, error)
 }
 
@@ -80,16 +80,17 @@ func (m *mongoMapper) FindAllByUnitID(ctx context.Context, unitId bson.ObjectID)
 }
 
 // CountByUnitID 按单位统计用户数量（排除已删除）
-func (m *mongoMapper) CountByUnitID(ctx context.Context, unitId bson.ObjectID) (int64, error) {
+func (m *mongoMapper) CountByUnitID(ctx context.Context, unitId bson.ObjectID) (int32, error) {
 	filter := bson.M{
 		cst.UnitID: unitId,
 		cst.Status: bson.M{cst.NE: cst.DeletedStatus},
 	}
-	return m.conn.CountDocuments(ctx, filter)
+	cnt, err := m.conn.CountDocuments(ctx, filter)
+	return int32(cnt), err
 }
 
 // CountByUnitIDAndPeriod 按单位及时间范围统计用户数量（排除已删除）
-func (m *mongoMapper) CountByUnitIDAndPeriod(ctx context.Context, unitId bson.ObjectID, start, end time.Time) (int64, error) {
+func (m *mongoMapper) CountByUnitIDAndPeriod(ctx context.Context, unitId bson.ObjectID, start, end time.Time) (int32, error) {
 	timeFilter := bson.M{}
 	if !start.IsZero() {
 		timeFilter[cst.GT] = start
@@ -106,7 +107,8 @@ func (m *mongoMapper) CountByUnitIDAndPeriod(ctx context.Context, unitId bson.Ob
 		filter[cst.CreateTime] = timeFilter
 	}
 
-	return m.conn.CountDocuments(ctx, filter)
+	cnt, err := m.conn.CountDocuments(ctx, filter)
+	return int32(cnt), err
 }
 
 // BatchFindByIDs 根据UserID切片批量查询用户
@@ -189,12 +191,13 @@ func (m *mongoMapper) CountByClasses(ctx context.Context, unitId bson.ObjectID, 
 }
 
 // Count 统计用户数量
-func (m *mongoMapper) Count(ctx context.Context) (int64, error) {
-	return m.conn.CountDocuments(ctx, bson.M{})
+func (m *mongoMapper) Count(ctx context.Context) (int32, error) {
+	cnt, err := m.conn.CountDocuments(ctx, bson.M{})
+	return int32(cnt), err
 }
 
 // CountAlarmUsers 统计高风险用户数量（riskLevel == high），可选按单位过滤
-func (m *mongoMapper) CountAlarmUsers(ctx context.Context, unitId *bson.ObjectID) (int64, error) {
+func (m *mongoMapper) CountAlarmUsers(ctx context.Context, unitId *bson.ObjectID) (int32, error) {
 	filter := bson.M{
 		"riskLevel": RiskLevelStoI[cst.High],
 		cst.Status:  bson.M{cst.NE: cst.DeletedStatus},
@@ -202,11 +205,13 @@ func (m *mongoMapper) CountAlarmUsers(ctx context.Context, unitId *bson.ObjectID
 	if unitId != nil {
 		filter[cst.UnitID] = *unitId
 	}
-	return m.conn.CountDocuments(ctx, filter)
+
+	cnt, err := m.conn.CountDocuments(ctx, filter)
+	return int32(cnt), err
 }
 
 // CountAlarmUsersByPeriod 统计高风险用户数量（riskLevel == high），可选按单位和时间范围过滤
-func (m *mongoMapper) CountAlarmUsersByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int64, error) {
+func (m *mongoMapper) CountAlarmUsersByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error) {
 	timeFilter := bson.M{}
 	if !start.IsZero() {
 		timeFilter["$gte"] = start
@@ -226,14 +231,15 @@ func (m *mongoMapper) CountAlarmUsersByPeriod(ctx context.Context, unitId *bson.
 		filter[cst.CreateTime] = timeFilter
 	}
 
-	return m.conn.CountDocuments(ctx, filter)
+	cnt, err := m.conn.CountDocuments(ctx, filter)
+	return int32(cnt), err
 }
 
 // RiskStat 风险等级 + 性别分布
 type RiskStat struct {
 	Level  int32 `bson:"_id.level"`
 	Gender int32 `bson:"_id.gender"`
-	Count  int64 `bson:"count"`
+	Count  int32 `bson:"count"`
 }
 
 // RiskDistributionStats 统计风险等级分布（按性别拆分），unitId 为空表示全平台

@@ -1,6 +1,7 @@
 package report
 
 import (
+	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/pkg/core"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"time"
@@ -70,4 +71,13 @@ func (t *Item) GetTextArray() (v []string, ok bool) {
 func (t *Item) GetNumberArray() (v []float64, ok bool) {
 	v, ok = t.Value.([]float64)
 	return
+}
+
+func (rpt *Report) GetDigest() string {
+	for _, item := range rpt.Result.Items {
+		if item.Key == cst.Digest {
+			return item.Value.(string)
+		}
+	}
+	return ""
 }

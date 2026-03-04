@@ -593,7 +593,7 @@ func DashboardUserConvRecords(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.DashboardUserConvRecordsResp)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.DashboardService.DashboardUserConvRecords(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }

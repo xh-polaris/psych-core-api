@@ -538,6 +538,8 @@ github.com/xh-polaris/psych-idl v0.0.0-20260303094703-b909b9053878 h1:oTNBFs8O59
 github.com/xh-polaris/psych-idl v0.0.0-20260303094703-b909b9053878/go.mod h1:Mq9OKYzoq5fzibYWoxdO0xsybjShIVJ4XLKu/IpVWHw=
 github.com/xh-polaris/psych-idl v0.0.0-20260303143458-3d2a0003c860 h1:5V0lXzGxZPBNWgx3i8T6jinftMkoCqg9P4yXltJUrRc=
 github.com/xh-polaris/psych-idl v0.0.0-20260303143458-3d2a0003c860/go.mod h1:Mq9OKYzoq5fzibYWoxdO0xsybjShIVJ4XLKu/IpVWHw=
+github.com/xh-polaris/psych-idl v0.0.0-20260304104418-2eaa1edf5607 h1:bnTCIqiD5Vnq7ibJjjP+OjPLfSjhH2xsl/G6LM1G0Yw=
+github.com/xh-polaris/psych-idl v0.0.0-20260304104418-2eaa1edf5607/go.mod h1:Mq9OKYzoq5fzibYWoxdO0xsybjShIVJ4XLKu/IpVWHw=
 github.com/yanyiwu/gojieba v1.4.6 h1:9oKbZijSHBdoTabXK34romSWj4aQLvs+j1ctIQjSxPk=
 github.com/yanyiwu/gojieba v1.4.6/go.mod h1:JUq4DddFVGdHXJHxxepxRmhrKlDpaBxR8O28v6fKYLY=
 github.com/yargevad/filepathx v1.0.0 h1:SYcT+N3tYGi+NvazubCNlvgIPbzAk7i7y2dwg3I5FYc=

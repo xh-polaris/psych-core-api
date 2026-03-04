@@ -27,7 +27,7 @@ const (
 type IMongoMapper interface {
 	Insert(ctx context.Context, msg *Alarm) error
 	RetrieveByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time, opt *options.FindOptionsBuilder) ([]*Alarm, error)
-	CountByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (int64, error)
+	CountByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (int32, error)
 	Exists(ctx context.Context, id bson.ObjectID) (bool, error)
 	AggregateStats(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (*OverviewStats, error)
 	EmotionDistribution(ctx context.Context, unitId *bson.ObjectID) (*EmotionDistribution, error)
@@ -70,7 +70,7 @@ func (m *mongoMapper) RetrieveByTime(ctx context.Context, unitID bson.ObjectID, 
 }
 
 // CountByTime 计数某Unit下一段时间内的所有预警信息 如时间范围传入零值time.Time{} 则查询所有
-func (m *mongoMapper) CountByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (int64, error) {
+func (m *mongoMapper) CountByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (int32, error) {
 	tf := bson.M{}
 	if !start.IsZero() {
 		tf[cst.GT] = start
@@ -84,12 +84,12 @@ func (m *mongoMapper) CountByTime(ctx context.Context, unitID bson.ObjectID, sta
 		f[cst.CreateTime] = tf
 	}
 
-	c, err := m.conn.CountDocuments(ctx, f)
+	cnt, err := m.conn.CountDocuments(ctx, f)
 	if err != nil {
 		logs.Errorf("[alarm mapper] count err:%s", errorx.ErrorWithoutStack(err))
 		return 0, err
 	}
-	return c, nil
+	return int32(cnt), nil
 }
 
 func (m *mongoMapper) Exists(ctx context.Context, userID bson.ObjectID) (bool, error) {
@@ -114,7 +114,7 @@ type OverviewStats struct {
 
 type weekData []struct {
 	ID    int32 `bson:"_id"`
-	Count int64 `bson:"count"`
+	Count int32 `bson:"count"`
 }
 
 // AggregateStats 计算预警统计信息：当前和较上周变化
