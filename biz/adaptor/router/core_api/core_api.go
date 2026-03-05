@@ -29,10 +29,12 @@ func Register(r *server.Hertz) {
 		_dashboard.POST("/alarm_records", append(_dashboardlistalarmrecordsMw(), core_api.DashboardListAlarmRecords)...)
 		_dashboard.POST("/classes", append(_dashboardlistclassesMw(), core_api.DashboardListClasses)...)
 		_dashboard.POST("/conversation_records", append(_dashboarduserconvrecordsMw(), core_api.DashboardUserConvRecords)...)
+		_dashboard.POST("/get_report", append(_dashboardgetreportMw(), core_api.DashboardGetReport)...)
 		_dashboard.POST("/overview", append(_dashboardgetdataoverviewMw(), core_api.DashboardGetDataOverview)...)
 		_dashboard.POST("/psych_trend", append(_dashboardgetpsychtrendMw(), core_api.DashboardGetPsychTrend)...)
 		_dashboard.POST("/trend", append(_dashboardgetdatatrendMw(), core_api.DashboardGetDataTrend)...)
 		_dashboard.POST("/units", append(_dashboardlistunitsMw(), core_api.DashboardListUnits)...)
+		_dashboard.POST("/update_alarm", append(_dashboardupdatealarmMw(), core_api.DashboardUpdateAlarm)...)
 		_dashboard.POST("/users", append(_dashboardlistusersMw(), core_api.DashboardListUsers)...)
 	}
 	{

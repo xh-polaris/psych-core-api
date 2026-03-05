@@ -41,11 +41,13 @@ const (
 	Contact        = "contact"
 	Password       = "password"
 	RiskLevel      = "riskLevel"
+	Remark         = "remark"
 
 	Status        = "status"
 	DeletedStatus = -1
 	Processed     = "processed" // 预警状态-已处理
 	Pending       = "pending"   // 预警状态-待处理
+	Emotion       = "emotion"
 	Meta          = "$meta"
 	TextScore     = "textScore"
 	Score         = "score"

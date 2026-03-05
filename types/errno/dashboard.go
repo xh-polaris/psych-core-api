@@ -10,8 +10,8 @@ const (
 	ErrDashboardActiveUserStat            = 5003 // 活跃用户统计失败
 	ErrDashboardConversationStat          = 5004 // 对话数量统计失败
 	ErrDashboardAvgDurationStat           = 5005 // 对话时长统计失败
-	ErrDashboardAlarmUserStat             = 5006
-	ErrDashboardTotalUserStat             = 5007
+	ErrDashboardAlarmUserStat             = 5006 // 预警用户统计失败
+	ErrDashboardTotalUserStat             = 5007 // 总用户统计失败
 	ErrDashboardUnitStat                  = 5008
 	ErrDashboardEmotionRatio              = 5009
 	ErrDashboardGetUnitKeywords           = 5010
@@ -20,6 +20,7 @@ const (
 	ErrDashboardGetConvMessages           = 5013 // 获取对话消息失败
 	ErrDashboardGetConvReports            = 5014 // 获取对话报表失败
 	ErrDashboardGenerateWordCloud         = 5015 // 生成词云失败
+	ErrDashboardGetReport                 = 5016 // 获取报表失败
 )
 
 func init() {
@@ -96,6 +97,11 @@ func init() {
 	code.Register(
 		ErrDashboardEmotionRatio,
 		"获取情绪分布失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrDashboardGetReport,
+		"获取报表失败",
 		code.WithAffectStability(false),
 	)
 }

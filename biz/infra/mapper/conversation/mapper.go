@@ -50,11 +50,6 @@ func (m *mongoMapper) Insert(ctx context.Context, conv *Conversation) error {
 	return err
 }
 
-func (m *mongoMapper) UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error {
-	_, err := m.conn.UpdateOneNoCache(ctx, bson.M{cst.ID: id}, bson.M{cst.Set: update})
-	return err
-}
-
 func (m *mongoMapper) Exists(ctx context.Context, conversationId bson.ObjectID) (bool, error) {
 	count, err := m.conn.CountDocuments(ctx, bson.M{cst.ID: conversationId, cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
 	if err != nil {

@@ -2,10 +2,11 @@ package service
 
 import (
 	"context"
-	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
-	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"sync"
 	"time"
+
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
@@ -23,6 +24,7 @@ import (
 type IAlarmService interface {
 	Overview(ctx context.Context, req *core_api.DashboardGetAlarmOverviewReq) (resp *core_api.DashboardGetAlarmOverviewResp, err error)
 	ListRecords(ctx context.Context, req *core_api.DashboardListAlarmRecordsReq) (resp *core_api.DashboardListAlarmRecordsResp, err error)
+	UpdateAlarm(ctx context.Context, req *core_api.DashboardUpdateAlarmReq) (resp *core_api.DashboardUpdateAlarmResp, err error)
 }
 
 type AlarmService struct {
@@ -190,4 +192,65 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 	}
 
 	return records, nil
+}
+
+func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardUpdateAlarmReq) (resp *core_api.DashboardUpdateAlarmResp, err error) {
+	// 参数校验
+	if req.Id == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "报警ID"))
+	}
+
+	if req.Alarm == nil {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "报警信息"))
+	}
+
+	// 解析报警ID
+	alarmId, err := bson.ObjectIDFromHex(req.Id)
+	if err != nil {
+		logs.Errorf("parse alarm id error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "报警ID"))
+	}
+
+	// 构建更新字段
+	update := bson.M{}
+
+	// 更新情绪状态
+	if req.Alarm.Emotion != "" {
+		emotionValue, ok := alarm.EmotionStoI[req.Alarm.Emotion]
+		if !ok {
+			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "情绪状态"))
+		}
+		update[cst.Emotion] = emotionValue
+	}
+
+	// 更新关键词
+	if len(req.Alarm.Keywords) > 0 {
+		update[cst.Keywords] = req.Alarm.Keywords
+	}
+
+	// 更新处理状态
+	if req.Alarm.Status != "" {
+		statusValue, ok := alarm.StatusStoI[req.Alarm.Status]
+		if !ok {
+			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "处理状态"))
+		}
+		update[cst.Status] = statusValue
+	}
+
+	// 更新时间
+	update[cst.UpdateTime] = time.Now()
+
+	// 执行更新
+	if len(update) > 0 {
+		if err = s.AlarmMapper.UpdateFields(ctx, alarmId, update); err != nil {
+			logs.Errorf("update alarm error: %s", errorx.ErrorWithoutStack(err))
+			return nil, err
+		}
+	}
+
+	// 构造返回结果
+	return &core_api.DashboardUpdateAlarmResp{
+		Code: 200,
+		Msg:  "success",
+	}, nil
 }

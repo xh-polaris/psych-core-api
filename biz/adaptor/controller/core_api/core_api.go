@@ -597,3 +597,35 @@ func DashboardUserConvRecords(ctx context.Context, c *app.RequestContext) {
 	resp, err := p.DashboardService.DashboardUserConvRecords(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
+
+// DashboardUpdateAlarm .
+// @router /dashboard/update_alarm [POST]
+func DashboardUpdateAlarm(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.DashboardUpdateAlarmReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.AlarmService.UpdateAlarm(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// DashboardGetReport .
+// @router /dashboard/get_report [POST]
+func DashboardGetReport(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.DashboardGetReportReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.DashboardService.DashboardGetReport(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}

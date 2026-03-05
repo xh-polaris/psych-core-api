@@ -3,6 +3,7 @@ package alarm
 import (
 	"context"
 	"errors"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
@@ -26,6 +27,7 @@ const (
 
 type IMongoMapper interface {
 	Insert(ctx context.Context, msg *Alarm) error
+	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
 	RetrieveByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time, opt *options.FindOptionsBuilder) ([]*Alarm, error)
 	CountByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (int32, error)
 	Exists(ctx context.Context, id bson.ObjectID) (bool, error)
@@ -35,16 +37,12 @@ type IMongoMapper interface {
 
 type mongoMapper struct {
 	conn *monc.Model
+	mapper.IMongoMapper[Alarm]
 }
 
 func NewAlarmMongoMapper(config *conf.Config) IMongoMapper {
 	conn := monc.MustNewModel(config.Mongo.URL, config.Mongo.DB, collection, config.CacheConf)
 	return &mongoMapper{conn: conn}
-}
-
-func (m *mongoMapper) Insert(ctx context.Context, msg *Alarm) error {
-	_, err := m.conn.InsertOneNoCache(ctx, msg)
-	return err
 }
 
 // RetrieveByTime 返回某Unit下一段时间内的所有预警信息 如时间范围传入零值time.Time{} 则查询所有

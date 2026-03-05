@@ -160,3 +160,13 @@ func _dashboarduserconvrecordsMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _dashboardgetreportMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardupdatealarmMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

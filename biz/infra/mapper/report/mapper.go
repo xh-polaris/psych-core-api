@@ -53,10 +53,6 @@ func (m *mongoMapper) InsertOne(ctx context.Context, report *Report) error {
 	return err
 }
 
-func (m *mongoMapper) FindOne(ctx context.Context, id bson.ObjectID) (*Report, error) {
-	return m.FindOne(ctx, id)
-}
-
 func (m *mongoMapper) ExistByUser(ctx context.Context, userId bson.ObjectID) (bool, error) {
 	return m.ExistsByFields(ctx, bson.M{cst.UserID: userId})
 }
@@ -71,7 +67,7 @@ func (m *mongoMapper) FindUserLatest(ctx context.Context, userId bson.ObjectID) 
 	return report, nil
 }
 
-// BatchFindLatest 查找某单位下一批用户的最新报表，注意报表有可能不存在
+// BatchFindUserLatest 查找某单位下一批用户的最新报表，注意报表有可能不存在
 func (m *mongoMapper) BatchFindUserLatest(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*Report, error) {
 	if len(userIds) == 0 {
 		return make(map[bson.ObjectID]*Report), nil
@@ -128,7 +124,7 @@ func (m *mongoMapper) BatchGetUserKeyWords(ctx context.Context, userIds []bson.O
 	for _, userId := range userIds {
 		report := reports[userId]
 		// 没有报表或报表结果为 nil，关键词为空切片
-		if report == nil || report.Result == nil {
+		if report == nil || report.Keywords == nil {
 			result[userId] = []string{}
 			continue
 		}
@@ -149,7 +145,7 @@ func (m *mongoMapper) GetAllUnitsKW(ctx context.Context) (map[string]int32, erro
 		// 过滤：只处理有关键词的报表
 		{{
 			Key: "$match", Value: bson.M{
-				"keywords": bson.M{
+				cst.Keywords: bson.M{
 					"$exists": true,
 					"$ne":     nil,
 					"$not":    bson.M{"$size": 0},
@@ -208,8 +204,8 @@ func (m *mongoMapper) GetUnitKW(ctx context.Context, unitId bson.ObjectID) (map[
 		// 过滤：匹配指定unit且有关键词的报表
 		{{
 			Key: "$match", Value: bson.M{
-				"unit_id": unitId,
-				"keywords": bson.M{
+				cst.UnitID: unitId,
+				cst.Keywords: bson.M{
 					"$exists": true,
 					"$ne":     nil,
 					"$not":    bson.M{"$size": 0},
@@ -265,7 +261,7 @@ func (m *mongoMapper) GetUnitKW(ctx context.Context, unitId bson.ObjectID) (map[
 // FindByConversation 根据对话ID查找报表
 func (m *mongoMapper) FindByConversation(ctx context.Context, sessionId bson.ObjectID) (*Report, error) {
 	var report Report
-	err := m.conn.FindOne(ctx, cacheKeyPrefix+sessionId.Hex(), &report, bson.M{"session": sessionId, cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
+	err := m.conn.FindOne(ctx, cacheKeyPrefix+sessionId.Hex(), &report, bson.M{cst.ConversationID: sessionId, cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
 	if err != nil {
 		return nil, err
 	}
@@ -280,8 +276,8 @@ func (m *mongoMapper) BatchFindBySession(ctx context.Context, sessionIds []bson.
 
 	var reports []*Report
 	filter := bson.M{
-		"session":  bson.M{cst.In: sessionIds},
-		cst.Status: bson.M{cst.NE: cst.DeletedStatus},
+		cst.ConversationID: bson.M{cst.In: sessionIds},
+		cst.Status:         bson.M{cst.NE: cst.DeletedStatus},
 	}
 
 	err := m.conn.Find(ctx, &reports, filter)
@@ -291,7 +287,7 @@ func (m *mongoMapper) BatchFindBySession(ctx context.Context, sessionIds []bson.
 
 	result := make(map[bson.ObjectID]*Report, len(reports))
 	for _, report := range reports {
-		result[report.Session] = report
+		result[report.ConversationID] = report
 	}
 
 	return result, nil

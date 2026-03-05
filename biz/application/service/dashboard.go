@@ -3,11 +3,12 @@ package service
 import (
 	"context"
 	"errors"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 	"sort"
 	"strconv"
 	"sync"
 	"time"
+
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"github.com/xh-polaris/psych-core-api/biz/domain/his"
 
@@ -44,6 +45,7 @@ type IDashboardService interface {
 
 	// 对话记录
 	DashboardUserConvRecords(ctx context.Context, req *core_api.DashboardUserConvRecordsReq) (*core_api.DashboardUserConvRecordsResp, error)
+	DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error)
 }
 
 type DashboardService struct {
@@ -933,7 +935,7 @@ func (s *DashboardService) getUserConvDetails(ctx context.Context, userOID bson.
 			}
 			// 报表存在，正常填入摘要
 			dgstMu.Lock()
-			digests[userOID] = rpt.GetDigest()
+			digests[userOID] = rpt.Digest
 			dgstMu.Unlock()
 
 			// 获取所有对话历史消息
@@ -1028,4 +1030,28 @@ func (s *DashboardService) getPagedUserConvs(ctx context.Context, userOID bson.O
 	}
 
 	return pagedConvs, pagination, nil
+}
+
+func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error) {
+	convOID, err := bson.ObjectIDFromHex(req.ConversationId)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
+	}
+
+	rpt, err := s.ReportMapper.FindByConversation(ctx, convOID)
+	if err != nil {
+		logs.Errorf("get report error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrDashboardGetReport)
+	}
+
+	return &core_api.DashboardGetReportResp{
+		Title:     rpt.Title,
+		Keywords:  rpt.Keywords,
+		Digest:    rpt.Digest,
+		Emotion:   rpt.Emotion,
+		Body:      rpt.Body,
+		NeedAlarm: rpt.NeedAlarm,
+		Code:      200,
+		Msg:       "success",
+	}, nil
 }
