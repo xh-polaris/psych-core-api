@@ -220,7 +220,7 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 	}
 
 	// 获得用户
-	userDAO, err := u.UserMapper.FindOne(ctx, userId)
+	userDAO, err := u.UserMapper.FindOneById(ctx, userId)
 	if err != nil {
 		logs.Errorf("find user error: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
@@ -366,7 +366,7 @@ func (u *UserService) UserUpdatePassword(ctx context.Context, req *core_api.User
 	// 密码
 	case cst.AuthTypePassword:
 		// 获取密码
-		userDAO, err = u.UserMapper.FindOne(ctx, userId)
+		userDAO, err = u.UserMapper.FindOneById(ctx, userId)
 		if err != nil {
 			logs.Errorf("find user by phone error: %s", errorx.ErrorWithoutStack(err))
 			return nil, err

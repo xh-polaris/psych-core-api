@@ -14,7 +14,7 @@ import (
 
 type IMongoMapper[T any] interface {
 	FindOneByFields(ctx context.Context, filter bson.M) (*T, error)
-	FindOne(ctx context.Context, id bson.ObjectID) (*T, error)
+	FindOneById(ctx context.Context, id bson.ObjectID) (*T, error)
 	FindAllByFields(ctx context.Context, filter bson.M) ([]*T, error)
 	OrderedFindAllByFields(ctx context.Context, filter bson.M, opts options.Lister[options.FindOptions]) ([]*T, error)
 	Insert(ctx context.Context, data *T) error
@@ -40,8 +40,8 @@ func (m *mongoMapper[T]) FindOneByFields(ctx context.Context, filter bson.M) (*T
 	return result, nil
 }
 
-// FindOne 根据ID查询实体
-func (m *mongoMapper[T]) FindOne(ctx context.Context, id bson.ObjectID) (*T, error) {
+// FindOneById 根据ID查询实体
+func (m *mongoMapper[T]) FindOneById(ctx context.Context, id bson.ObjectID) (*T, error) {
 	return m.FindOneByFields(ctx, bson.M{cst.ID: id})
 }
 

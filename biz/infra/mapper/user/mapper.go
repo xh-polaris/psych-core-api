@@ -24,7 +24,7 @@ const (
 type IMongoMapper interface {
 	FindOneByCode(ctx context.Context, phone string) (*User, error)
 	FindOneByCodeAndUnitID(ctx context.Context, phone string, unitId bson.ObjectID) (*User, error)
-	FindOne(ctx context.Context, id bson.ObjectID) (*User, error)
+	FindOneById(ctx context.Context, id bson.ObjectID) (*User, error)
 	Insert(ctx context.Context, user *User) error
 	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
 	ExistsByCode(ctx context.Context, phone string) (bool, error)

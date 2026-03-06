@@ -15,16 +15,14 @@ import (
 
 var _ IMongoMapper = (*mongoMapper)(nil)
 
-var Mapper IMongoMapper
-
 const (
 	collection     = "report"
 	cacheKeyPrefix = "cache:report:"
 )
 
 type IMongoMapper interface {
-	InsertOne(ctx context.Context, report *Report) error
-	FindOne(ctx context.Context, id bson.ObjectID) (*Report, error)
+	Insert(ctx context.Context, rep *Report) error
+	FindOneById(ctx context.Context, id bson.ObjectID) (*Report, error)
 	ExistByUser(ctx context.Context, userId bson.ObjectID) (bool, error)
 	FindUserLatest(ctx context.Context, userId bson.ObjectID) (*Report, error)
 	FindAllByUser(ctx context.Context, userId bson.ObjectID) ([]*Report, error)
@@ -44,13 +42,7 @@ type mongoMapper struct {
 
 func NewReportMongoMapper(config *conf.Config) IMongoMapper {
 	conn := monc.MustNewModel(config.Mongo.URL, config.Mongo.DB, collection, config.CacheConf)
-	Mapper = &mongoMapper{conn: conn}
-	return Mapper
-}
-
-func (m *mongoMapper) InsertOne(ctx context.Context, report *Report) error {
-	_, err := m.conn.InsertOne(ctx, cacheKeyPrefix+report.ID.Hex(), report)
-	return err
+	return &mongoMapper{conn: conn, IMongoMapper: mapper.NewMongoMapper[Report](conn)}
 }
 
 func (m *mongoMapper) ExistByUser(ctx context.Context, userId bson.ObjectID) (bool, error) {

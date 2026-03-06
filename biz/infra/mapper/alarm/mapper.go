@@ -26,11 +26,11 @@ const (
 )
 
 type IMongoMapper interface {
-	Insert(ctx context.Context, msg *Alarm) error
+	Insert(ctx context.Context, alarm *Alarm) error
 	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
 	RetrieveByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time, opt *options.FindOptionsBuilder) ([]*Alarm, error)
 	CountByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (int32, error)
-	Exists(ctx context.Context, id bson.ObjectID) (bool, error)
+	ExistsById(ctx context.Context, id bson.ObjectID) (bool, error)
 	AggregateStats(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (*OverviewStats, error)
 	EmotionDistribution(ctx context.Context, unitId *bson.ObjectID) (*EmotionDistribution, error)
 }
@@ -42,8 +42,13 @@ type mongoMapper struct {
 
 func NewAlarmMongoMapper(config *conf.Config) IMongoMapper {
 	conn := monc.MustNewModel(config.Mongo.URL, config.Mongo.DB, collection, config.CacheConf)
-	return &mongoMapper{conn: conn}
+	return &mongoMapper{conn: conn, IMongoMapper: mapper.NewMongoMapper[Alarm](conn)}
 }
+
+//func (m *mongoMapper) Insert(ctx context.Context, alarm *Alarm) error {
+//	_, err := m.conn.InsertOneNoCache(ctx, alarm)
+//	return err
+//}
 
 // RetrieveByTime 返回某Unit下一段时间内的所有预警信息 如时间范围传入零值time.Time{} 则查询所有
 func (m *mongoMapper) RetrieveByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time, opt *options.FindOptionsBuilder) (alarms []*Alarm, err error) {
@@ -90,7 +95,7 @@ func (m *mongoMapper) CountByTime(ctx context.Context, unitID bson.ObjectID, sta
 	return int32(cnt), nil
 }
 
-func (m *mongoMapper) Exists(ctx context.Context, userID bson.ObjectID) (bool, error) {
+func (m *mongoMapper) ExistsById(ctx context.Context, userID bson.ObjectID) (bool, error) {
 	c, err := m.conn.CountDocuments(ctx, bson.M{cst.UserID: userID, cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
 	if err != nil {
 		logs.Errorf("[alarm mapper] find err:%s", errorx.ErrorWithoutStack(err))

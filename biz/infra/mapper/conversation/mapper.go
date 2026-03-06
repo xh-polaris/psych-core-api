@@ -42,12 +42,7 @@ type mongoMapper struct {
 
 func NewConversationMongoMapper(config *conf.Config) IMongoMapper {
 	conn := monc.MustNewModel(config.Mongo.URL, config.Mongo.DB, collectionName, config.CacheConf)
-	return &mongoMapper{conn: conn}
-}
-
-func (m *mongoMapper) Insert(ctx context.Context, conv *Conversation) error {
-	_, err := m.conn.InsertOneNoCache(ctx, conv)
-	return err
+	return &mongoMapper{conn: conn, IMongoMapper: mapper.NewMongoMapper[Conversation](conn)}
 }
 
 func (m *mongoMapper) Exists(ctx context.Context, conversationId bson.ObjectID) (bool, error) {

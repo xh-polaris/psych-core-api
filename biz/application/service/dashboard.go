@@ -833,7 +833,7 @@ func (s *DashboardService) DashboardUserConvRecords(ctx context.Context, req *co
 	}
 
 	// 获取用户基本信息
-	usr, err := s.UserMapper.FindOne(ctx, userOID)
+	usr, err := s.UserMapper.FindOneById(ctx, userOID)
 	if err != nil {
 		logs.Errorf("get user info error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardGetUserInfo)

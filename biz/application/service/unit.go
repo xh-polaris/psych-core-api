@@ -186,7 +186,7 @@ func (u *UnitService) UnitGetInfo(ctx context.Context, req *core_api.UnitGetInfo
 	}
 
 	// 查询单位
-	unitDAO, err := u.UnitMapper.FindOne(ctx, unitId)
+	unitDAO, err := u.UnitMapper.FindOneById(ctx, unitId)
 	if err != nil {
 		logs.Errorf("find unit error: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
@@ -292,7 +292,7 @@ func (u *UnitService) UnitUpdatePassword(ctx context.Context, req *core_api.Unit
 	// 密码
 	case cst.AuthTypePassword:
 		// 获取密码
-		unitDAO, err = u.UnitMapper.FindOne(ctx, unitId)
+		unitDAO, err = u.UnitMapper.FindOneById(ctx, unitId)
 		if err != nil {
 			logs.Errorf("find unit by phone error: %s", errorx.ErrorWithoutStack(err))
 			return nil, err

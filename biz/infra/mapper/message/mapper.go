@@ -3,6 +3,7 @@ package message
 import (
 	"context"
 	"errors"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/conf"
@@ -30,11 +31,12 @@ type MongoMapper interface {
 
 type mongoMapper struct {
 	conn *monc.Model
+	mapper.IMongoMapper[Message]
 }
 
 func NewMessageMongoMapper(config *conf.Config) MongoMapper {
 	conn := monc.MustNewModel(config.Mongo.URL, config.Mongo.DB, collection, config.CacheConf)
-	return &mongoMapper{conn: conn}
+	return &mongoMapper{conn: conn, IMongoMapper: mapper.NewMongoMapper[Message](conn)}
 }
 
 func (m *mongoMapper) RetrieveMessage(ctx context.Context, conversation string, size int) (msgs []*Message, err error) {
@@ -53,11 +55,6 @@ func (m *mongoMapper) RetrieveMessage(ctx context.Context, conversation string, 
 		return nil, err
 	}
 	return msgs, nil
-}
-
-func (m *mongoMapper) Insert(ctx context.Context, msg *Message) error {
-	_, err := m.conn.InsertOneNoCache(ctx, msg)
-	return err
 }
 
 type MsgStats struct {
