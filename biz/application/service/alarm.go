@@ -170,7 +170,7 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 		kw, kwExists := keyWords[al.UserID]
 		if userExists {
 			records[i] = &core_api.AlarmRecord{
-				Id:       al.ID.String(),
+				Id:       al.ID.Hex(),
 				Emotion:  alarm.EmotionItoS[al.Emotion],
 				Keywords: al.Keywords,
 				Status:   alarm.StatusItoS[al.Status],

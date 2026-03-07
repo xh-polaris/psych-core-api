@@ -66,7 +66,7 @@ func (h *HistoryManager) RetrieveMessageFromCache(ctx context.Context, key strin
 		return nil, cache.Nil
 	}
 
-	msgs := make([]*message.Message, len(result), len(result))
+	msgs := make([]*message.Message, 0, len(result))
 	for _, data := range result {
 		var msg message.Message
 		if err = sonic.Unmarshal([]byte(data), &msg); err != nil {

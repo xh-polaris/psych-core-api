@@ -252,12 +252,7 @@ func (m *mongoMapper) GetUnitKW(ctx context.Context, unitId bson.ObjectID) (map[
 
 // FindByConversation 根据对话ID查找报表
 func (m *mongoMapper) FindByConversation(ctx context.Context, sessionId bson.ObjectID) (*Report, error) {
-	var report Report
-	err := m.conn.FindOne(ctx, cacheKeyPrefix+sessionId.Hex(), &report, bson.M{cst.ConversationID: sessionId, cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
-	if err != nil {
-		return nil, err
-	}
-	return &report, nil
+	return m.FindOneByFields(ctx, bson.M{cst.ConversationID: sessionId})
 }
 
 // BatchFindBySession 批量根据会话ID查找报表

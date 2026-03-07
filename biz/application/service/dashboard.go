@@ -900,9 +900,9 @@ func (s *DashboardService) getUserConvDetails(ctx context.Context, userOID bson.
 		return make([]*core_api.ConvDetail, 0), pagination, nil
 	}
 
-	tm := make(map[bson.ObjectID]int64, len(convs))                // 对话时间戳
-	digests := make(map[bson.ObjectID]string, len(convs))          // 摘要-取自ReportMapper
-	kwds := make(map[bson.ObjectID]*core_api.Keywords, len(convs)) // 关键词-取自词云域WordCloudExtractor
+	tm := make(map[bson.ObjectID]int64)                // 对话时间戳
+	digests := make(map[bson.ObjectID]string)          // 摘要-取自ReportMapper
+	kwds := make(map[bson.ObjectID]*core_api.Keywords) // 关键词-取自词云域WordCloudExtractor
 
 	// To Optimize：初期用户对话数，即len(convs)较小，遍历时逐个查Report即可 后续可优化为批量查询Report
 	// 对每条对话记录：1.调用ReportMapper获得摘要 2.调用HisDomain获取历史消息 3.调用词云域生成词云
@@ -920,28 +920,30 @@ func (s *DashboardService) getUserConvDetails(ctx context.Context, userOID bson.
 			tmMu.Unlock()
 
 			// 获取摘要
-			rpt, err := s.ReportMapper.FindByConversation(ctx, userOID)
+			rpt, err := s.ReportMapper.FindByConversation(ctx, c.ID)
 			if err != nil {
 				// 报表不存在，可能还未完成创建
 				if errors.Is(err, mongo.ErrNoDocuments) {
 					dgstMu.Lock()
-					digests[userOID] = "暂无摘要"
+					digests[c.ID] = "暂无摘要"
 					dgstMu.Unlock()
+				} else {
+					// 意外错误
+					// 这里不直接返回 继续尝试生成词云
+					logs.Errorf("get report error: %s", errorx.ErrorWithoutStack(err))
 				}
-				// 意外错误
-				logs.Errorf("get report error: %s", errorx.ErrorWithoutStack(err))
+			} else {
+				// 报表存在，正常填入摘要
+				dgstMu.Lock()
+				digests[c.ID] = rpt.Digest
+				dgstMu.Unlock()
 			}
-			// 报表存在，正常填入摘要
-			dgstMu.Lock()
-			digests[userOID] = rpt.Digest
-			dgstMu.Unlock()
-
 			// 获取所有对话历史消息
-			msgHis, err := his.Mgr.RetrieveMessage(ctx, conv.ID.String(), -1)
-			if err != nil {
+			msgHis, err := his.Mgr.RetrieveMessage(ctx, conv.ID.Hex(), -1)
+			if err != nil || len(msgHis) == 0 {
 				logs.Errorf("retrieve history messages error: %s", errorx.ErrorWithoutStack(err))
 				kwdsMu.Lock()
-				kwds[userOID] = &core_api.Keywords{
+				kwds[c.ID] = &core_api.Keywords{
 					KeywordMap: make(map[string]int32),
 					KeyTotal:   0,
 				}
@@ -953,7 +955,7 @@ func (s *DashboardService) getUserConvDetails(ctx context.Context, userOID bson.
 			if err != nil {
 				logs.Errorf("word cloud extractor error: %s", errorx.ErrorWithoutStack(err))
 				kwdsMu.Lock()
-				kwds[userOID] = &core_api.Keywords{
+				kwds[c.ID] = &core_api.Keywords{
 					KeywordMap: make(map[string]int32),
 					KeyTotal:   0,
 				}
@@ -962,7 +964,7 @@ func (s *DashboardService) getUserConvDetails(ctx context.Context, userOID bson.
 			}
 
 			kwdsMu.Lock()
-			kwds[userOID] = wc
+			kwds[c.ID] = wc
 			kwdsMu.Unlock()
 		}(conv)
 	}
@@ -970,7 +972,7 @@ func (s *DashboardService) getUserConvDetails(ctx context.Context, userOID bson.
 	wg.Wait()
 
 	// 构造响应中的convDetails列表
-	convDetails := make([]*core_api.ConvDetail, len(convs))
+	convDetails := make([]*core_api.ConvDetail, 0, len(convs))
 
 	for convId, convTime := range tm {
 		convDetail := &core_api.ConvDetail{

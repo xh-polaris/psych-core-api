@@ -298,8 +298,8 @@ func (m *mongoMapper) CountUserDailyConv(ctx context.Context, userId bson.Object
 			cst.UserID: userId,
 			cst.Status: bson.M{cst.NE: cst.DeletedStatus},
 			cst.CreateTime: bson.M{
-				cst.GT: oneWeekAgo,
-				cst.LT: now,
+				"$gte": oneWeekAgo,
+				"$lte": now,
 			},
 		}},
 		// 按照星期几分组并计数
