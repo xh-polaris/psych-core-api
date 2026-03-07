@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
@@ -11,7 +12,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
-	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
 )
 
 // config 配置app与workflow

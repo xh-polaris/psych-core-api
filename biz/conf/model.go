@@ -1,10 +1,10 @@
 package conf
 
 import (
+	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/pkg/app"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
-	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
 )
 
 type Coze struct {

@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
+	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
@@ -9,11 +11,9 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
-	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
 	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/google/wire"
-	"github.com/xh-polaris/psych-idl/kitex_gen/basic"
 )
 
 var _ IConfigService = (*ConfigService)(nil)

@@ -175,3 +175,23 @@ func _dashboardunitconvrecordsMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _conversationMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _createconversationMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _getconversationMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _listconversationsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

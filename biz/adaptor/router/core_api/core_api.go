@@ -24,6 +24,12 @@ func Register(r *server.Hertz) {
 		_config.POST("/update_info", append(_configupdateinfoMw(), core_api.ConfigUpdateInfo)...)
 	}
 	{
+		_conversation := root.Group("/conversation", _conversationMw()...)
+		_conversation.POST("/create", append(_createconversationMw(), core_api.CreateConversation)...)
+		_conversation.POST("/get", append(_getconversationMw(), core_api.GetConversation)...)
+		_conversation.POST("/list", append(_listconversationsMw(), core_api.ListConversations)...)
+	}
+	{
 		_dashboard := root.Group("/dashboard", _dashboardMw()...)
 		_dashboard.POST("/alarm_overview", append(_dashboardgetalarmoverviewMw(), core_api.DashboardGetAlarmOverview)...)
 		_dashboard.POST("/alarm_records", append(_dashboardlistalarmrecordsMw(), core_api.DashboardListAlarmRecords)...)

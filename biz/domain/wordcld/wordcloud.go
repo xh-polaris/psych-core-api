@@ -3,6 +3,7 @@ package wordcld
 import (
 	"bufio"
 	"context"
+	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -13,7 +14,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
-	"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
 	"github.com/yanyiwu/gojieba"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
