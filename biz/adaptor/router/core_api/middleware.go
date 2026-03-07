@@ -170,3 +170,8 @@ func _dashboardupdatealarmMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _dashboardunitconvrecordsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

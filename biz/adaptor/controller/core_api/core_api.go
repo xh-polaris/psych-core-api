@@ -629,3 +629,19 @@ func DashboardGetReport(ctx context.Context, c *app.RequestContext) {
 	resp, err := p.DashboardService.DashboardGetReport(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
+
+// DashboardUnitConvRecords .
+// @router /dashboard/unit_conversation_records [POST]
+func DashboardUnitConvRecords(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.DashboardUnitConvRecordsReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	resp := new(core_api.DashboardUnitConvRecordsResp)
+
+	c.JSON(consts.StatusOK, resp)
+}
