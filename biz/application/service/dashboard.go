@@ -55,8 +55,6 @@ type DashboardService struct {
 	ConversationMapper conversation.IMongoMapper
 	ReportMapper       report.IMongoMapper
 	AlarmMapper        alarm.IMongoMapper
-	WordCloudExtractor *wordcld.WordCloudExtractor
-	HistoryManager     *his.HistoryManager
 }
 
 var DashboardServiceSet = wire.NewSet(
@@ -641,9 +639,9 @@ func (s *DashboardService) getEmotionRatio(ctx context.Context, unitOID *bson.Ob
 
 func (s *DashboardService) getKeywords(ctx context.Context, unitOID *bson.ObjectID) (*core_api.Keywords, error) {
 	if unitOID != nil {
-		return s.WordCloudExtractor.FromUnitKWs(ctx, *unitOID)
+		return wordcld.Extractor.FromUnitKWs(ctx, *unitOID)
 	}
-	return s.WordCloudExtractor.FromAllUnitsKWs(ctx)
+	return wordcld.Extractor.FromAllUnitsKWs(ctx)
 }
 
 func (s *DashboardService) DashboardListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (*core_api.DashboardListClassesResp, error) {
@@ -772,7 +770,7 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 	var msgErr, kwErr error
 
 	var wg sync.WaitGroup
-	wg.Add(3)
+	wg.Add(2)
 
 	// 获取对话统计信息
 	go func() {
@@ -939,7 +937,7 @@ func (s *DashboardService) getUserConvDetails(ctx context.Context, userOID bson.
 			dgstMu.Unlock()
 
 			// 获取所有对话历史消息
-			msgHis, err := s.HistoryManager.RetrieveMessage(ctx, conv.ID.String(), -1)
+			msgHis, err := his.Mgr.RetrieveMessage(ctx, conv.ID.String(), -1)
 			if err != nil {
 				logs.Errorf("retrieve history messages error: %s", errorx.ErrorWithoutStack(err))
 				kwdsMu.Lock()
@@ -951,7 +949,7 @@ func (s *DashboardService) getUserConvDetails(ctx context.Context, userOID bson.
 				return
 			}
 			// 生成词云
-			wc, err := s.WordCloudExtractor.FromHisMsg(msgHis)
+			wc, err := wordcld.Extractor.FromHisMsg(msgHis)
 			if err != nil {
 				logs.Errorf("word cloud extractor error: %s", errorx.ErrorWithoutStack(err))
 				kwdsMu.Lock()

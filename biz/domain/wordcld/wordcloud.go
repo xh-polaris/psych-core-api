@@ -18,6 +18,8 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
+var Extractor WordCloudExtractor
+
 type WordCloudExtractor struct {
 	rptMapper report.IMongoMapper
 	jieba     *gojieba.Jieba
@@ -106,10 +108,11 @@ func ensureStopWordsLoaded() {
 }
 
 func NewWordCloudExtractor(rptMapper report.IMongoMapper) *WordCloudExtractor {
-	return &WordCloudExtractor{
+	Extractor = WordCloudExtractor{
 		rptMapper: rptMapper,
 		jieba:     gojieba.NewJieba(),
 	}
+	return &Extractor
 }
 
 func (wce *WordCloudExtractor) Free() {

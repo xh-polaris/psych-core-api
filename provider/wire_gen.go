@@ -42,6 +42,8 @@ func NewProvider() (*Provider, error) {
 		UnitMapper:         unitIMongoMapper,
 		MessageMapper:      mongoMapper,
 		ConversationMapper: conversationIMongoMapper,
+		ReportMapper:       reportIMongoMapper,
+		AlarmMapper:        iMongoMapper,
 	}
 	configIMongoMapper := config.NewConfigMongoMapper(confConfig)
 	configService := service.ConfigService{

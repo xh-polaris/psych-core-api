@@ -263,7 +263,7 @@ func (m *mongoMapper) RiskDistributionStats(ctx context.Context, unitId *bson.Ob
 	}
 
 	var results []*RiskStat
-	if err := m.conn.Aggregate(ctx, pipeline, &results); err != nil {
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
 		logs.Errorf("[user mapper] aggregate risk distribution err:%s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}

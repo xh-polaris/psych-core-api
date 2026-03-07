@@ -30,6 +30,7 @@ func InitInfra(app *AppDependency) {
 	app.Cache = redis.New()
 	app.MessageMapper = provider.Get().MessageMapper
 	app.ConversationMapper = provider.Get().ConversationMapper
+	app.ReportMapper = provider.Get().ReportMapper
 	lock.New(app.Cache) // 初始化 DistributionLockManager 分布式锁管理
 }
 

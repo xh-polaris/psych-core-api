@@ -196,19 +196,15 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 
 func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardUpdateAlarmReq) (resp *core_api.DashboardUpdateAlarmResp, err error) {
 	// 参数校验
-	if req.Id == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "报警ID"))
-	}
-
 	if req.Alarm == nil {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "报警信息"))
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "预警信息"))
 	}
 
-	// 解析报警ID
-	alarmId, err := bson.ObjectIDFromHex(req.Id)
+	// 解析预警ID
+	alarmId, err := bson.ObjectIDFromHex(req.Alarm.Id)
 	if err != nil {
 		logs.Errorf("parse alarm id error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "报警ID"))
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "预警ID"))
 	}
 
 	// 构建更新字段

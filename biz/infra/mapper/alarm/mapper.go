@@ -228,8 +228,8 @@ func (m *mongoMapper) EmotionDistribution(ctx context.Context, unitId *bson.Obje
 	}
 
 	var results []struct {
-		Emotion string `bson:"_id"`
-		Count   int32  `bson:"count"`
+		Emotion int32 `bson:"_id"`
+		Count   int32 `bson:"count"`
 	}
 
 	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
@@ -239,7 +239,7 @@ func (m *mongoMapper) EmotionDistribution(ctx context.Context, unitId *bson.Obje
 
 	distribution := make(EmotionDistribution)
 	for _, result := range results {
-		distribution[result.Emotion] = result.Count
+		distribution[EmotionItoS[result.Emotion]] = result.Count
 	}
 
 	return &distribution, nil

@@ -27,8 +27,13 @@ type User struct {
 	Grade      int32          `json:"grade,omitempty" bson:"grade,omitempty"`
 	Class      int32          `json:"class,omitempty" bson:"class,omitempty"`
 	Options    map[string]any `json:"option,omitempty" bson:"option,omitempty"`
-	Remark     string         `json:"remark,omitempty" bson:"remark,omitempty"` // 后台管理时添加的备注
+	Remark     Remark         `json:"remark,omitempty" bson:"remark,omitempty"` // 后台管理时添加的备注
 	CreateTime time.Time      `json:"createTime,omitempty" bson:"createTime,omitempty"`
 	UpdateTime time.Time      `json:"updateTime,omitempty" bson:"updateTime,omitempty"`
 	DeleteTime time.Time      `json:"deleteTime,omitempty" bson:"deleteTime,omitempty"`
+}
+
+type Remark struct {
+	Content    string    `json:"content,omitempty" bson:"content,omitempty"`
+	CreateTime time.Time `json:"createTime,omitempty" bson:"createTime,omitempty"`
 }
