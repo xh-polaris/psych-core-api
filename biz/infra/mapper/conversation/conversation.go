@@ -10,6 +10,7 @@ import (
 type Conversation struct {
 	ID         bson.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
 	UserID     bson.ObjectID `json:"userId,omitempty" bson:"userId,omitempty"`
+	Title      string        `json:"title,omitempty" bson:"title,omitempty"`
 	StartTime  time.Time     `json:"startTime,omitempty" bson:"startTime,omitempty"`
 	EndTime    time.Time     `json:"endTime,omitempty" bson:"endTime,omitempty"`
 	CreateTime time.Time     `json:"createTime,omitempty" bson:"createTime,omitempty"`

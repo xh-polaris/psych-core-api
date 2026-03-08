@@ -24,15 +24,21 @@ const (
 type IMongoMapper interface {
 	Insert(ctx context.Context, conv *Conversation) error
 	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
+
 	Exists(ctx context.Context, conversationId bson.ObjectID) (bool, error)
-	Count(ctx context.Context, unitId *bson.ObjectID) (int32, error)
+	CountByUnit(ctx context.Context, unitId *bson.ObjectID) (int32, error)
+	CountByUser(ctx context.Context, userId bson.ObjectID) (int32, error)
+	// 查找
+	FindManyByUserId(ctx context.Context, userId bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error) // 分页查找
+	FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error)                                           // 查找全部
+	// 聚合统计
 	CountUnitConvByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 	CountUserDailyConv(ctx context.Context, userId bson.ObjectID) (map[int32]int32, error)
-	BatchConvStats(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*ConvStats, error)
 	AverageDuration(ctx context.Context, unitId *bson.ObjectID) (float64, error)
 	AverageDurationByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (float64, error)
 	CountActiveUsers(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
-	FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error)
+	// 批量统计
+	BatchConvStats(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*ConvStats, error)
 }
 
 type mongoMapper struct {
@@ -54,13 +60,21 @@ func (m *mongoMapper) Exists(ctx context.Context, conversationId bson.ObjectID) 
 	return count > 0, nil
 }
 
-// Count 统计对话数量，unitId 为空表示全平台
-func (m *mongoMapper) Count(ctx context.Context, unitId *bson.ObjectID) (int32, error) {
+// CountByUnit 统计对话数量，unitId 为空表示全平台
+func (m *mongoMapper) CountByUnit(ctx context.Context, unitId *bson.ObjectID) (int32, error) {
 	if unitId == nil {
 		cnt, err := m.conn.CountDocuments(ctx, bson.M{cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
 		return int32(cnt), err
 	}
 	return m.countWithUnitFilter(ctx, unitId, nil, nil)
+}
+
+func (m *mongoMapper) CountByUser(ctx context.Context, userId bson.ObjectID) (int32, error) {
+	cnt, err := m.conn.CountDocuments(ctx, bson.M{cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
+	if err != nil {
+		return 0, err
+	}
+	return int32(cnt), err
 }
 
 // CountUnitByPeriod 按时间范围统计对话数量
@@ -340,6 +354,20 @@ func (m *mongoMapper) CountUserDailyConv(ctx context.Context, userId bson.Object
 }
 
 func (m *mongoMapper) FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error) {
-	// 要过滤已删除的
-	return m.OrderedFindAllByFields(ctx, bson.M{cst.UserID: userId, cst.Status: bson.M{cst.NE: cst.DeletedStatus}}, options.Find().SetSort(bson.M{cst.UpdateTime: -1}))
+	// 按时间顺序返回
+	c, err := m.FindManyWithOption(ctx, bson.M{cst.UserID: userId, cst.Status: bson.M{cst.NE: cst.DeletedStatus}}, options.Find().SetSort(bson.M{cst.UpdateTime: -1}))
+	if err != nil {
+		logs.Errorf("[conversation mapper] find all by user err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+	return c, nil
+}
+
+func (m *mongoMapper) FindManyByUserId(ctx context.Context, userId bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error) {
+	c, err := m.FindManyWithOption(ctx, bson.M{cst.UserID: userId, cst.Status: bson.M{cst.NE: cst.DeletedStatus}}, opt)
+	if err != nil {
+		logs.Errorf("[conversation mapper] paged find many by user err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+	return c, nil
 }

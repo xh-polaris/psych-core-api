@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"sort"
 	"strconv"
 	"sync"
@@ -134,7 +135,7 @@ func (s *DashboardService) dashboardOverviewAdmin(ctx context.Context, twoWeeksB
 	}
 
 	// 对话数量（总对话数 + 本周/上周新增）
-	totalConversations, err := s.ConversationMapper.Count(ctx, nil)
+	totalConversations, err := s.ConversationMapper.CountByUnit(ctx, nil)
 	if err != nil {
 		logs.Errorf("count conversations error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
@@ -250,7 +251,7 @@ func (s *DashboardService) dashboardOverviewUnit(ctx context.Context, unitOID bs
 	}
 
 	// 对话数量（当前单位）
-	totalConversations, err := s.ConversationMapper.Count(ctx, &unitOID)
+	totalConversations, err := s.ConversationMapper.CountByUnit(ctx, &unitOID)
 	if err != nil {
 		logs.Errorf("count unit conversations error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
@@ -412,14 +413,14 @@ func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_
 	}
 
 	for _, b := range buckets {
-		// 这里简单用 AverageDuration + Count 近似，不做复杂聚合：
+		// 这里简单用 AverageDuration + CountByUnit 近似，不做复杂聚合：
 		// 实际更精确的做法是 conversation 表做 $bucket/$group，这里按需求“从简”实现。
 		var cnt int32
 		var err error
 		if unitOID != nil {
-			cnt, err = s.ConversationMapper.Count(ctx, unitOID)
+			cnt, err = s.ConversationMapper.CountByUnit(ctx, unitOID)
 		} else {
-			cnt, err = s.ConversationMapper.Count(ctx, nil)
+			cnt, err = s.ConversationMapper.CountByUnit(ctx, nil)
 		}
 		if err != nil {
 			logs.Errorf("count conversations for duration bucket error: %s", errorx.ErrorWithoutStack(err))
@@ -728,13 +729,7 @@ func (s *DashboardService) DashboardListUsers(ctx context.Context, req *core_api
 	})
 
 	// 分页结果
-	total := int32(len(dbUsers))
-	pg := &basic.Pagination{
-		Total:   int64(total),
-		Page:    req.PaginationOptions.GetPage(),
-		Limit:   req.PaginationOptions.GetLimit(),
-		HasNext: req.PaginationOptions.GetPage()*req.PaginationOptions.GetLimit() < int64(total),
-	}
+	pg := util.PaginationRes(int32(len(dbUsers)), req.PaginationOptions)
 
 	// 补全响应中的riskUser
 	riskUsers, err2 := s.completeRiskUser(ctx, pg, dbUsers)
@@ -1023,12 +1018,7 @@ func (s *DashboardService) getPagedUserConvs(ctx context.Context, userOID bson.O
 
 	// 返回分页范围内的Conversation
 	pagedConvs := convs[startIdx:endIdx]
-	pagination := &basic.Pagination{
-		Total:   int64(total),
-		Page:    paginationOpts.GetPage(),
-		Limit:   paginationOpts.GetLimit(),
-		HasNext: int32(pageNum*pageSize) < total,
-	}
+	pagination := util.PaginationRes(total, paginationOpts)
 
 	return pagedConvs, pagination, nil
 }

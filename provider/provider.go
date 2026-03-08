@@ -25,15 +25,16 @@ func Init() {
 
 // Provider 依赖的对象
 type Provider struct {
-	Config             *conf.Config
-	AlarmService       service.AlarmService
-	DashboardService   service.DashboardService
-	ConfigService      service.ConfigService
-	UserService        service.UserService
-	UnitService        service.UnitService
-	MessageMapper      message.MongoMapper
-	ConversationMapper conversation.IMongoMapper
-	ReportMapper       report.IMongoMapper
+	Config              *conf.Config
+	AlarmService        service.AlarmService
+	DashboardService    service.DashboardService
+	ConfigService       service.ConfigService
+	UserService         service.UserService
+	UnitService         service.UnitService
+	ConversationService service.ConversationService
+	MessageMapper       message.MongoMapper
+	ConversationMapper  conversation.IMongoMapper
+	ReportMapper        report.IMongoMapper
 }
 
 func Get() *Provider {
@@ -48,6 +49,7 @@ var ApplicationSet = wire.NewSet(
 	service.ConfigServiceSet,
 	service.UserServiceSet,
 	service.UnitServiceSet,
+	service.ConversationServiceSet,
 )
 
 var InfrastructureSet = wire.NewSet(

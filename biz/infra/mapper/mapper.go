@@ -16,7 +16,7 @@ type IMongoMapper[T any] interface {
 	FindOneByFields(ctx context.Context, filter bson.M) (*T, error)
 	FindOneById(ctx context.Context, id bson.ObjectID) (*T, error)
 	FindAllByFields(ctx context.Context, filter bson.M) ([]*T, error)
-	OrderedFindAllByFields(ctx context.Context, filter bson.M, opts options.Lister[options.FindOptions]) ([]*T, error)
+	FindManyWithOption(ctx context.Context, filter bson.M, opts options.Lister[options.FindOptions]) ([]*T, error)
 	Insert(ctx context.Context, data *T) error
 	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
 	ExistsByFields(ctx context.Context, filter bson.M) (bool, error)
@@ -54,7 +54,7 @@ func (m *mongoMapper[T]) FindAllByFields(ctx context.Context, filter bson.M) ([]
 	return result, nil
 }
 
-func (m *mongoMapper[T]) OrderedFindAllByFields(ctx context.Context, filter bson.M, opts options.Lister[options.FindOptions]) ([]*T, error) {
+func (m *mongoMapper[T]) FindManyWithOption(ctx context.Context, filter bson.M, opts options.Lister[options.FindOptions]) ([]*T, error) {
 	var result []*T
 	if err := m.conn.Find(ctx, &result, filter, opts); err != nil {
 		return nil, err

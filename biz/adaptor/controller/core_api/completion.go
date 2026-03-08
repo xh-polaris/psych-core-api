@@ -8,6 +8,8 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/pkg/httpx"
+	"github.com/xh-polaris/psych-core-api/provider"
 )
 
 // CreateConversation .
@@ -21,9 +23,9 @@ func CreateConversation(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.CreateConversationResp)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.ConversationService.CreateConversation(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // ListConversations .
@@ -37,9 +39,9 @@ func ListConversations(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.ListConversationsResp)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.ConversationService.ListConversations(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // GetConversation .
@@ -53,7 +55,7 @@ func GetConversation(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.GetConversationResp)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.ConversationService.GetConversation(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }

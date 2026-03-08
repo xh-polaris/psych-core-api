@@ -2,8 +2,8 @@ package service
 
 import (
 	"context"
-	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"sync"
 	"time"
 
@@ -19,7 +19,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/types/errno"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 type IAlarmService interface {
@@ -76,17 +75,14 @@ func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardL
 	total, err := s.AlarmMapper.CountByTime(ctx, unitOID, time.Time{}, time.Time{})
 	if total == 0 {
 		return &core_api.DashboardListAlarmRecordsResp{
-			Pagination: &basic.Pagination{
-				Total:   0,
-				HasNext: false,
-			},
-			Code: 200,
-			Msg:  "success",
+			Pagination: util.PaginationRes(total, req.PaginationOptions),
+			Code:       200,
+			Msg:        "success",
 		}, nil
 	}
 
 	// 再retrieve 此时alarm数不应为0
-	opt := findPageOption(req.PaginationOptions).SetSort(bson.D{{cst.Status, -1}})
+	opt := util.PagedFindOpt(req.PaginationOptions).SetSort(bson.D{{cst.Status, -1}})
 	alarms, err := s.AlarmMapper.RetrieveByTime(ctx, unitOID, time.Time{}, time.Time{}, opt)
 	if err != nil || len(alarms) == 0 {
 		logs.Errorf("retrieve alarms error: %s", errorx.ErrorWithoutStack(err))
@@ -95,24 +91,12 @@ func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardL
 	completeAlarm, err2 := s.completeAlarm(ctx, alarms)
 
 	// 构建响应
-	hasNext := req.PaginationOptions.GetPage()*req.PaginationOptions.GetLimit() < int64(total)
 	return &core_api.DashboardListAlarmRecordsResp{
-		Records: completeAlarm,
-		Pagination: &basic.Pagination{
-			Total:   int64(total),
-			Page:    req.PaginationOptions.GetPage(),
-			Limit:   req.PaginationOptions.GetLimit(),
-			HasNext: hasNext,
-		},
-		Code: 200,
-		Msg:  "success",
+		Records:    completeAlarm,
+		Pagination: util.PaginationRes(total, req.PaginationOptions),
+		Code:       200,
+		Msg:        "success",
 	}, err2
-}
-
-func findPageOption(reqOpt *basic.PaginationOptions) *options.FindOptionsBuilder {
-	p := reqOpt.GetPage() - 1
-	l := reqOpt.GetLimit()
-	return options.Find().SetSkip(p * l).SetLimit(l)
 }
 
 func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alarm) ([]*core_api.AlarmRecord, error) {
