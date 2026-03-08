@@ -9,6 +9,7 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/xh-polaris/psych-core-api/biz/infra/cache"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 )
@@ -32,9 +33,10 @@ func New(cache cache.Cmdable, mapper message.MongoMapper) {
 func (h *HistoryManager) RetrieveMessage(ctx context.Context, id string, size int) (msgs []*message.Message, err error) {
 	// retrieve cache
 	if msgs, err = h.RetrieveMessageFromCache(ctx, cachePrefix+id); err == nil {
-		if size >= 0 && len(msgs) > size {
+		if size > 0 && len(msgs) > size {
 			return msgs[:size], nil
 		}
+		util.DPrint("[his] retrieve cache, size=%d, msgs=%v\n", size, msgs)
 		return msgs, nil
 	}
 	// retrieve storage
@@ -47,6 +49,7 @@ func (h *HistoryManager) RetrieveMessage(ctx context.Context, id string, size in
 			logs.Errorf("cache msgs err: %s", err)
 		}
 	}
+	util.DPrint("[his] retrieve storage, size=%d, msgs=%v\n", size, msgs)
 	return msgs, nil
 }
 
@@ -87,7 +90,7 @@ func (h *HistoryManager) CacheMessage(ctx context.Context, key string, msgs []*m
 	p := h.cache.Pipeline()
 	p.HSet(ctx, key, fields)
 	p.Expire(ctx, key, time.Hour*6)
-
+	util.DPrint("[his] cache msgs, key=%s, size=%d\n", key, len(msgs))
 	_, err = p.Exec(ctx)
 	return
 }
@@ -99,9 +102,11 @@ func (h *HistoryManager) AddMessage(ctx context.Context, id string, msg *message
 		logs.Errorf("add message err: %s", err)
 		return
 	}
+	util.DPrint("[his] add message storage, id=%s, msg=%v\n", id, msg)
 	// add to cache
 	if err = h.CacheMessage(ctx, cachePrefix+id, []*message.Message{msg}); err != nil {
 		logs.Errorf("cache msgs err: %s", err)
 	}
+	util.DPrint("[his] add message cache, id=%s, msg=%v\n", id, msg)
 	return
 }
