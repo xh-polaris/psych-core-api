@@ -10,6 +10,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/cache"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -39,9 +40,10 @@ func New(cache cache.Cmdable, msgMapper message.MongoMapper, convMapper conversa
 func (h *HistoryManager) RetrieveMessage(ctx context.Context, id string, size int) (msgs []*message.Message, err error) {
 	// retrieve cache
 	if msgs, err = h.RetrieveMessageFromCache(ctx, cachePrefix+id); err == nil {
-		if size >= 0 && len(msgs) > size {
+		if size > 0 && len(msgs) > size {
 			return msgs[:size], nil
 		}
+		util.DPrint("[his] retrieve cache, size=%d, msgs=%v\n", size, msgs)
 		return msgs, nil
 	}
 	// retrieve storage
@@ -54,6 +56,7 @@ func (h *HistoryManager) RetrieveMessage(ctx context.Context, id string, size in
 			logs.Errorf("cache msgs err: %s", err)
 		}
 	}
+	util.DPrint("[his] retrieve storage, size=%d, msgs=%v\n", size, msgs)
 	return msgs, nil
 }
 
@@ -106,45 +109,11 @@ func (h *HistoryManager) AddMessage(ctx context.Context, id string, msg *message
 		logs.Errorf("add message err: %s", err)
 		return
 	}
-
-	// upsert conversation meta
-	if msg != nil && h.convMapper != nil {
-		convID := msg.ConversationId
-		userID := msg.UserId
-		if !convID.IsZero() && !userID.IsZero() {
-			now := msg.CreateTime
-
-			exists, errExist := h.convMapper.Exists(ctx, convID)
-			if errExist != nil {
-				logs.Errorf("check conversation exists err: %s", errorx.ErrorWithoutStack(errExist))
-			} else if !exists {
-				conv := &conversation.Conversation{
-					ID:         convID,
-					UserID:     userID,
-					StartTime:  now,
-					EndTime:    now,
-					CreateTime: now,
-					UpdateTime: now,
-					Status:     0,
-				}
-				if errIns := h.convMapper.Insert(ctx, conv); errIns != nil {
-					logs.Errorf("insert conversation err: %s", errorx.ErrorWithoutStack(errIns))
-				}
-			} else {
-				update := bson.M{
-					"endTime":    now,
-					"updateTime": now,
-				}
-				if errUpd := h.convMapper.UpdateFields(ctx, convID, update); errUpd != nil {
-					logs.Errorf("update conversation err: %s", errorx.ErrorWithoutStack(errUpd))
-				}
-			}
-		}
-	}
-
+	util.DPrint("[his] add message storage, id=%s, msg=%v\n", id, msg)
 	// add to cache
 	if err = h.CacheMessage(ctx, cachePrefix+id, []*message.Message{msg}); err != nil {
 		logs.Errorf("cache msgs err: %s", err)
 	}
+	util.DPrint("[his] add message cache, id=%s, msg=%v\n", id, msg)
 	return
 }

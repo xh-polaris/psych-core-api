@@ -20,7 +20,7 @@ func (e *Engine) execTTS(ctx context.Context, id uint, stream *schema.StreamRead
 	if err := e.tts.Send(ctx, app.FirstTTS); err != nil { // 首包
 		e.unexpected(err, "tts first send err")
 	}
-	util.DPrint("[tts] send FirstTTS")
+	util.DPrint("[tts] send FirstTTS\n")
 	// 启用tts接收
 	go e.execTTSRecv(ctx, id)
 	var stop bool
@@ -42,13 +42,13 @@ func (e *Engine) execTTS(ctx context.Context, id uint, stream *schema.StreamRead
 				if err = e.tts.Send(ctx, app.LastTTS); err != nil {
 					e.unexpected(err, "tts send err")
 				}
-				util.DPrint("[tts] send LastTTS")
+				util.DPrint("[tts] send LastTTS\n")
 				return
 			}
 			if err = e.tts.Send(ctx, msg.Content); err != nil {
 				return
 			}
-			util.DPrint("[tts] send %s", msg.Content)
+			util.DPrint("[tts] send %s\n", msg.Content)
 		}
 	}
 }
