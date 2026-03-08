@@ -7,6 +7,7 @@ const (
 	ErrCreateConversation = 7000
 	ErrListConversation   = 7001
 	ErrGetConversation    = 7002
+	ErrFetchMessages      = 7003
 )
 
 func init() {
@@ -23,6 +24,11 @@ func init() {
 	code.Register(
 		ErrGetConversation,
 		"加载对话失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrFetchMessages,
+		"加载历史消息失败",
 		code.WithAffectStability(false),
 	)
 }

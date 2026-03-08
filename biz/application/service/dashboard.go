@@ -1001,20 +1001,9 @@ func (s *DashboardService) getPagedUserConvs(ctx context.Context, userOID bson.O
 		logs.Errorf("get user convs error: %s", errorx.ErrorWithoutStack(err))
 		return nil, nil, errorx.New(errno.ErrDashboardGetConversations)
 	}
-
-	// 分页处理
-	pageSize := int(paginationOpts.GetLimit())
-	pageNum := int(paginationOpts.GetPage())
 	total := int32(len(convs))
 
-	startIdx := (pageNum - 1) * pageSize
-	endIdx := startIdx + pageSize
-	if startIdx >= len(convs) {
-		startIdx = len(convs)
-	}
-	if endIdx > len(convs) {
-		endIdx = len(convs)
-	}
+	startIdx, endIdx := util.PagedIndex(total, paginationOpts)
 
 	// 返回分页范围内的Conversation
 	pagedConvs := convs[startIdx:endIdx]

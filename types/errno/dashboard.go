@@ -17,7 +17,6 @@ const (
 	ErrDashboardGetUnitKeywords           = 5010
 	ErrDashboardGetUserInfo               = 5011 // 获取用户信息失败
 	ErrDashboardGetConversations          = 5012 // 获取用户对话记录失败
-	ErrDashboardGetConvMessages           = 5013 // 获取对话消息失败
 	ErrDashboardGetConvReports            = 5014 // 获取对话报表失败
 	ErrDashboardGenerateWordCloud         = 5015 // 生成词云失败
 	ErrDashboardGetReport                 = 5016 // 获取报表失败
@@ -47,11 +46,6 @@ func init() {
 	code.Register(
 		ErrDashboardGetConversations,
 		"获取用户对话记录失败",
-		code.WithAffectStability(false),
-	)
-	code.Register(
-		ErrDashboardGetConvMessages,
-		"获取对话消息失败",
 		code.WithAffectStability(false),
 	)
 	code.Register(

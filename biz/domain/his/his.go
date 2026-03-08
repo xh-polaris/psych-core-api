@@ -13,7 +13,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
-	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 var Mgr *HistoryManager

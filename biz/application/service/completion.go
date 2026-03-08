@@ -5,6 +5,7 @@ import (
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
+	"github.com/xh-polaris/psych-core-api/biz/domain/his"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
@@ -100,5 +101,33 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 }
 
 func (c *ConversationService) GetConversation(ctx context.Context, req *core_api.GetConversationReq) (resp *core_api.GetConversationResp, err error) {
-	return nil, errorx.New(errno.ErrUnImplement)
+	// 鉴权
+	//userMeta, err := util.ExtraUserMeta(ctx)
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	// RetrieveMessage仅返回意外异常 消息搜索结果为空时返回空切片，和nil err
+	// 非空时，返回index倒序的列表
+	rawMsgs, err := his.Mgr.RetrieveMessage(ctx, req.ConversationId, -1)
+	if err != nil {
+		return nil, errorx.New(errno.ErrFetchMessages)
+	}
+
+	total := int32(len(rawMsgs))
+	startIdx, endIdx := util.PagedIndex(total, req.PaginationOptions)
+
+	msgs := make([]*core_api.Message, len(rawMsgs))
+	for _, rawMsg := range rawMsgs[startIdx:endIdx] {
+		msgs = append(msgs, &core_api.Message{
+			Content: rawMsg.Content,
+			Role:    message.RoleItoS[rawMsg.Role],
+			Index:   rawMsg.Index,
+		})
+	}
+
+	return &core_api.GetConversationResp{
+		Pagination:  util.PaginationRes(total, req.PaginationOptions),
+		MessageList: msgs,
+	}, nil
 }
