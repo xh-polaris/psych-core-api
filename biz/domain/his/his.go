@@ -8,6 +8,7 @@ import (
 
 	"github.com/bytedance/sonic"
 	"github.com/xh-polaris/psych-core-api/biz/infra/cache"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
@@ -20,13 +21,18 @@ const cachePrefix = "psych:msg:"
 
 // HistoryManager 历史记录管理, 所有的历史记录都按照从旧到新排序
 type HistoryManager struct {
-	cache  cache.Cmdable
-	mapper message.MongoMapper
+	cache      cache.Cmdable
+	msgMapper  message.MongoMapper
+	convMapper conversation.IMongoMapper
 }
 
 // New 创建一个新的历史记录管理器
-func New(cache cache.Cmdable, mapper message.MongoMapper) {
-	Mgr = &HistoryManager{cache: cache, mapper: mapper}
+func New(cache cache.Cmdable, msgMapper message.MongoMapper, convMapper conversation.IMongoMapper) {
+	Mgr = &HistoryManager{
+		cache:      cache,
+		msgMapper:  msgMapper,
+		convMapper: convMapper,
+	}
 }
 
 // RetrieveMessage 获取消息, size 小于等于0时取出所有
@@ -40,7 +46,7 @@ func (h *HistoryManager) RetrieveMessage(ctx context.Context, id string, size in
 		return msgs, nil
 	}
 	// retrieve storage
-	if msgs, err = h.mapper.RetrieveMessage(ctx, id, size); err != nil {
+	if msgs, err = h.msgMapper.RetrieveMessage(ctx, id, size); err != nil {
 		return nil, err
 	}
 	// build cache
@@ -90,7 +96,7 @@ func (h *HistoryManager) CacheMessage(ctx context.Context, key string, msgs []*m
 	p := h.cache.Pipeline()
 	p.HSet(ctx, key, fields)
 	p.Expire(ctx, key, time.Hour*6)
-	util.DPrint("[his] cache msgs, key=%s, size=%d\n", key, len(msgs))
+
 	_, err = p.Exec(ctx)
 	return
 }
@@ -98,7 +104,7 @@ func (h *HistoryManager) CacheMessage(ctx context.Context, key string, msgs []*m
 // AddMessage 新增消息
 func (h *HistoryManager) AddMessage(ctx context.Context, id string, msg *message.Message) (err error) {
 	// add to storage
-	if err = h.mapper.Insert(ctx, msg); err != nil {
+	if err = h.msgMapper.Insert(ctx, msg); err != nil {
 		logs.Errorf("add message err: %s", err)
 		return
 	}

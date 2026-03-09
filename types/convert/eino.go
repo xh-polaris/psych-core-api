@@ -6,13 +6,13 @@ import (
 	"github.com/cloudwego/eino/schema"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	mmsg "github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-func UserMMsg(conversationId, userId primitive.ObjectID, content string, index int) *mmsg.Message {
+func UserMMsg(conversationId, userId bson.ObjectID, content string, index int) *mmsg.Message {
 	now := time.Now()
 	return &mmsg.Message{
-		MessageId:      primitive.NewObjectID(),
+		MessageId:      bson.NewObjectID(),
 		ConversationId: conversationId,
 		SectionId:      conversationId,
 		UserId:         userId,
@@ -28,10 +28,10 @@ func UserMMsg(conversationId, userId primitive.ObjectID, content string, index i
 	}
 }
 
-func AssistantMMsg(conversationId, userId primitive.ObjectID, content string, index int) *mmsg.Message {
+func AssistantMMsg(conversationId, userId bson.ObjectID, content string, index int) *mmsg.Message {
 	now := time.Now()
 	return &mmsg.Message{
-		MessageId:      primitive.NewObjectID(),
+		MessageId:      bson.NewObjectID(),
 		ConversationId: conversationId,
 		SectionId:      conversationId,
 		UserId:         userId,

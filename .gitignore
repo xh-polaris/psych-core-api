@@ -36,3 +36,5 @@ _testmain.go
 dumped_hertz_remote_config.json
 
 /etc/
+/test/
+/psych-core-api

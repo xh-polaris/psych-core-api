@@ -9,22 +9,69 @@ package provider
 import (
 	"github.com/xh-polaris/psych-core-api/biz/application/service"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 )
 
 // Injectors from wire.go:
 
 func NewProvider() (*Provider, error) {
-	config, err := conf.NewConfig()
+	confConfig, err := conf.NewConfig()
 	if err != nil {
 		return nil, err
 	}
-	authService := service.AuthService{}
-	mongoMapper := message.NewMessageMongoMapper(config)
+	iMongoMapper := alarm.NewAlarmMongoMapper(confConfig)
+	userIMongoMapper := user.NewUserMongoMapper(confConfig)
+	conversationIMongoMapper := conversation.NewConversationMongoMapper(confConfig)
+	reportIMongoMapper := report.NewReportMongoMapper(confConfig)
+	alarmService := service.AlarmService{
+		AlarmMapper:        iMongoMapper,
+		UserMapper:         userIMongoMapper,
+		ConversationMapper: conversationIMongoMapper,
+		ReportMapper:       reportIMongoMapper,
+	}
+	unitIMongoMapper := unit.NewUnitMongoMapper(confConfig)
+	mongoMapper := message.NewMessageMongoMapper(confConfig)
+	dashboardService := service.DashboardService{
+		UserMapper:         userIMongoMapper,
+		UnitMapper:         unitIMongoMapper,
+		MessageMapper:      mongoMapper,
+		ConversationMapper: conversationIMongoMapper,
+		ReportMapper:       reportIMongoMapper,
+		AlarmMapper:        iMongoMapper,
+	}
+	configIMongoMapper := config.NewConfigMongoMapper(confConfig)
+	configService := service.ConfigService{
+		ConfigMapper: configIMongoMapper,
+	}
+	userService := service.UserService{
+		UserMapper: userIMongoMapper,
+		UnitMapper: unitIMongoMapper,
+	}
+	unitService := service.UnitService{
+		UnitMapper: unitIMongoMapper,
+		UserMapper: userIMongoMapper,
+	}
+	conversationService := service.ConversationService{
+		MessageMapper:      mongoMapper,
+		ConversationMapper: conversationIMongoMapper,
+	}
 	providerProvider := &Provider{
-		Config:        config,
-		AuthService:   authService,
-		MessageMapper: mongoMapper,
+		Config:              confConfig,
+		AlarmService:        alarmService,
+		DashboardService:    dashboardService,
+		ConfigService:       configService,
+		UserService:         userService,
+		UnitService:         unitService,
+		ConversationService: conversationService,
+		MessageMapper:       mongoMapper,
+		ConversationMapper:  conversationIMongoMapper,
+		ReportMapper:        reportIMongoMapper,
 	}
 	return providerProvider, nil
 }

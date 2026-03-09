@@ -1,10 +1,10 @@
 package conf
 
 import (
+	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/pkg/app"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
-	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
 )
 
 type Coze struct {
@@ -59,7 +59,7 @@ type ModelConfig struct {
 }
 
 // ChatConf 获取对话配置
-func (c *Config) ChatConf(chat *profile.ChatApp) (*app.ChatSetting, error) {
+func (c *Config) ChatConf(chat *core_api.ChatApp) (*app.ChatSetting, error) {
 	if chat == nil {
 		return nil, errorx.New(errno.ConfigErr, errorx.KV("app", "chat"))
 	}
@@ -71,7 +71,7 @@ func (c *Config) ChatConf(chat *profile.ChatApp) (*app.ChatSetting, error) {
 }
 
 // TTSConf 获取TTS配置
-func (c *Config) TTSConf(tts *profile.TTSApp) (*app.TTSSetting, error) {
+func (c *Config) TTSConf(tts *core_api.TTSApp) (*app.TTSSetting, error) {
 	if tts == nil {
 		return nil, errorx.New(errno.ConfigErr, errorx.KV("app", "tts"))
 	}
@@ -95,7 +95,7 @@ func (c *Config) ASRConf() (*app.ASRSetting, error) {
 }
 
 // ReportConf 获取报表配置
-func (c *Config) ReportConf(report *profile.ReportApp) (*app.ReportSetting, error) {
+func (c *Config) ReportConf(report *core_api.ReportApp) (*app.ReportSetting, error) {
 	if report == nil {
 		return nil, errorx.New(errno.ConfigErr, errorx.KV("app", "report"))
 	}

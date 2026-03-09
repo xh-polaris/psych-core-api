@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/xh-polaris/psych-core-api/biz/application/service"
 	"io"
 	"strings"
 	"sync"
@@ -60,13 +61,20 @@ type Engine struct {
 	uSession string         // uSession 对话ID
 	usage    *core.Usage    // 用量
 	conf     *core.Config
+
+	usrSvc  *service.UserService
+	cfgSvc  *service.ConfigService
+	unitSvc *service.UnitService
 }
 
 // NewEngine 创建一个新的对话引擎
-func NewEngine(ctx context.Context, conn *websocket.Conn) *Engine {
+func NewEngine(ctx context.Context, conn *websocket.Conn, usrSvc *service.UserService, cfgSvc *service.ConfigService) *Engine {
 	ctx, cancel := context.WithCancel(ctx)
-	e := &Engine{ctx: ctx, cancel: cancel, wsx: wsx.NewHZWSClient(conn), usage: &core.Usage{}, heartbeatTicker: time.NewTicker(heartbeatTimeout),
-		start: time.Now(), meta: meta, info: make(map[string]any), errs: make(chan error, 3)}
+	e := &Engine{
+		ctx: ctx, cancel: cancel, wsx: wsx.NewHZWSClient(conn), usage: &core.Usage{}, heartbeatTicker: time.NewTicker(heartbeatTimeout),
+		start: time.Now(), meta: meta, info: make(map[string]any), errs: make(chan error, 3),
+		usrSvc: usrSvc, cfgSvc: cfgSvc,
+	}
 	//e.wsx.SetCloseHandler(func(code int, text string) (err error) { // 处理close消息
 	//	if err = e.wsx.ControlClose(websocket.FormatCloseMessage(code, text)); err != nil { // 给客户端写回一个close消息
 	//		logs.Error("[engine] [close] err: %s", err)
@@ -179,7 +187,7 @@ func (e *Engine) Lock() error {
 		return nil
 	}
 	if e.lock == nil {
-		e.lock = lock.Mgr.NewLock(e.info[cst.UserId].(string))
+		e.lock = lock.Mgr.NewLock(e.info[cst.UserID].(string))
 	}
 	if ok, err := e.lock.TryLock(e.ctx, time.Minute*3, time.Second*90, time.Minute*2); err != nil {
 		return errorx.WrapByCode(err, errno.UnKnown)

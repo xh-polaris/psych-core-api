@@ -30,3 +30,168 @@ func _usersigninMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _dashboardMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardgetalarmoverviewMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardlistalarmusersMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardlistclassesMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardgetdataoverviewMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardlistusersMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _configMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _configcreateMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _configgetbyunitidMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _configupdateinfoMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardlistalarmrecordsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardgetpsychtrendMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardgetdatatrendMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardlistunitsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _unitMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _unitcreateandlinkuserMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _unitgetinfoMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _unitlinkuserMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _unitsigninMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _unitsignupMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _unitupdateinfoMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _unitupdatepasswordMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _usersignupMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _userupdateinfoMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _userupdatepasswordMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboarduserconvrecordsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardgetreportMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardupdatealarmMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardunitconvrecordsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _conversationMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _createconversationMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _getconversationMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _listconversationsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

@@ -1,18 +1,16 @@
 package engine
 
 import (
+	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/app"
 	_ "github.com/xh-polaris/psych-core-api/pkg/app/volc/asr"
 	_ "github.com/xh-polaris/psych-core-api/pkg/app/volc/tts"
 	"github.com/xh-polaris/psych-core-api/pkg/core"
-	"github.com/xh-polaris/psych-core-api/pkg/logs"
-	"github.com/xh-polaris/psych-idl/kitex_gen/profile"
-
-	"github.com/xh-polaris/psych-core-api/biz/infra/rpc"
-	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
+	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 )
 
@@ -21,15 +19,58 @@ func (e *Engine) config() error {
 	var err error
 	var cf *core.Config
 	var wfc *core.WorkFlowConfig
-	var configResp *profile.ConfigGetByUnitIdResp
-	pm := rpc.GetPsychProfile()
+	var configResp *core_api.ConfigGetByUnitIdResp
 
 	// 获取配置
-	req := &profile.ConfigGetByUnitIdReq{UnitId: e.info[cst.UnitId].(string), Admin: true}
-	if configResp, err = pm.ConfigGetByUnitID(e.ctx, req); err != nil {
-		logs.Error("[engine] [%s] UnitAppConfigGetByUnitId err: %v", core.AConfig, err)
-		return e.MWrite(core.MErr, core.ToErr(errorx.WrapByCode(err, errno.GetConfigErr)))
+	req := &core_api.ConfigGetByUnitIdReq{UnitId: e.info[cst.JsonUnitID].(string), Admin: true}
+	if e.cfgSvc != nil {
+		if configResp, err = e.cfgSvc.ConfigGetByUnitID(e.ctx, req); err != nil {
+			logs.Error("[engine] [%s] UnitAppConfigGetByUnitId err: %v", core.AConfig, err)
+			return e.MWrite(core.MErr, core.ToErr(errorx.WrapByCode(err, errno.GetConfigErr)))
+		}
+	} else {
+		// 本地fallback: 从 conf.ModelConfig 中选取第一个可用 provider 来构造最小 Config
+		confLocal := conf.GetConfig()
+		var chatProvider string
+		var ttsProvider string
+		if confLocal != nil && confLocal.ModelConfig != nil {
+			for k := range confLocal.ModelConfig.Chat {
+				chatProvider = k
+				break
+			}
+			for k := range confLocal.ModelConfig.TTS {
+				ttsProvider = k
+				break
+			}
+		}
+		configResp = &core_api.ConfigGetByUnitIdResp{
+			Config: &core_api.Config{
+				Type: "",
+				Chat: &core_api.ChatApp{
+					Name:        "",
+					Description: "",
+					Provider:    chatProvider,
+					AppId:       "",
+				},
+				Tts: &core_api.TTSApp{
+					Name:        "",
+					Description: "",
+					Provider:    ttsProvider,
+					AppId:       "",
+					Speaker:     "",
+				},
+				Report: &core_api.ReportApp{
+					Name:        "",
+					Description: "",
+					Provider:    "",
+					AppId:       "",
+				},
+			},
+			Code: 0,
+			Msg:  "local-fallback",
+		}
 	}
+
 	// 构造配置
 	if cf, wfc, err = e.buildConfig(configResp); err != nil {
 		logs.Error("[workflow] [config] build config err: %v", err)
@@ -59,12 +100,12 @@ func (e *Engine) config() error {
 }
 
 // 构造配置
-func (e *Engine) buildConfig(resp *profile.ConfigGetByUnitIdResp) (c *core.Config, wfc *core.WorkFlowConfig, err error) {
+func (e *Engine) buildConfig(resp *core_api.ConfigGetByUnitIdResp) (c *core.Config, wfc *core.WorkFlowConfig, err error) {
 	wfc = &core.WorkFlowConfig{}
 	if wfc.ChatConfig, err = conf.GetConfig().ChatConf(resp.Config.Chat); err != nil {
 		return
 	}
-	wfc.ChatConfig.UserId = e.info[cst.UserId].(string)
+	wfc.ChatConfig.UserId = e.info[cst.UserID].(string)
 	if wfc.TTSConfig, err = conf.GetConfig().TTSConf(resp.Config.Tts); err != nil {
 		return
 	}
