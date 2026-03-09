@@ -49,7 +49,7 @@ func (m *mongoMapper) RetrieveMessage(ctx context.Context, conversation string, 
 	if size > 0 {
 		opts.SetLimit(int64(size))
 	}
-	if err = m.conn.Find(ctx, &msgs, bson.M{"conversation_id": oid, cst.Status: bson.M{cst.NE: cst.DeletedStatus}},
+	if err = m.conn.Find(ctx, &msgs, bson.M{cst.ConversationID: oid, cst.Status: bson.M{cst.NE: cst.DeletedStatus}},
 		opts); err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
 		logs.Errorf("[message mapper] find err:%s", errorx.ErrorWithoutStack(err))
 		return nil, err

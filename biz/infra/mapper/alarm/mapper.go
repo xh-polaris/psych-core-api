@@ -60,7 +60,7 @@ func (m *mongoMapper) RetrieveByTime(ctx context.Context, unitID bson.ObjectID, 
 		tf[cst.LT] = end
 	}
 
-	f := bson.M{cst.UnitId: unitID, cst.Status: bson.M{cst.NE: cst.DeletedStatus}}
+	f := bson.M{cst.UnitID: unitID, cst.Status: bson.M{cst.NE: cst.DeletedStatus}}
 	if len(tf) > 0 {
 		f[cst.CreateTime] = tf
 	}
@@ -82,7 +82,7 @@ func (m *mongoMapper) CountByTime(ctx context.Context, unitID bson.ObjectID, sta
 		tf[cst.LT] = end
 	}
 	// 若有传入时间限制 将时间过滤器tf，填入filter
-	f := bson.M{cst.UnitId: unitID, cst.Status: bson.M{cst.NE: cst.DeletedStatus}}
+	f := bson.M{cst.UnitID: unitID, cst.Status: bson.M{cst.NE: cst.DeletedStatus}}
 	if len(tf) != 0 {
 		f[cst.CreateTime] = tf
 	}
@@ -129,7 +129,7 @@ func (m *mongoMapper) AggregateStats(ctx context.Context, unitID bson.ObjectID, 
 	// 使用 $facet 一次查询获取当前周和上周的数据
 	pipeline := mongo.Pipeline{
 		{{Key: "$match", Value: bson.M{
-			cst.UnitId: unitID,
+			cst.UnitID: unitID,
 			cst.Status: bson.M{cst.NE: cst.DeletedStatus},
 		}}},
 		{{Key: "$facet", Value: bson.M{
@@ -216,7 +216,7 @@ func (m *mongoMapper) EmotionDistribution(ctx context.Context, unitId *bson.Obje
 		cst.Status: bson.M{cst.NE: cst.DeletedStatus},
 	}
 	if unitId != nil {
-		match[cst.UnitId] = *unitId
+		match[cst.UnitID] = *unitId
 	}
 
 	pipeline := mongo.Pipeline{

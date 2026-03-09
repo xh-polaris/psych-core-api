@@ -22,7 +22,7 @@ func (e *Engine) config() error {
 	var configResp *core_api.ConfigGetByUnitIdResp
 
 	// 获取配置
-	req := &core_api.ConfigGetByUnitIdReq{UnitId: e.info[cst.UnitId].(string), Admin: true}
+	req := &core_api.ConfigGetByUnitIdReq{UnitId: e.info[cst.JsonUnitID].(string), Admin: true}
 	if e.cfgSvc != nil {
 		if configResp, err = e.cfgSvc.ConfigGetByUnitID(e.ctx, req); err != nil {
 			logs.Error("[engine] [%s] UnitAppConfigGetByUnitId err: %v", core.AConfig, err)

@@ -15,7 +15,7 @@ type Unit struct {
 	Contact    string        `json:"contact,omitempty" bson:"contact,omitempty"`
 	Level      int           `json:"level,omitempty" bson:"level,omitempty"`
 	Status     int           `json:"status,omitempty" bson:"status,omitempty"`
-	CreateTime time.Time     `json:"createTime,omitempty" bson:"createTime,omitempty"`
-	UpdateTime time.Time     `json:"updateTime,omitempty" bson:"updateTime,omitempty"`
-	DeleteTime time.Time     `json:"deleteTime,omitempty" bson:"deleteTime,omitempty"`
+	CreateTime time.Time     `json:"createTime,omitempty" bson:"create_time,omitempty"`
+	UpdateTime time.Time     `json:"updateTime,omitempty" bson:"update_time,omitempty"`
+	DeleteTime time.Time     `json:"deleteTime,omitempty" bson:"delete_time,omitempty"`
 }

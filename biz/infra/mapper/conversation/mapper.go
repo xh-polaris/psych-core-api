@@ -111,7 +111,7 @@ func (m *mongoMapper) countWithUnitFilter(ctx context.Context, unitId *bson.Obje
 				"foreignField": cst.ID,
 				"as":           "userDoc",
 			}},
-			bson.M{"$match": bson.M{"userDoc.unitId": *unitId}},
+			bson.M{"$match": bson.M{"userDoc.unit_id": *unitId}},
 		)
 	}
 
@@ -165,7 +165,7 @@ func (m *mongoMapper) averageDurationWithFilter(ctx context.Context, unitId *bso
 				"foreignField": cst.ID,
 				"as":           "userDoc",
 			}},
-			bson.M{"$match": bson.M{"userDoc.unitId": *unitId}},
+			bson.M{"$match": bson.M{"userDoc.unit_id": *unitId}},
 		)
 	}
 
@@ -225,7 +225,7 @@ func (m *mongoMapper) CountActiveUsers(ctx context.Context, unitId *bson.ObjectI
 				"foreignField": cst.ID,
 				"as":           "userDoc",
 			}},
-			bson.M{"$match": bson.M{"userDoc.unitId": *unitId}},
+			bson.M{"$match": bson.M{"userDoc.unit_id": *unitId}},
 		)
 	}
 

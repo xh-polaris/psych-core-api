@@ -50,8 +50,8 @@ func ExtraUserMeta(ctx context.Context) (m *usr.Meta, err error) {
 	if claims, err = ParseJwt(string(c.GetHeader("Authorization"))); err != nil {
 		return nil, err
 	}
-	meta.UserId = claims[cst.UserID].(string)
-	meta.UnitId = claims[cst.UnitId].(string)
-	meta.Code = claims[cst.Code].(string)
+	meta.UserId = claims[cst.JsonUserID].(string)
+	meta.UnitId = claims[cst.JsonUnitID].(string)
+	meta.Code = claims[cst.JsonCode].(string)
 	return &meta, nil
 }

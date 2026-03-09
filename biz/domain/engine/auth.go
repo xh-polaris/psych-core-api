@@ -27,7 +27,7 @@ func (e *Engine) auth(auth *core.Auth) (bool, error) {
 		return false, e.MWrite(core.MErr, merr)
 	}
 	e.info = alreadyAuth.Info
-	if cid, ok := alreadyAuth.Info[cst.ConversationID]; ok {
+	if cid, ok := alreadyAuth.Info[cst.JsonConversationID]; ok {
 		e.uSession = cid.(string)
 	} else {
 		e.uSession = bson.NewObjectID().Hex()
@@ -47,9 +47,9 @@ func (e *Engine) already(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Er
 	// 提取字段
 	alreadyAuth.Info = auth.Info
 	e.info = alreadyAuth.Info
-	e.info[cst.UnitId] = claims[cst.UnitId].(string)
-	e.info[cst.UserID] = claims[cst.UserID].(string)
-	e.info[cst.Code] = claims[cst.Code].(string)
+	e.info[cst.JsonUserID] = claims[cst.JsonUnitID].(string)
+	e.info[cst.JsonCode] = claims[cst.JsonUserID].(string)
+	e.info[cst.JsonCode] = claims[cst.JsonCode].(string)
 	return alreadyAuth, nil
 }
 
@@ -64,7 +64,7 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 		return nil, core.ToErr(errorx.New(errno.ErrInternalError))
 	}
 	signReq := &core_api.UserSignInReq{
-		UnitId:     auth.Info[cst.UnitId].(string),
+		UnitId:     auth.Info[cst.JsonUnitID].(string),
 		AuthType:   auth.AuthType,
 		AuthId:     auth.AuthID,
 		VerifyCode: auth.VerifyCode,
@@ -81,9 +81,9 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 	if alreadyAuth.Info == nil {
 		alreadyAuth.Info = make(map[string]any)
 	}
-	alreadyAuth.Info[cst.UnitId] = signResp.UnitId
-	alreadyAuth.Info[cst.UserID] = signResp.UserId
-	alreadyAuth.Info[cst.Code] = signResp.CodeValue
+	alreadyAuth.Info[cst.JsonUnitID] = signResp.UnitId
+	alreadyAuth.Info[cst.JsonUserID] = signResp.UserId
+	alreadyAuth.Info[cst.JsonCode] = signResp.CodeValue
 	e.info = alreadyAuth.Info
 	return
 }

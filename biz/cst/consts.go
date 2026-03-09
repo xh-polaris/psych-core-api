@@ -15,57 +15,66 @@ const (
 	ToolEnum = 3
 )
 
+// json字段枚举
+const (
+	JsonUserID         = "userId"
+	JsonUnitID         = "unitId"
+	JsonConversationID = "conversationId"
+	JsonCode           = "code"
+)
+
 // mapper层字段枚举
 const (
 	ID             = "_id"
-	ConversationID = "conversationId"
-	MessageID      = "messageId"
-	UserID         = "userId"
-	CreateTime     = "createTime"
-	UpdateTime     = "updateTime"
-	DeleteTime     = "deleteTime"
-	UnitId         = "unitId"
+	ConversationID = "conversation_id"
+	MessageID      = "message_id"
+	UserID         = "user_id"
+	CreateTime     = "create_time"
+	UpdateTime     = "update_time"
+	DeleteTime     = "delete_time"
 	Code           = "code"
-	CodeType       = "codeType"
+	CodeType       = "code_type"
 	Role           = "role"
 	Phone          = "phone"
-	StudentID      = "studentId"
 	Name           = "name"
-	UnitID         = "unitId"
+	UnitID         = "unit_id"
 	Gender         = "gender"
 	Birth          = "birth"
-	EnrollYear     = "enrollYear"
+	EnrollYear     = "enroll_year"
 	Grade          = "grade"
 	Class          = "class"
 	Address        = "address"
 	Contact        = "contact"
 	Password       = "password"
-	RiskLevel      = "riskLevel"
+	RiskLevel      = "risk_level"
 	Remark         = "remark"
 
 	Status        = "status"
 	DeletedStatus = -1
-	Processed     = "processed" // 预警状态-已处理
-	Pending       = "pending"   // 预警状态-待处理
-	Emotion       = "emotion"
-	Meta          = "$meta"
-	TextScore     = "textScore"
-	Score         = "score"
-	NE            = "$ne"
-	LT            = "$lt"
-	GT            = "$gt"
-	In            = "$in"
-	Set           = "$set"
-	Text          = "$text"
-	Search        = "$search"
-	Regex         = "$regex"
-	Options       = "$options"
 
-	// 预警管理-情绪类型
+	Emotion   = "emotion"
+	Meta      = "$meta"
+	TextScore = "textScore"
+	Score     = "score"
+	NE        = "$ne"
+	LT        = "$lt"
+	GT        = "$gt"
+	In        = "$in"
+	Set       = "$set"
+	Text      = "$text"
+	Search    = "$search"
+	Regex     = "$regex"
+	Options   = "$options"
+
+	// 预警管理
+	// 情绪类型
 	Danger   = "danger"
 	Depress  = "depress"
 	Negative = "negative"
 	Normal   = "normal"
+	// 预警记录状态
+	Processed = "processed"
+	Pending   = "pending"
 
 	// 用户风险等级
 	High   = "high"

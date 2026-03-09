@@ -57,16 +57,21 @@ func NewProvider() (*Provider, error) {
 		UnitMapper: unitIMongoMapper,
 		UserMapper: userIMongoMapper,
 	}
-	providerProvider := &Provider{
-		Config:             confConfig,
-		AlarmService:       alarmService,
-		DashboardService:   dashboardService,
-		ConfigService:      configService,
-		UserService:        userService,
-		UnitService:        unitService,
+	conversationService := service.ConversationService{
 		MessageMapper:      mongoMapper,
 		ConversationMapper: conversationIMongoMapper,
-		ReportMapper:       reportIMongoMapper,
+	}
+	providerProvider := &Provider{
+		Config:              confConfig,
+		AlarmService:        alarmService,
+		DashboardService:    dashboardService,
+		ConfigService:       configService,
+		UserService:         userService,
+		UnitService:         unitService,
+		ConversationService: conversationService,
+		MessageMapper:       mongoMapper,
+		ConversationMapper:  conversationIMongoMapper,
+		ReportMapper:        reportIMongoMapper,
 	}
 	return providerProvider, nil
 }

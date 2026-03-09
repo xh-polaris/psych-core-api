@@ -19,6 +19,7 @@ type IConversationService interface {
 	CreateConversation(ctx context.Context, req *core_api.CreateConversationReq) (resp *core_api.CreateConversationResp, err error)
 	ListConversations(ctx context.Context, req *core_api.ListConversationsReq) (resp *core_api.ListConversationsResp, err error)
 	GetConversation(ctx context.Context, req *core_api.GetConversationReq) (resp *core_api.GetConversationResp, err error)
+	FinishConversation(ctx context.Context)
 }
 
 type ConversationService struct {
@@ -61,7 +62,7 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 	//}
 
 	userId := bson.NewObjectID() // TODO
-
+	userId, _ = bson.ObjectIDFromHex("69abcc4f7f113a15afc12fda")
 	total, err := c.ConversationMapper.CountByUser(ctx, userId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrListConversation)
@@ -81,7 +82,7 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 		return nil, errorx.New(errno.ErrListConversation)
 	}
 
-	convs := make([]*core_api.Conversation, len(dbConvs))
+	convs := make([]*core_api.Conversation, 0, len(dbConvs))
 	for _, dbConv := range dbConvs {
 		conv := &core_api.Conversation{
 			ConversationId: dbConv.ID.Hex(),
@@ -117,7 +118,7 @@ func (c *ConversationService) GetConversation(ctx context.Context, req *core_api
 	total := int32(len(rawMsgs))
 	startIdx, endIdx := util.PagedIndex(total, req.PaginationOptions)
 
-	msgs := make([]*core_api.Message, len(rawMsgs))
+	msgs := make([]*core_api.Message, 0, len(rawMsgs))
 	for _, rawMsg := range rawMsgs[startIdx:endIdx] {
 		msgs = append(msgs, &core_api.Message{
 			Content: rawMsg.Content,
@@ -131,3 +132,5 @@ func (c *ConversationService) GetConversation(ctx context.Context, req *core_api
 		MessageList: msgs,
 	}, nil
 }
+
+func (c *ConversationService) FinishConversation(ctx context.Context) {}
