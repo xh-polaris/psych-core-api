@@ -3,7 +3,6 @@ package wordcld
 import (
 	"bufio"
 	"context"
-	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -11,9 +10,11 @@ import (
 	"sync"
 	"unicode/utf8"
 
+	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
+	"github.com/xh-polaris/psych-core-api/pkg/filter"
 	"github.com/yanyiwu/gojieba"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -26,8 +27,8 @@ type WordCloudExtractor struct {
 }
 
 var (
-	// 全局停用词集合
-	stopWords     map[string]struct{}
+	// 全局过滤引擎
+	dfaFilter     *filter.DFAFilter
 	stopWordsOnce sync.Once
 
 	// 文本清理正则表达式
@@ -44,36 +45,52 @@ var defaultStopWords = []string{
 	"但是", "不过", "然后", "所以", "因为", "如果", "虽然", "虽说",
 	"就是", "只是", "还是", "还有", "而且", "并且", "或", "和",
 	"啊", "呀", "哦", "嗯", "呢", "吧", "吗", "呗", "哈", "嘿",
+	"好的", "好的吧", "明白", "知道", "好吧", "没问题", "确实是",
 }
 
-// loadStopWords 加载停用词列表
-func loadStopWords() {
-	stopWords = make(map[string]struct{})
+// 词性黑名单 (针对虚词、代词等)
+var posBlacklist = map[string]struct{}{
+	"x":  {}, // 非语素词
+	"zg": {}, // 状态词
+	"uj": {}, // 助词
+	"ul": {}, // 助词
+	"uv": {}, // 助词
+	"uz": {}, // 助词
+	"ug": {}, // 助词
+	"r":  {}, // 代词
+	"c":  {}, // 连词
+	"p":  {}, // 介词
+	"u":  {}, // 助词
+	"y":  {}, // 语气词
+	"e":  {}, // 叹词
+	"o":  {}, // 拟声词
+	"m":  {}, // 数词
+	"q":  {}, // 量词
+}
 
-	// 尝试从配置文件加载
+// loadStopWords 加载并初始化 DFA 过滤器
+func loadStopWords() {
+	dfaFilter = filter.NewDFAFilter()
+
+	// 1. 加载默认停用词
+	for _, word := range defaultStopWords {
+		dfaFilter.AddWord(strings.TrimSpace(word))
+	}
+
+	// 2. 尝试从配置文件加载
 	stopWordsPath := os.Getenv("STOPWORDS_PATH")
 	if stopWordsPath == "" {
 		stopWordsPath = "etc/stopwords.txt"
 	}
 
-	// 尝试相对于工作目录和可执行文件目录
 	paths := []string{
 		stopWordsPath,
 		filepath.Join("etc", "stopwords.txt"),
 	}
 
-	loaded := false
 	for _, path := range paths {
 		if err := loadStopWordsFromFile(path); err == nil {
-			loaded = true
 			break
-		}
-	}
-
-	// 如果没有成功从文件加载，使用默认停用词表
-	if !loaded {
-		for _, word := range defaultStopWords {
-			stopWords[strings.TrimSpace(word)] = struct{}{}
 		}
 	}
 }
@@ -89,25 +106,21 @@ func loadStopWordsFromFile(path string) error {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		word := strings.TrimSpace(scanner.Text())
-		if word != "" && !strings.HasPrefix(word, "#") { // 支持注释行
-			stopWords[word] = struct{}{}
+		if word != "" && !strings.HasPrefix(word, "#") {
+			dfaFilter.AddWord(word)
 		}
-	}
-
-	// 添加默认停用词以确保基本覆盖
-	for _, word := range defaultStopWords {
-		stopWords[strings.TrimSpace(word)] = struct{}{}
 	}
 
 	return scanner.Err()
 }
 
-// ensureStopWordsLoaded 确保停用词已加载
+// ensureStopWordsLoaded 确保过滤器已初始化
 func ensureStopWordsLoaded() {
 	stopWordsOnce.Do(loadStopWords)
 }
 
 func NewWordCloudExtractor(rptMapper report.IMongoMapper) *WordCloudExtractor {
+	ensureStopWordsLoaded()
 	Extractor = WordCloudExtractor{
 		rptMapper: rptMapper,
 		jieba:     gojieba.NewJieba(),
@@ -120,35 +133,43 @@ func (wce *WordCloudExtractor) Free() {
 }
 
 func (wce *WordCloudExtractor) FromHisMsg(msgs []*message.Message) (*core_api.Keywords, error) {
-	var builder strings.Builder
+	if len(msgs) == 0 {
+		return &core_api.Keywords{KeywordMap: make(map[string]int32), KeyTotal: 0}, nil
+	}
+
+	wordCounts := make(map[string]int32)
 	for _, msg := range msgs {
-		if msg.Role == message.RoleStoI[cst.User] {
-			// 预处理消息内容：去除多余空白和标点
-			content := preprocessText(msg.Content)
-			if content != "" {
-				builder.WriteString(content)
-				builder.WriteString(" ")
+		if msg.Role != message.RoleStoI[cst.User] {
+			continue
+		}
+
+		// 预处理
+		content := preprocessText(msg.Content)
+		if content == "" {
+			continue
+		}
+
+		// 使用词性标注
+		tags := wce.jieba.Tag(content)
+		for _, tag := range tags {
+			parts := strings.Split(tag, "/")
+			if len(parts) != 2 {
+				continue
+			}
+			word, pos := parts[0], parts[1]
+
+			// 标准化
+			word = normalizeWord(word)
+
+			// 组合校验：1.词性校验 2.合法性校验 3.DFA停用词/敏感词校验
+			if isPOSAllowed(pos) && isValidWord(word) {
+				wordCounts[word]++
 			}
 		}
 	}
 
-	text := strings.TrimSpace(builder.String())
-	if text == "" {
+	if len(wordCounts) == 0 {
 		return &core_api.Keywords{KeywordMap: make(map[string]int32), KeyTotal: 0}, nil
-	}
-
-	// 使用结巴分词
-	words := wce.jieba.Cut(text, true)
-	wordCounts := make(map[string]int32)
-
-	for _, word := range words {
-		// 标准化词语
-		normalizedWord := normalizeWord(word)
-
-		// 过滤无效词语
-		if isValidWord(normalizedWord) {
-			wordCounts[normalizedWord]++
-		}
 	}
 
 	return &core_api.Keywords{
@@ -157,36 +178,40 @@ func (wce *WordCloudExtractor) FromHisMsg(msgs []*message.Message) (*core_api.Ke
 	}, nil
 }
 
+// isPOSAllowed 词性校验
+func isPOSAllowed(pos string) bool {
+	if _, black := posBlacklist[pos]; black {
+		return false
+	}
+	return true
+}
+
 // preprocessText 预处理文本内容
 func preprocessText(text string) string {
 	if text == "" {
 		return ""
 	}
-
-	// 移除多余的标点符号，保留中文、字母和数字
+	// 移除标点
 	text = punctuationRegex.ReplaceAllString(text, " ")
-
-	// 标准化空白字符
+	// 标准化空白
 	text = whitespaceRegex.ReplaceAllString(text, " ")
-
 	return strings.TrimSpace(text)
 }
 
 // normalizeWord 标准化词语
 func normalizeWord(word string) string {
 	word = strings.TrimSpace(word)
-	word = strings.ToLower(word) // 转为小写（对英文有效）
+	word = strings.ToLower(word)
 	return word
 }
 
-// isValidWord 判断词语是否有效
+// isValidWord 判断词语是否有效 (常规校验)
 func isValidWord(word string) bool {
-	// 空词检查
 	if word == "" {
 		return false
 	}
 
-	// 长度检查：过滤过短的词
+	// 长度检查：过滤单字 (除非是特定的实词，但在词云中单字通常意义不大)
 	if utf8.RuneCountInString(word) < 2 {
 		return false
 	}
@@ -198,8 +223,8 @@ func isValidWord(word string) bool {
 		return false
 	}
 
-	// 停用词检查
-	if isStopWord(word) {
+	// DFA 停用词校验
+	if dfaFilter.IsMatched(word) {
 		return false
 	}
 
@@ -232,11 +257,4 @@ func (wce *WordCloudExtractor) FromAllUnitsKWs(ctx context.Context) (*core_api.K
 		KeywordMap: kws,
 		KeyTotal:   int32(len(kws)),
 	}, nil
-}
-
-// isStopWord 判断是否为停用词
-func isStopWord(word string) bool {
-	ensureStopWordsLoaded()
-	_, found := stopWords[word]
-	return found
 }
