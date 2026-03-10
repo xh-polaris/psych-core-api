@@ -47,6 +47,7 @@ type IDashboardService interface {
 
 	// 对话记录
 	DashboardUserConvRecords(ctx context.Context, req *core_api.DashboardUserConvRecordsReq) (*core_api.DashboardUserConvRecordsResp, error)
+	DashboardUnitConvRecords(ctx context.Context, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error)
 	DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error)
 }
 
@@ -661,18 +662,19 @@ func (s *DashboardService) DashboardListClasses(ctx context.Context, req *core_a
 	}
 
 	// 查询结果
-	res, err := s.UserMapper.CountByClasses(ctx, unitOID, grades, classes)
+	clsStats, err := s.UserMapper.CountByClasses(ctx, unitOID, grades, classes)
+	clsTeachers, err := s.UserMapper.FindUnitClassTeachers(ctx, unitOID)
 	if err != nil {
 		return nil, errorx.New(errno.ErrCountUserByClasses)
 	}
 
 	// 整理结果，构建响应
 	return &core_api.DashboardListClassesResp{
-		Grades: aggregateAndSort(res),
+		Grades: aggregateAndSort(clsStats, clsTeachers),
 	}, nil
 }
 
-func aggregateAndSort(mapperRes []*user.ClassStatResult) []*core_api.GradeInfo {
+func aggregateAndSort(mapperRes []*user.ClassStatResult, clsTeachers user.ClassTeachers) []*core_api.GradeInfo {
 	if len(mapperRes) == 0 {
 		return make([]*core_api.GradeInfo, 0)
 	}
@@ -696,8 +698,8 @@ func aggregateAndSort(mapperRes []*user.ClassStatResult) []*core_api.GradeInfo {
 			Class:        item.Info.Class,
 			UserNum:      uNum,
 			AlarmNum:     aNum,
-			TeacherName:  "",
-			TeacherPhone: "",
+			TeacherName:  clsTeachers[item.Info.Grade][item.Info.Class].Name,
+			TeacherPhone: clsTeachers[item.Info.Grade][item.Info.Class].Code,
 		})
 	}
 
@@ -1034,4 +1036,31 @@ func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api
 		Code:      200,
 		Msg:       "success",
 	}, nil
+}
+
+func (s *DashboardService) DashboardUnitConvRecords(ctx context.Context, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error) {
+	if uid := req.GetUnitId(); uid != "" {
+		return s.getOneUnitConvs(ctx, req)
+	}
+
+	return s.getAllUnitsConvs(ctx, req)
+}
+
+// req包含unitId
+func (s *DashboardService) getOneUnitConvs(ctx context.Context, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error) {
+	unitOID, err := bson.ObjectIDFromHex(req.GetUnitId())
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitId"), errorx.KV("value", "用户ID"))
+	}
+
+	_, err = s.ConversationMapper.CountByUnit(ctx, &unitOID)
+	if err != nil {
+		return nil, errorx.New(errno.ErrDashboardGetConversations)
+	}
+
+	return nil, errorx.New(errno.UnImplementErr)
+}
+
+func (s *DashboardService) getAllUnitsConvs(ctx context.Context, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error) {
+	return nil, errorx.New(errno.UnImplementErr)
 }
