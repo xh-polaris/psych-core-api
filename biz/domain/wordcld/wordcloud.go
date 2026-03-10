@@ -3,13 +3,14 @@ package wordcld
 import (
 	"bufio"
 	"context"
-	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
 	"unicode/utf8"
+
+	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
@@ -107,10 +108,45 @@ func ensureStopWordsLoaded() {
 	stopWordsOnce.Do(loadStopWords)
 }
 
+// initJiebaInstance 初始化jieba实例
+func initJiebaInstance() *gojieba.Jieba {
+	dictPath := os.Getenv("JIEBA_DICT_PATH")
+
+	// 在生产环境（Docker）中，必须使用自定义路径，因为默认的Go模块路径不存在
+	// 如果没有设置环境变量，设置默认值为Docker中的字典路径
+	if dictPath == "" {
+		dictPath = "/app/dict"
+	}
+
+	// 检查自定义字典目录是否存在并包含必要的字典文件
+	requiredFiles := []string{
+		"jieba.dict.utf8",
+		"hmm_model.utf8",
+		"user.dict.utf8",
+		"idf.utf8",
+		"stop_words.utf8",
+	}
+
+	// 检查所有字典文件是否存在
+	dictPaths := make([]string, 0, len(requiredFiles))
+	for _, filename := range requiredFiles {
+		fullPath := filepath.Join(dictPath, filename)
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+			// 如果字典文件不存在，尝试使用gojieba的默认配置（仅限开发环境）
+			// 生产环境中这通常会失败，所以应该确保字典文件正确部署
+			return gojieba.NewJieba()
+		}
+		dictPaths = append(dictPaths, fullPath)
+	}
+
+	// 如果所有字典文件都存在，使用自定义路径
+	return gojieba.NewJieba(dictPaths...)
+}
+
 func NewWordCloudExtractor(rptMapper report.IMongoMapper) *WordCloudExtractor {
 	Extractor = WordCloudExtractor{
 		rptMapper: rptMapper,
-		jieba:     gojieba.NewJieba(),
+		jieba:     initJiebaInstance(),
 	}
 	return &Extractor
 }
