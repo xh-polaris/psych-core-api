@@ -593,7 +593,7 @@ func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core
 		EmotionRatio: emoRatio,
 		Risks:        riskDistributions,
 		Keywords:     keywords,
-		Code:         200,
+		Code:         0,
 		Msg:          "success",
 	}, nil
 }
@@ -669,6 +669,8 @@ func (s *DashboardService) DashboardListClasses(ctx context.Context, req *core_a
 	// 整理结果，构建响应
 	return &core_api.DashboardListClassesResp{
 		Grades: aggregateAndSort(res),
+		Code:   0,
+		Msg:    "success",
 	}, nil
 }
 
@@ -738,6 +740,8 @@ func (s *DashboardService) DashboardListUsers(ctx context.Context, req *core_api
 	return &core_api.DashboardListUsersResp{
 		RiskUsers:  riskUsers,
 		Pagination: pg,
+		Code:       0,
+		Msg:        "success",
 	}, err2
 
 }
@@ -856,7 +860,7 @@ func (s *DashboardService) DashboardUserConvRecords(ctx context.Context, req *co
 		UserConvTrend: userConvTrend,
 		ConvDetail:    convDetail,
 		Pagination:    pagination,
-		Code:          200,
+		Code:          0,
 		Msg:           "success",
 	}
 
@@ -1031,7 +1035,7 @@ func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api
 		Emotion:   rpt.Emotion,
 		Body:      rpt.Body,
 		NeedAlarm: rpt.NeedAlarm,
-		Code:      200,
+		Code:      0,
 		Msg:       "success",
 	}, nil
 }

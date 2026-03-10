@@ -50,7 +50,7 @@ func (c *ConversationService) CreateConversation(ctx context.Context, req *core_
 
 	return &core_api.CreateConversationResp{
 		ConversationId: temp.Hex(),
-		Code:           200,
+		Code:           0,
 		Msg:            "success",
 	}, nil
 }
@@ -71,7 +71,7 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 	if total == 0 {
 		return &core_api.ListConversationsResp{
 			Pagination: util.PaginationRes(0, req.PaginationOptions),
-			Code:       200,
+			Code:       0,
 			Msg:        "success",
 		}, nil
 	}
@@ -96,7 +96,7 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 	return &core_api.ListConversationsResp{
 		Pagination:       util.PaginationRes(total, req.PaginationOptions),
 		ConversationList: convs,
-		Code:             200,
+		Code:             0,
 		Msg:              "success",
 	}, nil
 }
@@ -130,6 +130,8 @@ func (c *ConversationService) GetConversation(ctx context.Context, req *core_api
 	return &core_api.GetConversationResp{
 		Pagination:  util.PaginationRes(total, req.PaginationOptions),
 		MessageList: msgs,
+		Code:        0,
+		Msg:         "success",
 	}, nil
 }
 

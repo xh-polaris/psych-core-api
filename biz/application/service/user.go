@@ -148,7 +148,7 @@ func (u *UserService) UserSignUp(ctx context.Context, req *core_api.UserSignUpRe
 			CreateTime: userDAO.CreateTime.Unix(),
 			UpdateTime: userDAO.UpdateTime.Unix(),
 		},
-		Code: 200,
+		Code: 0,
 		Msg:  "success",
 	}, nil
 }
@@ -201,7 +201,7 @@ func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInRe
 		UserId:    userDAO.ID.Hex(),
 		CodeValue: userDAO.Code,
 		CodeType:  codeType,
-		Code:      200,
+		Code:      0,
 		Msg:       "success",
 	}, nil
 }
@@ -263,7 +263,7 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 			UpdateTime: userDAO.UpdateTime.Unix(),
 			DeleteTime: userDAO.DeleteTime.Unix(),
 		},
-		Code: 200,
+		Code: 0,
 		Msg:  "success",
 	}, nil
 }
@@ -328,7 +328,7 @@ func (u *UserService) UserUpdateInfo(ctx context.Context, req *core_api.UserUpda
 
 	// 构造返回结果
 	return &basic.Response{
-		Code: 200,
+		Code: 0,
 		Msg:  "success",
 	}, nil
 }
@@ -394,7 +394,7 @@ func (u *UserService) UserUpdatePassword(ctx context.Context, req *core_api.User
 
 	// 构造返回结果
 	return &basic.Response{
-		Code: 200,
+		Code: 0,
 		Msg:  "success",
 	}, nil
 }

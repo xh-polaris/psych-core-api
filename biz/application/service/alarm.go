@@ -60,7 +60,7 @@ func (s *AlarmService) Overview(ctx context.Context, req *core_api.DashboardGetA
 		ProcessedChange: st.ProcessedChange,
 		PendingChange:   st.PendingChange,
 		TrackChange:     st.TrackChange,
-		Code:            200,
+		Code:            0,
 		Msg:             "success",
 	}, nil
 }
@@ -76,7 +76,7 @@ func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardL
 	if total == 0 {
 		return &core_api.DashboardListAlarmRecordsResp{
 			Pagination: util.PaginationRes(total, req.PaginationOptions),
-			Code:       200,
+			Code:       0,
 			Msg:        "success",
 		}, nil
 	}
@@ -94,7 +94,7 @@ func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardL
 	return &core_api.DashboardListAlarmRecordsResp{
 		Records:    completeAlarm,
 		Pagination: util.PaginationRes(total, req.PaginationOptions),
-		Code:       200,
+		Code:       0,
 		Msg:        "success",
 	}, err2
 }
@@ -231,7 +231,7 @@ func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardU
 
 	// 构造返回结果
 	return &core_api.DashboardUpdateAlarmResp{
-		Code: 200,
+		Code: 0,
 		Msg:  "success",
 	}, nil
 }
