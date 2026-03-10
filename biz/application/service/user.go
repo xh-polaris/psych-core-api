@@ -2,9 +2,10 @@ package service
 
 import (
 	"context"
+	"time"
+
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
-	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
@@ -180,11 +181,12 @@ func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInRe
 		logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}
+	logs.Infof("user sign in with unit id: %s", unitId)
 
 	// 获得用户
 	userDAO, err := u.UserMapper.FindOneByCodeAndUnitID(ctx, req.AuthId, unitId)
 	if err != nil {
-		logs.Errorf("find user by code and unit id error: %s", errorx.ErrorWithoutStack(err))
+		logs.Errorf("find user by code %s and unit id %s error: %s", req.AuthId, unitId, errorx.ErrorWithoutStack(err))
 		return nil, err
 	}
 	if userDAO == nil {

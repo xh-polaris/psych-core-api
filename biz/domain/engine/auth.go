@@ -71,7 +71,7 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 	}
 	signResp, err := e.usrSvc.UserSignIn(e.ctx, signReq)
 	if err != nil {
-		logs.Error("[engine] [%s] UserSignIn err: %v", core.AAuth, err)
+		logs.Errorf("[engine] [%s] UserSignIn err: %v", core.AAuth, err)
 		// UserService 已返回带业务 code 的错误，直接透传
 		merr = core.ToErr(err)
 		return

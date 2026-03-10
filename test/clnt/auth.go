@@ -18,9 +18,9 @@ func SendAuthMessage(conn *websocket.Conn, meta *core.Meta, reader *bufio.Reader
 	if !customUser {
 		auth = core.Auth{
 			AuthType:   0,
-			AuthID:     "hsdsfz2025",                                           //promptInput(reader, "请输入AuthID: "),
-			VerifyCode: "123456",                                               //promptInput(reader, "请输入VerifyCode: "),
-			Info:       map[string]any{cst.UnitId: "691f10a80c8a2207a770ff24"}, //make(map[string]any),
+			AuthID:     "hsdsfz2025",                                               //promptInput(reader, "请输入AuthID: "),
+			VerifyCode: "123456",                                                   //promptInput(reader, "请输入VerifyCode: "),
+			Info:       map[string]any{cst.JsonUnitID: "691f10a80c8a2207a770ff24"}, //make(map[string]any),
 		}
 	} else {
 		auth = core.Auth{

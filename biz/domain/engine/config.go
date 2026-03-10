@@ -105,7 +105,7 @@ func (e *Engine) buildConfig(resp *core_api.ConfigGetByUnitIdResp) (c *core.Conf
 	if wfc.ChatConfig, err = conf.GetConfig().ChatConf(resp.Config.Chat); err != nil {
 		return
 	}
-	wfc.ChatConfig.UserId = e.info[cst.UserID].(string)
+	wfc.ChatConfig.UserId = e.info[cst.JsonUserID].(string)
 	if wfc.TTSConfig, err = conf.GetConfig().TTSConf(resp.Config.Tts); err != nil {
 		return
 	}

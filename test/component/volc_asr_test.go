@@ -16,102 +16,123 @@ import (
 var audioPath = "../output.pcm"
 
 func TestVolcASRApp(t *testing.T) {
-	asrApp := GetASRApp()
-	ctx := context.Background()
+	asrApp := GetASRApp(t)
+	t.Logf("asr app: %v", asrApp)
 
-	// 打开音频文件
 	file, err := os.Open(audioPath)
 	if err != nil {
 		t.Fatalf("无法打开音频文件: %v", err)
 	}
-	defer func() { _ = file.Close() }()
+	defer file.Close()
 
-	// 使用WaitGroup协调goroutine
-	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	err = asrApp.Dial(ctx)
-	if err != nil {
+	// 建立连接
+	if err = asrApp.Dial(ctx); err != nil {
 		t.Fatal(err)
 	}
 
-	// 发送协程
+	var wg sync.WaitGroup
+
+	// 启动接收协程
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		receiveResults(ctx, t, asrApp)
+	}()
+
+	// 启动发送协程
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		sendAudio(ctx, t, asrApp, file)
 	}()
 
-	// 8. 等待任务完成
 	wg.Wait()
-	cancel()
 }
 
-// sendAudio 发送音频数据
 func sendAudio(ctx context.Context, t *testing.T, asrApp app.ASRApp, file *os.File) {
-	//var res string
 
-	buf := make([]byte, 3200) // 每次发送3200字节（约200ms 16kHz音频）
-	last := []byte{app.LastASR}
+	buf := make([]byte, 3200)
+	//last := []byte{app.LastASR}
 
 	i := 0
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
+
 			n, err := file.Read(buf)
+
 			if err == io.EOF {
 				t.Log("音频发送完成")
-				goto e
+				goto END
 			}
+
 			if err != nil {
 				t.Errorf("读取音频失败: %v", err)
-				goto e
+				goto END
 			}
 
 			if err := asrApp.Send(ctx, buf[:n]); err != nil {
 				t.Errorf("发送失败: %v", err)
 				return
 			}
-			t.Logf("发送%d", i)
+
+			t.Logf("发送 chunk %d", i)
 			i++
-			time.Sleep(10 * time.Millisecond) // 模拟实时流
+
+			// 模拟实时音频
+			time.Sleep(10 * time.Millisecond)
 		}
 	}
-e:
-	if err := asrApp.Send(ctx, last); err != nil {
-		t.Errorf("last:%s", err.Error())
-	}
+
+END:
+
+	//if err := asrApp.Send(ctx, last); err != nil {
+	//	t.Errorf("发送 last 失败: %v", err)
+	//}
 }
 
-// receiveResults 接收识别结果
 func receiveResults(ctx context.Context, t *testing.T, app app.ASRApp) {
+
 	for {
+
 		select {
+		case <-ctx.Done():
+			return
 		default:
+
 			res, end, err := app.Receive(ctx)
+
 			if err != nil {
+
 				if err == io.EOF {
 					t.Log("连接正常关闭")
 					return
 				}
+
 				t.Errorf("接收错误: %v", err)
 				return
 			}
-			if end {
-				t.Log("end")
-				return
-			}
+
 			if len(res) > 0 {
 				log.Printf("识别结果: %s", res)
+			}
+
+			if end {
+				t.Log("识别结束")
+				return
 			}
 		}
 	}
 }
 
-func GetASRApp() app.ASRApp {
-	return asr.NewVcASRApp("vc-asr-test", &app.ASRSetting{
+func GetASRApp(t *testing.T) app.ASRApp {
+	setting := &app.ASRSetting{
 		Provider:   GetTestConfig()["VCASRAppProvider"].(string),
 		Url:        GetTestConfig()["VCASRAppUrl"].(string),
 		AppID:      GetTestConfig()["VCASRAppAppID"].(string),
@@ -126,5 +147,7 @@ func GetASRApp() app.ASRApp {
 		EnablePunc: GetTestConfig()["VCASRAppEnablePunc"].(bool),
 		EnableDdc:  GetTestConfig()["VCASRAppEnableDdc"].(bool),
 		ResultType: GetTestConfig()["VCASRAppResultType"].(string),
-	})
+	}
+	t.Logf("asr setting: %v", setting)
+	return asr.NewVcASRApp("vc-asr-test", setting)
 }
