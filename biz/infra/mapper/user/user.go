@@ -10,6 +10,9 @@ import (
 var (
 	RiskLevelStoI = map[string]int32{cst.High: 1, cst.Medium: 2, cst.Low: 3, cst.Normal: 4}
 	RiskLevelItoS = map[int32]string{1: cst.High, 2: cst.Medium, 3: cst.Low, 4: cst.Normal}
+
+	RoleStoI = map[string]int32{cst.Student: 0, cst.Teacher: 1, cst.ClassTeacher: 2}
+	RoleItoS = map[int32]string{0: cst.Student, 1: cst.Teacher, 2: cst.ClassTeacher}
 )
 
 type User struct {
@@ -24,6 +27,7 @@ type User struct {
 	RiskLevel  int            `json:"riskLevel,omitempty" bson:"risk_level,omitempty"`
 	Status     int            `json:"status,omitempty" bson:"status,omitempty"`
 	EnrollYear int32          `json:"enrollYear,omitempty" bson:"enroll_year,omitempty"`
+	Role       int32          `json:"role,omitempty" bson:"role,omitempty"`
 	Grade      int32          `json:"grade,omitempty" bson:"grade,omitempty"`
 	Class      int32          `json:"class,omitempty" bson:"class,omitempty"`
 	Options    map[string]any `json:"option,omitempty" bson:"option,omitempty"`

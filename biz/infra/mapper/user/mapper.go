@@ -39,6 +39,7 @@ type IMongoMapper interface {
 	CountAlarmUsers(ctx context.Context, unitId *bson.ObjectID) (int32, error)
 	CountAlarmUsersByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 	RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID) ([]*RiskStat, error)
+	FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID) (ClassTeachers, error)
 }
 
 type mongoMapper struct {
@@ -268,4 +269,26 @@ func (m *mongoMapper) RiskDistributionStats(ctx context.Context, unitId *bson.Ob
 		return nil, err
 	}
 	return results, nil
+}
+
+type ClassTeachers map[int32]map[int32]*User
+
+func (m *mongoMapper) FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID) (ClassTeachers, error) {
+	filter := bson.M{
+		cst.UnitID: unitId,
+		cst.Role:   RoleStoI[cst.ClassTeacher],
+	}
+
+	clsTeacherUsers, err := m.FindAllByFields(ctx, filter)
+	if err != nil {
+		logs.Error("[user mapper] FindUnitClassTeachers err:%s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	clsTeachers := make(map[int32]map[int32]*User)
+	for _, u := range clsTeacherUsers {
+		clsTeachers[u.Grade][u.Class] = u
+	}
+
+	return clsTeachers, nil
 }
