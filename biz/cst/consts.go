@@ -52,6 +52,10 @@ const (
 	Status        = "status"
 	DeletedStatus = -1
 
+	Student      = "student"
+	Teacher      = "teacher"
+	ClassTeacher = "class_teacher"
+
 	Emotion   = "emotion"
 	Meta      = "$meta"
 	TextScore = "textScore"
