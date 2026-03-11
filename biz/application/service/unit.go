@@ -2,9 +2,10 @@ package service
 
 import (
 	"context"
+	"time"
+
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
-	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
@@ -122,7 +123,10 @@ func (u *UnitService) UnitSignUp(ctx context.Context, req *core_api.UnitSignUpRe
 	}, nil
 }
 
+// UnitSignIn 单位Admin登录
 func (u *UnitService) UnitSignIn(ctx context.Context, req *core_api.UnitSignInReq) (*core_api.UnitSignInResp, error) {
+	// 后续使用synapse4b Query Unit获得unitID
+
 	// 参数校验
 	if req.AuthId == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "电话号码"))
@@ -156,10 +160,13 @@ func (u *UnitService) UnitSignIn(ctx context.Context, req *core_api.UnitSignInRe
 			return nil, errorx.New(errno.ErrWrongAccountOrPassword)
 		}
 
-		// 获得密码
+		// 校验密码
 		if !encrypt.BcryptCheck(req.VerifyCode, unitDAO.Password) {
 			return nil, errorx.New(errno.ErrWrongAccountOrPassword)
 		}
+
+		// TODO 签发UnitAdmin jwt
+
 	// 验证码登录
 	case cst.AuthTypeCode:
 		return nil, errorx.New(errno.ErrUnImplement) // TODO: 验证码登录

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
@@ -72,12 +73,12 @@ func (u *UserService) UserSignUp(ctx context.Context, req *core_api.UserSignUpRe
 		return nil, errorx.New(errno.ErrPhoneAlreadyExist)
 	}
 
-	// 密码加密
-	hashedPwd, err := encrypt.BcryptEncrypt(req.User.Password)
-	if err != nil {
-		logs.Errorf("bcrypt encrypt error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
+	// 不加密直接明文存密码
+	//hashedPwd, err := encrypt.BcryptEncrypt(req.User.Password)
+	//if err != nil {
+	//	logs.Errorf("bcrypt encrypt error: %s", errorx.ErrorWithoutStack(err))
+	//	return nil, err
+	//}
 
 	// 转换枚举值
 	gender, ok := enum.ParseGender(req.User.Gender)
@@ -85,8 +86,9 @@ func (u *UserService) UserSignUp(ctx context.Context, req *core_api.UserSignUpRe
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "性别"))
 	}
 
-	// 转换ID
+	// 转换unitID
 	var unitId bson.ObjectID
+	var err error
 	if req.User.UnitId != "" {
 		unitId, err = bson.ObjectIDFromHex(req.User.UnitId)
 		if err != nil {
@@ -100,7 +102,7 @@ func (u *UserService) UserSignUp(ctx context.Context, req *core_api.UserSignUpRe
 		ID:         bson.NewObjectID(),
 		CodeType:   enum.CodeTypePhone,
 		Code:       req.User.Code,
-		Password:   hashedPwd,
+		Password:   req.User.Password,
 		Name:       req.User.Name,
 		Birth:      time.Unix(req.User.Birth, 0),
 		Gender:     gender,
@@ -149,16 +151,13 @@ func (u *UserService) UserSignUp(ctx context.Context, req *core_api.UserSignUpRe
 			CreateTime: userDAO.CreateTime.Unix(),
 			UpdateTime: userDAO.UpdateTime.Unix(),
 		},
-		Code: 200,
+		Code: 0,
 		Msg:  "success",
 	}, nil
 }
 
 func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInReq) (*core_api.UserSignInResp, error) {
 	// 参数校验
-	//if req.AuthType == "" {
-	//	return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "登录方式"))
-	//}
 	if req.AuthId == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "账号"))
 	}
@@ -168,7 +167,7 @@ func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInRe
 	switch req.AuthType {
 	case cst.AuthTypeCode:
 		return nil, errorx.New(errno.ErrUnImplement) // TODO: 验证码登录
-	case cst.AuthTypePassword:
+	case cst.AuthTypePassword: //
 		if req.VerifyCode == "" {
 			return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "密码"))
 		}
@@ -193,17 +192,30 @@ func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInRe
 		return nil, errorx.New(errno.ErrWrongAccountOrPassword)
 	}
 
-	// 密码验证
-	if !encrypt.BcryptCheck(req.VerifyCode, userDAO.Password) {
+	// 明文密码验证
+	if req.VerifyCode != userDAO.Password {
 		return nil, errorx.New(errno.ErrWrongAccountOrPassword)
 	}
 	codeType, _ := enum.GetCodeType(userDAO.CodeType)
+
+	// 签发jwt
+	token, err := util.GenerateJwt(map[string]any{
+		cst.JsonUnitID: req.UnitId,
+		cst.JsonUserID: userDAO.ID.Hex(),
+		cst.JsonCode:   userDAO.Code, // 手机号或学号 后续可能需要区分
+		cst.JsonAdmin:  userDAO.Role,
+	})
+	if err != nil {
+		logs.Errorf("generate token for UserSignIn error: %s", errorx.ErrorWithoutStack(err))
+	}
+
 	return &core_api.UserSignInResp{
 		UnitId:    userDAO.UnitID.Hex(),
 		UserId:    userDAO.ID.Hex(),
 		CodeValue: userDAO.Code,
 		CodeType:  codeType,
-		Code:      200,
+		Token:     token,
+		Code:      0,
 		Msg:       "success",
 	}, nil
 }
@@ -265,7 +277,7 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 			UpdateTime: userDAO.UpdateTime.Unix(),
 			DeleteTime: userDAO.DeleteTime.Unix(),
 		},
-		Code: 200,
+		Code: 0,
 		Msg:  "success",
 	}, nil
 }
@@ -330,7 +342,7 @@ func (u *UserService) UserUpdateInfo(ctx context.Context, req *core_api.UserUpda
 
 	// 构造返回结果
 	return &basic.Response{
-		Code: 200,
+		Code: 0,
 		Msg:  "success",
 	}, nil
 }
@@ -396,7 +408,7 @@ func (u *UserService) UserUpdatePassword(ctx context.Context, req *core_api.User
 
 	// 构造返回结果
 	return &basic.Response{
-		Code: 200,
+		Code: 0,
 		Msg:  "success",
 	}, nil
 }

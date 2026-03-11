@@ -526,6 +526,12 @@ github.com/xh-polaris/gopkg v0.0.0-20250312141711-7327267f4ea6 h1:5LzTSKpK7rMv9T
 github.com/xh-polaris/gopkg v0.0.0-20250312141711-7327267f4ea6/go.mod h1:C+TEAEky4WkrDpxzCDCxVi968lxZ15HwrdVxWrbL42Y=
 github.com/xh-polaris/psych-idl v0.0.0-20260307124857-2a4d7dea5233 h1:lHiuChLDKd1t7yuTV+coHjLSE+9fADBmf/MeiR3d/p4=
 github.com/xh-polaris/psych-idl v0.0.0-20260307124857-2a4d7dea5233/go.mod h1:Mq9OKYzoq5fzibYWoxdO0xsybjShIVJ4XLKu/IpVWHw=
+github.com/xh-polaris/psych-idl v0.0.0-20260311143959-eb88f4b7d0ff h1:+ke9nPSPkVMDMOmZqHX+9iuXLAoIi/bYk8BirqTIT40=
+github.com/xh-polaris/psych-idl v0.0.0-20260311143959-eb88f4b7d0ff/go.mod h1:Mq9OKYzoq5fzibYWoxdO0xsybjShIVJ4XLKu/IpVWHw=
+github.com/xh-polaris/psych-idl v0.0.0-20260311163535-7c73dd746f6f h1:KijRA+MqjVqcQ17z2UtPdZky20NSZL9M2JAhPK+l0Kc=
+github.com/xh-polaris/psych-idl v0.0.0-20260311163535-7c73dd746f6f/go.mod h1:Mq9OKYzoq5fzibYWoxdO0xsybjShIVJ4XLKu/IpVWHw=
+github.com/xh-polaris/psych-idl v0.0.0-20260311165400-263c29b44b0f h1:hbPtO2ZWbAxFMPxJPMhJxObzlBxSaVgtk/tCGN7oJcQ=
+github.com/xh-polaris/psych-idl v0.0.0-20260311165400-263c29b44b0f/go.mod h1:Mq9OKYzoq5fzibYWoxdO0xsybjShIVJ4XLKu/IpVWHw=
 github.com/yanyiwu/gojieba v1.4.6 h1:9oKbZijSHBdoTabXK34romSWj4aQLvs+j1ctIQjSxPk=
 github.com/yanyiwu/gojieba v1.4.6/go.mod h1:JUq4DddFVGdHXJHxxepxRmhrKlDpaBxR8O28v6fKYLY=
 github.com/yargevad/filepathx v1.0.0 h1:SYcT+N3tYGi+NvazubCNlvgIPbzAk7i7y2dwg3I5FYc=
