@@ -2,9 +2,10 @@ package conversation
 
 import (
 	"context"
+	"time"
+
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
-	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
@@ -29,6 +30,7 @@ type IMongoMapper interface {
 	CountByUnit(ctx context.Context, unitId *bson.ObjectID) (int32, error)
 	CountByUser(ctx context.Context, userId bson.ObjectID) (int32, error)
 	// 查找
+	FindOneById(ctx context.Context, id bson.ObjectID) (*Conversation, error)
 	FindManyByUserId(ctx context.Context, userId bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error) // 分页查找
 	FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error)                                           // 查找全部
 	// 聚合统计

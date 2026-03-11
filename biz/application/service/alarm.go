@@ -2,10 +2,11 @@ package service
 
 import (
 	"context"
-	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
-	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"sync"
 	"time"
+
+	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
@@ -40,6 +41,22 @@ var AlarmServiceSet = wire.NewSet(
 )
 
 func (s *AlarmService) Overview(ctx context.Context, req *core_api.DashboardGetAlarmOverviewReq) (resp *core_api.DashboardGetAlarmOverviewResp, err error) {
+	// 鉴权
+	userMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.UnitId != "" {
+		if !userMeta.HasUnitAdminAuth() || userMeta.UserId != req.UnitId {
+			return nil, errorx.New(errno.ErrInsufficientAuth)
+		}
+	}
+	if req.UnitId == "" && !userMeta.HasSuperAdminAuth() {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
+	}
+
+	// 提取unitID
 	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
@@ -48,7 +65,7 @@ func (s *AlarmService) Overview(ctx context.Context, req *core_api.DashboardGetA
 	st, err := s.AlarmMapper.AggregateStats(ctx, unitOID, time.Time{}, time.Time{})
 	if err != nil {
 		logs.Errorf("aggregate alarm error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
+		return nil, errorx.New(errno.ErrDashboardAlarmUserStat)
 	}
 
 	return &core_api.DashboardGetAlarmOverviewResp{
@@ -60,12 +77,28 @@ func (s *AlarmService) Overview(ctx context.Context, req *core_api.DashboardGetA
 		ProcessedChange: st.ProcessedChange,
 		PendingChange:   st.PendingChange,
 		TrackChange:     st.TrackChange,
-		Code:            200,
+		Code:            0,
 		Msg:             "success",
 	}, nil
 }
 
 func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardListAlarmRecordsReq) (resp *core_api.DashboardListAlarmRecordsResp, err error) {
+	// 鉴权
+	userMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.UnitId != "" {
+		if !userMeta.HasUnitAdminAuth() || userMeta.UserId != req.UnitId {
+			return nil, errorx.New(errno.ErrInsufficientAuth)
+		}
+	}
+	if req.UnitId == "" && !userMeta.HasSuperAdminAuth() {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
+	}
+
+	// 提取unitID
 	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
@@ -76,7 +109,7 @@ func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardL
 	if total == 0 {
 		return &core_api.DashboardListAlarmRecordsResp{
 			Pagination: util.PaginationRes(total, req.PaginationOptions),
-			Code:       200,
+			Code:       0,
 			Msg:        "success",
 		}, nil
 	}
@@ -94,7 +127,7 @@ func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardL
 	return &core_api.DashboardListAlarmRecordsResp{
 		Records:    completeAlarm,
 		Pagination: util.PaginationRes(total, req.PaginationOptions),
-		Code:       200,
+		Code:       0,
 		Msg:        "success",
 	}, err2
 }
@@ -180,6 +213,16 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 }
 
 func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardUpdateAlarmReq) (resp *core_api.DashboardUpdateAlarmResp, err error) {
+	// 初步鉴权-需要有UnitAdmin权限
+	userMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if !userMeta.HasUnitAdminAuth() {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
+	}
+
 	// 参数校验
 	if req.Alarm == nil {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "预警信息"))
@@ -190,6 +233,17 @@ func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardU
 	if err != nil {
 		logs.Errorf("parse alarm id error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "预警ID"))
+	}
+
+	// 二次鉴权：需要在统一unit下
+	oldAlarm, err := s.AlarmMapper.FindOneById(ctx, alarmId)
+	// optimize 查不到时考虑直接创建而非报错
+	if err != nil {
+		logs.Errorf("find alarm error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrNotFound)
+	}
+	if userMeta.UnitId != oldAlarm.UnitID.Hex() {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
 	// 构建更新字段
@@ -225,13 +279,13 @@ func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardU
 	if len(update) > 0 {
 		if err = s.AlarmMapper.UpdateFields(ctx, alarmId, update); err != nil {
 			logs.Errorf("update alarm error: %s", errorx.ErrorWithoutStack(err))
-			return nil, err
+			return nil, errorx.New(errno.ErrInternalError)
 		}
 	}
 
 	// 构造返回结果
 	return &core_api.DashboardUpdateAlarmResp{
-		Code: 200,
+		Code: 0,
 		Msg:  "success",
 	}, nil
 }

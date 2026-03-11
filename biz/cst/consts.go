@@ -13,6 +13,15 @@ const (
 	// Tool is the role of a tool, means the message is a tool call output.
 	Tool     = "tool"
 	ToolEnum = 3
+
+	CtxKeyToken = "token"
+
+	// userMeta-权限相关枚举值 与User.Role一致
+	AuthLevelUnitStudent      = 0
+	AuthLevelUnitTeacher      = 1
+	AuthLevelUnitClassTeacher = 2
+	AuthLevelUnitAdmin        = 3
+	AuthLevelSuperAdmin       = 4
 )
 
 // json字段枚举
@@ -21,6 +30,7 @@ const (
 	JsonUnitID         = "unitId"
 	JsonConversationID = "conversationId"
 	JsonCode           = "code"
+	JsonAdmin          = "admin"
 )
 
 // mapper层字段枚举

@@ -2,13 +2,14 @@ package core_api
 
 import (
 	"context"
+
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/xh-polaris/psych-core-api/biz/adaptor/middleware"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/pkg/httpx"
 	"github.com/xh-polaris/psych-core-api/provider"
-	//"github.com/xh-polaris/psych-idl/kitex_gen/core_api"
 )
 
 // ==========================================
@@ -34,6 +35,7 @@ func DashboardGetDataOverview(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.DashboardService.DashboardGetDataOverview(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
@@ -58,6 +60,7 @@ func DashboardGetDataTrend(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.DashboardService.DashboardGetDataTrend(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
@@ -81,6 +84,7 @@ func DashboardListUnits(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.DashboardService.DashboardListUnits(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
@@ -105,6 +109,7 @@ func DashboardGetPsychTrend(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.DashboardService.DashboardGetPsychTrend(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
@@ -129,6 +134,7 @@ func DashboardGetAlarmOverview(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.AlarmService.Overview(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
@@ -158,6 +164,7 @@ func DashboardListAlarmRecords(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.AlarmService.ListRecords(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
@@ -184,6 +191,7 @@ func DashboardListClasses(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.DashboardService.DashboardListClasses(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
@@ -213,6 +221,7 @@ func DashboardListUsers(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.DashboardService.DashboardListUsers(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
@@ -594,6 +603,7 @@ func DashboardUserConvRecords(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.DashboardService.DashboardUserConvRecords(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
@@ -610,6 +620,7 @@ func DashboardUpdateAlarm(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.AlarmService.UpdateAlarm(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
@@ -626,6 +637,7 @@ func DashboardGetReport(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.DashboardService.DashboardGetReport(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)

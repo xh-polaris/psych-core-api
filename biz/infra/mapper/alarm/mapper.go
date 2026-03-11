@@ -27,6 +27,7 @@ const (
 
 type IMongoMapper interface {
 	Insert(ctx context.Context, alarm *Alarm) error
+	FindOneById(ctx context.Context, id bson.ObjectID) (*Alarm, error)
 	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
 	RetrieveByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time, opt *options.FindOptionsBuilder) ([]*Alarm, error)
 	CountByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (int32, error)

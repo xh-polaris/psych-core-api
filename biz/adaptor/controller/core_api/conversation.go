@@ -7,6 +7,7 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/xh-polaris/psych-core-api/biz/adaptor/middleware"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/pkg/httpx"
 	"github.com/xh-polaris/psych-core-api/provider"
@@ -23,6 +24,7 @@ func CreateConversation(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.ConversationService.CreateConversation(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
@@ -39,6 +41,7 @@ func ListConversations(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.ConversationService.ListConversations(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
@@ -55,6 +58,7 @@ func GetConversation(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.ConversationService.GetConversation(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
