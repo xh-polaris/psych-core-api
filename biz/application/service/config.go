@@ -2,11 +2,12 @@ package service
 
 import (
 	"context"
-	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
-	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"time"
 
+	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
+	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util/enum"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
@@ -139,6 +140,7 @@ func (c *ConfigService) ConfigGetByUnitID(ctx context.Context, req *core_api.Con
 	// 根据权限返回不同DTO
 	switch req.GetAdmin() {
 	case true:
+		util.DPrint("configDAO: %+v\n", configDAO.Chat)
 		return &core_api.ConfigGetByUnitIdResp{
 			Config: adminConfig(configDAO),
 			Code:   0,
@@ -151,7 +153,6 @@ func (c *ConfigService) ConfigGetByUnitID(ctx context.Context, req *core_api.Con
 			Msg:    "success",
 		}, nil
 	}
-
 	return nil, errorx.New(errno.ErrInternalError)
 }
 

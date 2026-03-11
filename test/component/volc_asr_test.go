@@ -55,7 +55,7 @@ func TestVolcASRApp(t *testing.T) {
 func sendAudio(ctx context.Context, t *testing.T, asrApp app.ASRApp, file *os.File) {
 
 	buf := make([]byte, 3200)
-	//last := []byte{app.LastASR}
+	last := []byte{app.LastASR}
 
 	i := 0
 
@@ -92,9 +92,10 @@ func sendAudio(ctx context.Context, t *testing.T, asrApp app.ASRApp, file *os.Fi
 
 END:
 
-	//if err := asrApp.Send(ctx, last); err != nil {
-	//	t.Errorf("发送 last 失败: %v", err)
-	//}
+	if err := asrApp.Send(ctx, last); err != nil {
+		t.Errorf("发送 last 失败: %v", err)
+	}
+	t.Log("发送Last")
 }
 
 func receiveResults(ctx context.Context, t *testing.T, app app.ASRApp) {
@@ -149,5 +150,5 @@ func GetASRApp(t *testing.T) app.ASRApp {
 		ResultType: GetTestConfig()["VCASRAppResultType"].(string),
 	}
 	t.Logf("asr setting: %v", setting)
-	return asr.NewVcASRApp("vc-asr-test", setting)
+	return asr.NewVcASRApp("", setting)
 }

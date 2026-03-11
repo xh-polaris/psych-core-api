@@ -23,7 +23,7 @@ func (ws *HZWSClient) classifyErr(err error) error {
 		// 为了避免内部错误被隐藏, 此处日志记录错误原因
 		logs.Error("[HZWSClient] close error", err)
 		ws.closed = true
-		return AbnormalCloseErr
+		return err
 	default:
 		return err
 	}

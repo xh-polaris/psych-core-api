@@ -32,8 +32,8 @@ func (e *Engine) auth(auth *core.Auth) (bool, error) {
 	} else {
 		e.uSession = bson.NewObjectID().Hex()
 	}
-	util.DPrint("[engine] [auth] info: %+v, merr: %+v\n", alreadyAuth, merr) // debug
-	return true, e.MWrite(core.MAuth, alreadyAuth)                           // 前端收到Auth响应后, 需要显示配置中
+	util.DPrint("[engine] [auth] info: %+v, merr: %+v, uSession: %s\n", alreadyAuth, merr, e.uSession) // debug
+	return true, e.MWrite(core.MAuth, alreadyAuth)                                                     // 前端收到Auth响应后, 需要显示配置中
 }
 
 // 已登录

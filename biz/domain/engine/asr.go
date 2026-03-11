@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 
+	"github.com/gorilla/websocket"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/app"
 	"github.com/xh-polaris/psych-core-api/pkg/core"
@@ -44,8 +45,11 @@ func (e *Engine) execASRRecv(ctx context.Context) {
 			return
 		default:
 			text, last, err := e.asr.Receive(ctx)
-			if err != nil && !wsx.IsNormal(err) { // 出现问题, 需要结束整个链路
+			// 这里由于ASR的问题, 可能出现正常响应也1006, 所以这里跳过
+			if err != nil && !wsx.IsNormal(err) && !websocket.IsCloseError(err, websocket.CloseAbnormalClosure) { // 出现问题, 需要结束整个链路
 				e.unexpected(err, "asr receive err")
+				return
+			} else if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
 				return
 			}
 			if err = e.MWrite(core.MResp, &core.Resp{ID: 0, Type: core.RUserText, Content: text}); err != nil { // 写回响应
