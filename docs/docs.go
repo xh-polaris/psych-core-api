@@ -22,7 +22,12 @@ const docTemplate = `{
         },
         "/config/create": {
             "post": {
-                "description": "创建或初始化单位配置",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Initialize or create service configurations (Chat, TTS, Report) for a unit.",
                 "consumes": [
                     "application/json"
                 ],
@@ -35,7 +40,7 @@ const docTemplate = `{
                 "summary": "Create Config (创建配置)",
                 "parameters": [
                     {
-                        "description": "Config Request",
+                        "description": "Configuration details",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -46,15 +51,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Status response",
                         "schema": {
                             "$ref": "#/definitions/basic.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
                         }
                     }
                 }
@@ -62,7 +61,12 @@ const docTemplate = `{
         },
         "/config/get_by_unit_id": {
             "get": {
-                "description": "根据 Unit ID 获取配置详情",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve service configurations for a specific Unit ID.",
                 "consumes": [
                     "application/json"
                 ],
@@ -83,22 +87,16 @@ const docTemplate = `{
                     },
                     {
                         "type": "boolean",
-                        "description": "Is Admin",
+                        "description": "Whether to return sensitive admin-only fields (e.g., AppIDs)",
                         "name": "admin",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Configuration details",
                         "schema": {
                             "$ref": "#/definitions/core_api.ConfigGetByUnitIdResp"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
                         }
                     }
                 }
@@ -106,7 +104,12 @@ const docTemplate = `{
         },
         "/config/update_info": {
             "post": {
-                "description": "更新单位的配置信息（如Chat/TTS/Report配置）",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Update existing service configurations for a unit. Admin only.",
                 "consumes": [
                     "application/json"
                 ],
@@ -119,7 +122,7 @@ const docTemplate = `{
                 "summary": "Update Config (更新配置)",
                 "parameters": [
                     {
-                        "description": "Config Request",
+                        "description": "Configuration fields to update",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -130,23 +133,37 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Status response",
                         "schema": {
                             "$ref": "#/definitions/basic.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
                         }
                     }
                 }
             }
         },
+        "/conversation/create": {
+            "post": {
+                "responses": {}
+            }
+        },
+        "/conversation/get": {
+            "post": {
+                "responses": {}
+            }
+        },
+        "/conversation/list": {
+            "post": {
+                "responses": {}
+            }
+        },
         "/dashboard/alarm_overview": {
-            "get": {
-                "description": "获取预警管理的统计概览（高危、已处理、待处理等）",
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get statistical overview of alarm management (high risk, processed, pending).",
                 "consumes": [
                     "application/json"
                 ],
@@ -160,7 +177,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Unit ID",
+                        "description": "Unit ID to filter",
                         "name": "unitId",
                         "in": "query",
                         "required": true
@@ -168,13 +185,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Alarm statistics overview",
                         "schema": {
                             "$ref": "#/definitions/core_api.DashboardGetAlarmOverviewResp"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Missing or invalid Unit ID",
                         "schema": {
                             "type": "string"
                         }
@@ -183,8 +200,13 @@ const docTemplate = `{
             }
         },
         "/dashboard/alarm_records": {
-            "get": {
-                "description": "获取预警记录列表，支持筛选和分页",
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List psychological alarm records with filtering by emotion, status, and keywords.",
                 "consumes": [
                     "application/json"
                 ],
@@ -194,55 +216,27 @@ const docTemplate = `{
                 "tags": [
                     "Dashboard"
                 ],
-                "summary": "List Alarm Records (预警记录)",
+                "summary": "List Alarm Records (预警记录列表)",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Unit ID",
-                        "name": "unitId",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Emotion",
-                        "name": "emotion",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Status",
-                        "name": "status",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Keyword",
-                        "name": "keyword",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Page Number",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Page Size",
-                        "name": "size",
-                        "in": "query"
+                        "description": "Filtering and pagination options",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/core_api.DashboardListAlarmRecordsReq"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Paginated alarm records",
                         "schema": {
                             "$ref": "#/definitions/core_api.DashboardListAlarmRecordsResp"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request body",
                         "schema": {
                             "type": "string"
                         }
@@ -251,8 +245,13 @@ const docTemplate = `{
             }
         },
         "/dashboard/classes": {
-            "get": {
-                "description": "获取班级列表及班级内的用户/预警统计",
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List classes within a unit along with user and alarm counts.",
                 "consumes": [
                     "application/json"
                 ],
@@ -273,26 +272,26 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Grade",
+                        "description": "Grade filter",
                         "name": "grade",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Class",
+                        "description": "Class filter",
                         "name": "class",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Hierarchical grade/class statistics",
                         "schema": {
                             "$ref": "#/definitions/core_api.DashboardListClassesResp"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid parameters",
                         "schema": {
                             "type": "string"
                         }
@@ -300,9 +299,92 @@ const docTemplate = `{
                 }
             }
         },
+        "/dashboard/conversation_records": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get detailed conversation records for a specific user, including trends and details.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "User Conversation Records (用户对话记录)",
+                "parameters": [
+                    {
+                        "description": "User ID and pagination",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/core_api.DashboardUserConvRecordsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Conversation history and analysis",
+                        "schema": {
+                            "$ref": "#/definitions/core_api.DashboardUserConvRecordsResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/dashboard/get_report": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve a detailed psychological analysis report for a specific conversation.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "Get Report (获取心理报告)",
+                "parameters": [
+                    {
+                        "description": "Conversation ID",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/core_api.DashboardGetReportReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Detailed report content",
+                        "schema": {
+                            "$ref": "#/definitions/core_api.DashboardGetReportResp"
+                        }
+                    }
+                }
+            }
+        },
         "/dashboard/overview": {
-            "get": {
-                "description": "获取数据看板的总体概览数据",
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get overall dashboard statistics, including total units, users, active users, and conversation counts. Supports period comparison.",
                 "consumes": [
                     "application/json"
                 ],
@@ -316,20 +398,32 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Unit ID",
+                        "description": "Specific Unit ID to filter. If empty, returns global admin view (if authorized).",
                         "name": "unitId",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Successful response with overview data",
                         "schema": {
                             "$ref": "#/definitions/core_api.DashboardGetDataOverviewResp"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
                         "schema": {
                             "type": "string"
                         }
@@ -338,8 +432,13 @@ const docTemplate = `{
             }
         },
         "/dashboard/psych_trend": {
-            "get": {
-                "description": "获取心理风险分布和高频关键词",
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get psychological risk distribution and high-frequency keywords for a unit or globally.",
                 "consumes": [
                     "application/json"
                 ],
@@ -353,21 +452,20 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Unit ID",
+                        "description": "Unit ID to filter",
                         "name": "unitId",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Psychological risk and keyword data",
                         "schema": {
                             "$ref": "#/definitions/core_api.DashboardGetPsychTrendResp"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid parameters",
                         "schema": {
                             "type": "string"
                         }
@@ -376,8 +474,13 @@ const docTemplate = `{
             }
         },
         "/dashboard/trend": {
-            "get": {
-                "description": "获取活跃度和对话数据的趋势图表",
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get activity and conversation trends over time, including daily active users and conversation frequency.",
                 "consumes": [
                     "application/json"
                 ],
@@ -391,20 +494,26 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Unit ID",
+                        "description": "Specific Unit ID to filter",
                         "name": "unitId",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Trend data points",
                         "schema": {
                             "$ref": "#/definitions/core_api.DashboardGetDataTrendResp"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "type": "string"
                         }
@@ -412,9 +521,53 @@ const docTemplate = `{
                 }
             }
         },
+        "/dashboard/unit_conversation_records": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get overall conversation statistics and records for a unit. (Work in Progress)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "Unit Conversation Records (单位对话记录总览)",
+                "parameters": [
+                    {
+                        "description": "Unit ID and pagination",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/core_api.DashboardUnitConvRecordsReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Unit-wide conversation overview",
+                        "schema": {
+                            "$ref": "#/definitions/core_api.DashboardUnitConvRecordsResp"
+                        }
+                    }
+                }
+            }
+        },
         "/dashboard/units": {
-            "get": {
-                "description": "获取数据看板中的单位列表统计信息",
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List all units with their respective statistics (user count, risk level, etc.). Admin only.",
                 "consumes": [
                     "application/json"
                 ],
@@ -427,13 +580,19 @@ const docTemplate = `{
                 "summary": "List Units (单位列表)",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "List of units with stats",
                         "schema": {
                             "$ref": "#/definitions/core_api.DashboardListUnitsResp"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Admin access required",
                         "schema": {
                             "type": "string"
                         }
@@ -441,9 +600,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/dashboard/users": {
-            "get": {
-                "description": "获取风险用户列表，支持筛选和分页",
+        "/dashboard/update_alarm": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Update the processing status or feedback for a psychological alarm record.",
                 "consumes": [
                     "application/json"
                 ],
@@ -453,55 +617,66 @@ const docTemplate = `{
                 "tags": [
                     "Dashboard"
                 ],
-                "summary": "List Users (用户列表)",
+                "summary": "Update Alarm (更新预警状态)",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Unit ID",
-                        "name": "unitId",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Risk Level",
-                        "name": "level",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Gender",
-                        "name": "gender",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Keyword",
-                        "name": "keyword",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Page Number",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Page Size",
-                        "name": "size",
-                        "in": "query"
+                        "description": "Alarm ID and update details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/core_api.DashboardUpdateAlarmReq"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Update status response",
+                        "schema": {
+                            "$ref": "#/definitions/core_api.DashboardUpdateAlarmResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/dashboard/users": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List risk users within a unit with filtering and pagination.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "List Users (用户管理列表)",
+                "parameters": [
+                    {
+                        "description": "Filter by level, gender, keyword and pagination",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/core_api.DashboardListUsersReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated risk user list",
                         "schema": {
                             "$ref": "#/definitions/core_api.DashboardListUsersResp"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request body",
                         "schema": {
                             "type": "string"
                         }
@@ -511,7 +686,12 @@ const docTemplate = `{
         },
         "/unit/create_and_link_user": {
             "post": {
-                "description": "批量导入用户并自动关联到本单位",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Batch import users and automatically link them to the unit.",
                 "consumes": [
                     "application/json"
                 ],
@@ -524,7 +704,7 @@ const docTemplate = `{
                 "summary": "Create And Link Users (批量创建并关联用户)",
                 "parameters": [
                     {
-                        "description": "Create And Link Request",
+                        "description": "Batch creation details",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -535,15 +715,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Batch processing results",
                         "schema": {
                             "$ref": "#/definitions/core_api.UnitCreateAndLinkUserResp"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
                         }
                     }
                 }
@@ -551,7 +725,12 @@ const docTemplate = `{
         },
         "/unit/get_info": {
             "get": {
-                "description": "获取当前单位的详细信息",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve details of the specified unit.",
                 "consumes": [
                     "application/json"
                 ],
@@ -573,15 +752,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Unit details",
                         "schema": {
                             "$ref": "#/definitions/core_api.UnitGetInfoResp"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
                         }
                     }
                 }
@@ -589,7 +762,12 @@ const docTemplate = `{
         },
         "/unit/link_user": {
             "post": {
-                "description": "将现有用户关联到本单位",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Associate an existing user with this unit.",
                 "consumes": [
                     "application/json"
                 ],
@@ -602,7 +780,7 @@ const docTemplate = `{
                 "summary": "Link User (关联用户)",
                 "parameters": [
                     {
-                        "description": "Link Request",
+                        "description": "Linking details",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -613,15 +791,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Status response",
                         "schema": {
                             "$ref": "#/definitions/basic.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
                         }
                     }
                 }
@@ -629,7 +801,7 @@ const docTemplate = `{
         },
         "/unit/sign_in": {
             "post": {
-                "description": "B端单位账号登录",
+                "description": "Login for unit/organization administrator accounts.",
                 "consumes": [
                     "application/json"
                 ],
@@ -642,7 +814,7 @@ const docTemplate = `{
                 "summary": "Unit Sign In (单位登录)",
                 "parameters": [
                     {
-                        "description": "Login Request",
+                        "description": "Unit admin credentials",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -653,15 +825,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Login success",
                         "schema": {
                             "$ref": "#/definitions/core_api.UnitSignInResp"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
                         }
                     }
                 }
@@ -669,7 +835,7 @@ const docTemplate = `{
         },
         "/unit/sign_up": {
             "post": {
-                "description": "B端单位账号注册",
+                "description": "Register a new organization/unit account.",
                 "consumes": [
                     "application/json"
                 ],
@@ -682,7 +848,7 @@ const docTemplate = `{
                 "summary": "Unit Sign Up (单位注册)",
                 "parameters": [
                     {
-                        "description": "Register Request",
+                        "description": "Unit registration details",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -693,15 +859,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Successful unit registration",
                         "schema": {
                             "$ref": "#/definitions/core_api.UnitSignUpResp"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
                         }
                     }
                 }
@@ -709,7 +869,12 @@ const docTemplate = `{
         },
         "/unit/update_info": {
             "post": {
-                "description": "更新单位资料",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Update organizational details for a unit.",
                 "consumes": [
                     "application/json"
                 ],
@@ -722,7 +887,7 @@ const docTemplate = `{
                 "summary": "Update Unit Info (更新单位信息)",
                 "parameters": [
                     {
-                        "description": "Update Info Request",
+                        "description": "Fields to update",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -733,15 +898,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Status response",
                         "schema": {
                             "$ref": "#/definitions/basic.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
                         }
                     }
                 }
@@ -749,7 +908,12 @@ const docTemplate = `{
         },
         "/unit/update_password": {
             "post": {
-                "description": "修改单位登录密码",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Change the login password for a unit administrator.",
                 "consumes": [
                     "application/json"
                 ],
@@ -762,7 +926,7 @@ const docTemplate = `{
                 "summary": "Update Unit Password (修改单位密码)",
                 "parameters": [
                     {
-                        "description": "Update Password Request",
+                        "description": "Password update details",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -773,15 +937,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Status response",
                         "schema": {
                             "$ref": "#/definitions/basic.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
                         }
                     }
                 }
@@ -789,7 +947,12 @@ const docTemplate = `{
         },
         "/user/get_info": {
             "get": {
-                "description": "获取当前登录用户的详细信息",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve details of the currently authenticated user.",
                 "consumes": [
                     "application/json"
                 ],
@@ -803,7 +966,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "User ID",
+                        "description": "Target User ID",
                         "name": "userId",
                         "in": "query",
                         "required": true
@@ -811,13 +974,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "User profile information",
                         "schema": {
                             "$ref": "#/definitions/core_api.UserGetInfoResp"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "type": "string"
                         }
@@ -827,7 +990,7 @@ const docTemplate = `{
         },
         "/user/sign_in": {
             "post": {
-                "description": "C端用户登录",
+                "description": "Login for end-users using password or verification code.",
                 "consumes": [
                     "application/json"
                 ],
@@ -840,7 +1003,7 @@ const docTemplate = `{
                 "summary": "User Sign In (用户登录)",
                 "parameters": [
                     {
-                        "description": "Login Request",
+                        "description": "Login credentials",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -851,13 +1014,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Login success with JWT token",
                         "schema": {
                             "$ref": "#/definitions/core_api.UserSignInResp"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid credentials",
                         "schema": {
                             "type": "string"
                         }
@@ -867,7 +1030,7 @@ const docTemplate = `{
         },
         "/user/sign_up": {
             "post": {
-                "description": "C端用户注册",
+                "description": "Register a new end-user (e.g., student/teacher).",
                 "consumes": [
                     "application/json"
                 ],
@@ -880,7 +1043,7 @@ const docTemplate = `{
                 "summary": "User Sign Up (用户注册)",
                 "parameters": [
                     {
-                        "description": "Register Request",
+                        "description": "User registration details",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -891,7 +1054,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Successful registration response",
                         "schema": {
                             "$ref": "#/definitions/core_api.UserSignUpResp"
                         }
@@ -907,7 +1070,12 @@ const docTemplate = `{
         },
         "/user/update_info": {
             "post": {
-                "description": "更新用户个人资料",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Update profile data for the end-user.",
                 "consumes": [
                     "application/json"
                 ],
@@ -920,7 +1088,7 @@ const docTemplate = `{
                 "summary": "Update User Info (更新用户信息)",
                 "parameters": [
                     {
-                        "description": "Update Info Request",
+                        "description": "Fields to update",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -931,13 +1099,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Status response",
                         "schema": {
                             "$ref": "#/definitions/basic.Response"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid input",
                         "schema": {
                             "type": "string"
                         }
@@ -947,7 +1115,12 @@ const docTemplate = `{
         },
         "/user/update_password": {
             "post": {
-                "description": "修改用户登录密码",
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Change the login password for an end-user.",
                 "consumes": [
                     "application/json"
                 ],
@@ -960,7 +1133,7 @@ const docTemplate = `{
                 "summary": "Update User Password (修改用户密码)",
                 "parameters": [
                     {
-                        "description": "Update Password Request",
+                        "description": "Password update details",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -971,15 +1144,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Status response",
                         "schema": {
                             "$ref": "#/definitions/basic.Response"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
                         }
                     }
                 }
@@ -1023,6 +1190,26 @@ const docTemplate = `{
                 }
             }
         },
+        "basic.PaginationOptions": {
+            "type": "object",
+            "properties": {
+                "backward": {
+                    "type": "boolean"
+                },
+                "lastToken": {
+                    "type": "string"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                }
+            }
+        },
         "basic.Response": {
             "type": "object",
             "properties": {
@@ -1053,7 +1240,7 @@ const docTemplate = `{
                     }
                 },
                 "lastConversationTime": {
-                    "description": "上次对话时间（分钟时间戳）",
+                    "description": "上次对话时间（时间戳）",
                     "type": "integer"
                 },
                 "status": {
@@ -1068,7 +1255,7 @@ const docTemplate = `{
                     "description": "用户信息",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/profile.User"
+                            "$ref": "#/definitions/core_api.User"
                         }
                     ]
                 }
@@ -1164,6 +1351,27 @@ const docTemplate = `{
                 },
                 "msg": {
                     "type": "string"
+                }
+            }
+        },
+        "core_api.ConvDetail": {
+            "type": "object",
+            "properties": {
+                "digest": {
+                    "description": "摘要",
+                    "type": "string"
+                },
+                "keywords": {
+                    "description": "关键词（词云）",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/core_api.Keywords"
+                        }
+                    ]
+                },
+                "time": {
+                    "description": "对话时间",
+                    "type": "integer"
                 }
             }
         },
@@ -1292,6 +1500,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "activePoints": {
+                    "description": "近一周学生活跃趋势",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/core_api.TrendPoint"
@@ -1301,12 +1510,14 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "conversationDurations": {
+                    "description": "对话时间分布",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/core_api.ConversationDuration"
                     }
                 },
                 "conversationPoints": {
+                    "description": "近一周对话频率趋势",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/core_api.TrendPoint"
@@ -1323,20 +1534,97 @@ const docTemplate = `{
                 "code": {
                     "type": "integer"
                 },
+                "emotionRatio": {
+                    "description": "情绪分布",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/core_api.EmotionRatio"
+                        }
+                    ]
+                },
                 "keywords": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/core_api.Keyword"
-                    }
+                    "description": "关键词 用于词云",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/core_api.Keywords"
+                        }
+                    ]
                 },
                 "msg": {
                     "type": "string"
                 },
                 "risks": {
+                    "description": "分性别的风险等级统计",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/core_api.RiskDistribution"
                     }
+                }
+            }
+        },
+        "core_api.DashboardGetReportReq": {
+            "type": "object",
+            "properties": {
+                "ConversationId": {
+                    "type": "string"
+                }
+            }
+        },
+        "core_api.DashboardGetReportResp": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "description": "详细分析内容",
+                    "type": "string"
+                },
+                "code": {
+                    "type": "integer"
+                },
+                "digest": {
+                    "description": "对话摘要",
+                    "type": "string"
+                },
+                "emotion": {
+                    "description": "情绪状态（由模型自由生成）",
+                    "type": "string"
+                },
+                "keywords": {
+                    "description": "关键词列表",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "msg": {
+                    "type": "string"
+                },
+                "needAlarm": {
+                    "description": "是否需要告警",
+                    "type": "boolean"
+                },
+                "title": {
+                    "description": "对话标题",
+                    "type": "string"
+                }
+            }
+        },
+        "core_api.DashboardListAlarmRecordsReq": {
+            "type": "object",
+            "properties": {
+                "emotion": {
+                    "type": "string"
+                },
+                "keyword": {
+                    "type": "string"
+                },
+                "paginationOptions": {
+                    "$ref": "#/definitions/basic.PaginationOptions"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "unitId": {
+                    "type": "string"
                 }
             }
         },
@@ -1394,6 +1682,26 @@ const docTemplate = `{
                 }
             }
         },
+        "core_api.DashboardListUsersReq": {
+            "type": "object",
+            "properties": {
+                "gender": {
+                    "type": "string"
+                },
+                "keyword": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "integer"
+                },
+                "paginationOptions": {
+                    "$ref": "#/definitions/basic.PaginationOptions"
+                },
+                "unitId": {
+                    "type": "string"
+                }
+            }
+        },
         "core_api.DashboardListUsersResp": {
             "type": "object",
             "properties": {
@@ -1440,6 +1748,96 @@ const docTemplate = `{
                 }
             }
         },
+        "core_api.DashboardUnitConvRecordsReq": {
+            "type": "object",
+            "properties": {
+                "unitId": {
+                    "type": "string"
+                }
+            }
+        },
+        "core_api.DashboardUnitConvRecordsResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "msg": {
+                    "type": "string"
+                }
+            }
+        },
+        "core_api.DashboardUpdateAlarmReq": {
+            "type": "object",
+            "properties": {
+                "alarm": {
+                    "$ref": "#/definitions/core_api.AlarmRecord"
+                }
+            }
+        },
+        "core_api.DashboardUpdateAlarmResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "msg": {
+                    "type": "string"
+                }
+            }
+        },
+        "core_api.DashboardUserConvRecordsReq": {
+            "type": "object",
+            "properties": {
+                "paginationOptions": {
+                    "$ref": "#/definitions/basic.PaginationOptions"
+                },
+                "userId": {
+                    "type": "string"
+                }
+            }
+        },
+        "core_api.DashboardUserConvRecordsResp": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "convDetail": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/core_api.ConvDetail"
+                    }
+                },
+                "msg": {
+                    "type": "string"
+                },
+                "pagination": {
+                    "$ref": "#/definitions/basic.Pagination"
+                },
+                "user": {
+                    "$ref": "#/definitions/core_api.User"
+                },
+                "userConvTrend": {
+                    "$ref": "#/definitions/core_api.UserConvTrend"
+                }
+            }
+        },
+        "core_api.EmotionRatio": {
+            "type": "object",
+            "properties": {
+                "ratio": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer",
+                        "format": "int32"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "core_api.GradeInfo": {
             "type": "object",
             "properties": {
@@ -1454,14 +1852,29 @@ const docTemplate = `{
                 }
             }
         },
-        "core_api.Keyword": {
+        "core_api.Keywords": {
             "type": "object",
             "properties": {
-                "count": {
+                "keyTotal": {
                     "type": "integer"
                 },
-                "keyword": {
+                "keywordMap": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer",
+                        "format": "int32"
+                    }
+                }
+            }
+        },
+        "core_api.Remark": {
+            "type": "object",
+            "properties": {
+                "content": {
                     "type": "string"
+                },
+                "time": {
+                    "type": "integer"
                 }
             }
         },
@@ -1519,7 +1932,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "user": {
-                    "$ref": "#/definitions/profile.User"
+                    "$ref": "#/definitions/core_api.User"
                 }
             }
         },
@@ -1779,6 +2192,9 @@ const docTemplate = `{
                 "password": {
                     "type": "string"
                 },
+                "remark": {
+                    "$ref": "#/definitions/core_api.Remark"
+                },
                 "status": {
                     "type": "string"
                 },
@@ -1787,6 +2203,17 @@ const docTemplate = `{
                 },
                 "updateTime": {
                     "type": "integer"
+                }
+            }
+        },
+        "core_api.UserConvTrend": {
+            "type": "object",
+            "properties": {
+                "trendPoints": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/core_api.TrendPoint"
+                    }
                 }
             }
         },
@@ -1800,7 +2227,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "user": {
-                    "$ref": "#/definitions/profile.User"
+                    "$ref": "#/definitions/core_api.User"
                 }
             }
         },
@@ -1891,62 +2318,6 @@ const docTemplate = `{
                 },
                 "verifyCode": {
                     "type": "string"
-                }
-            }
-        },
-        "profile.User": {
-            "type": "object",
-            "properties": {
-                "birth": {
-                    "type": "integer"
-                },
-                "class": {
-                    "type": "integer"
-                },
-                "code": {
-                    "type": "string"
-                },
-                "codeType": {
-                    "type": "string"
-                },
-                "createTime": {
-                    "type": "integer"
-                },
-                "deleteTime": {
-                    "type": "integer"
-                },
-                "enrollYear": {
-                    "type": "integer"
-                },
-                "gender": {
-                    "type": "string"
-                },
-                "grade": {
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "options": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "$ref": "#/definitions/anypb.Any"
-                    }
-                },
-                "password": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "unitId": {
-                    "type": "string"
-                },
-                "updateTime": {
-                    "type": "integer"
                 }
             }
         }
