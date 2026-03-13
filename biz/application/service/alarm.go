@@ -195,8 +195,8 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 				User: &core_api.UserVO{
 					Code:  dbUser.Code,
 					Name:  dbUser.Name,
-					Grade: dbUser.Grade,
-					Class: dbUser.Class,
+					Grade: int32(dbUser.Grade),
+					Class: int32(dbUser.Class),
 				},
 			}
 		}

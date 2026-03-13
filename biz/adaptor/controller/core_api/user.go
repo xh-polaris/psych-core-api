@@ -13,22 +13,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/provider"
 )
 
-// UserSignUp .
-// @router /user/sign_up [POST]
-func UserSignUp(ctx context.Context, c *app.RequestContext) {
-	var err error
-	var req core_api.UserSignUpReq
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		c.String(consts.StatusBadRequest, err.Error())
-		return
-	}
-
-	p := provider.Get()
-	resp, err := p.UserService.UserSignUp(ctx, &req)
-	httpx.PostProcess(ctx, c, &req, resp, err)
-}
-
 // UserSignIn .
 // @router /user/sign_in [POST]
 func UserSignIn(ctx context.Context, c *app.RequestContext) {

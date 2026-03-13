@@ -49,9 +49,7 @@ func Register(r *server.Hertz) {
 		_unit.POST("/create_and_link_user", append(_unitcreateandlinkuserMw(), core_api.UnitCreateAndLinkUser)...)
 		_unit.GET("/get_info", append(_unitgetinfoMw(), core_api.UnitGetInfo)...)
 		_unit.POST("/link_user", append(_unitlinkuserMw(), core_api.UnitLinkUser)...)
-		_unit.POST("/sign_in", append(_unitsigninMw(), core_api.UnitSignIn)...)
 		_unit.POST("/update_info", append(_unitupdateinfoMw(), core_api.UnitUpdateInfo)...)
-		_unit.POST("/update_password", append(_unitupdatepasswordMw(), core_api.UnitUpdatePassword)...)
 	}
 	{
 		_user := root.Group("/user", _userMw()...)

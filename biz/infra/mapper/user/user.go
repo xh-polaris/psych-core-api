@@ -26,10 +26,10 @@ type User struct {
 	Gender     int            `json:"gender,omitempty" bson:"gender,omitempty"`
 	RiskLevel  int            `json:"riskLevel,omitempty" bson:"risk_level,omitempty"`
 	Status     int            `json:"status,omitempty" bson:"status,omitempty"`
-	EnrollYear int32          `json:"enrollYear,omitempty" bson:"enroll_year,omitempty"`
-	Role       int32          `json:"role,omitempty" bson:"role,omitempty"`
-	Grade      int32          `json:"grade,omitempty" bson:"grade,omitempty"`
-	Class      int32          `json:"class,omitempty" bson:"class,omitempty"`
+	EnrollYear int            `json:"enrollYear,omitempty" bson:"enroll_year,omitempty"`
+	Role       int            `json:"role,omitempty" bson:"role,omitempty"`
+	Grade      int            `json:"grade,omitempty" bson:"grade,omitempty"`
+	Class      int            `json:"class,omitempty" bson:"class,omitempty"`
 	Options    map[string]any `json:"option,omitempty" bson:"option,omitempty"`
 	Remark     Remark         `json:"remark,omitempty" bson:"remark,omitempty"` // 后台管理时添加的备注
 	CreateTime time.Time      `json:"createTime,omitempty" bson:"create_time,omitempty"`

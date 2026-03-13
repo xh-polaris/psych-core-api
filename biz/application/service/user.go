@@ -95,7 +95,7 @@ func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInRe
 	token, err := util.GenerateJwt(map[string]any{
 		cst.JsonUnitID: req.UnitId,
 		cst.JsonUserID: userDAO.ID.Hex(),
-		cst.JsonCode:   userDAO.Code, // 手机号或学号 后续可能需要区分
+		cst.JsonCode:   userDAO.Code, // 手机号或学号
 		cst.JsonAdmin:  userDAO.Role,
 	})
 	if err != nil {
@@ -162,9 +162,9 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 			Gender:     genderStr,
 			Birth:      userDAO.Birth.Unix(),
 			Status:     statusStr,
-			EnrollYear: userDAO.EnrollYear,
-			Class:      userDAO.Class,
-			Grade:      userDAO.Grade,
+			EnrollYear: int32(userDAO.EnrollYear),
+			Class:      int32(userDAO.Class),
+			Grade:      int32(userDAO.Grade),
 			Options:    optionsAny,
 			CreateTime: userDAO.CreateTime.Unix(),
 			UpdateTime: userDAO.UpdateTime.Unix(),

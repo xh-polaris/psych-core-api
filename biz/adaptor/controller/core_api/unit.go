@@ -13,38 +13,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/provider"
 )
 
-// UnitSignUp .
-// @router /unit/sign_up [POST]
-func UnitSignUp(ctx context.Context, c *app.RequestContext) {
-	var err error
-	var req core_api.UnitSignUpReq
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		c.String(consts.StatusBadRequest, err.Error())
-		return
-	}
-
-	p := provider.Get()
-	resp, err := p.UnitService.UnitSignUp(ctx, &req)
-	httpx.PostProcess(ctx, c, &req, resp, err)
-}
-
-// UnitSignIn .
-// @router /unit/sign_in [POST]
-func UnitSignIn(ctx context.Context, c *app.RequestContext) {
-	var err error
-	var req core_api.UnitSignInReq
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		c.String(consts.StatusBadRequest, err.Error())
-		return
-	}
-
-	p := provider.Get()
-	resp, err := p.UnitService.UnitSignIn(ctx, &req)
-	httpx.PostProcess(ctx, c, &req, resp, err)
-}
-
 // UnitGetInfo .
 // @router /unit/get_info [GET]
 func UnitGetInfo(ctx context.Context, c *app.RequestContext) {
@@ -70,22 +38,6 @@ func UnitUpdateInfo(ctx context.Context, c *app.RequestContext) {
 
 	p := provider.Get()
 	resp, err := p.UnitService.UnitUpdateInfo(ctx, &req)
-	httpx.PostProcess(ctx, c, &req, resp, err)
-}
-
-// UnitUpdatePassword .
-// @router /unit/update_password [POST]
-func UnitUpdatePassword(ctx context.Context, c *app.RequestContext) {
-	var err error
-	var req core_api.UnitUpdatePasswordReq
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		c.String(consts.StatusBadRequest, err.Error())
-		return
-	}
-
-	p := provider.Get()
-	resp, err := p.UnitService.UnitUpdatePassword(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 

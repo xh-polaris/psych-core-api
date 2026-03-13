@@ -79,8 +79,8 @@ func (s *DashboardService) DashboardGetDataOverview(ctx context.Context, req *co
 
 	// 区分管理端 / 单位端
 	if req.UnitId == nil || req.GetUnitId() == "" {
-		// 管理端 - 需要管理员权限
-		if !userMeta.HasUnitAdminAuth() {
+		// 管理端 - 需要超级管理员权限
+		if !userMeta.HasSuperAdminAuth() {
 			return nil, errorx.New(errno.ErrInsufficientAuth)
 		}
 		return s.dashboardOverviewAdmin(ctx, twoWeeksBefore, weekBefore, now)
@@ -749,17 +749,17 @@ func aggregateAndSort(mapperRes []*user.ClassStatResult, clsTeachers user.ClassT
 		return make([]*core_api.GradeInfo, 0)
 	}
 
-	gradeMap := make(map[int32]*core_api.GradeInfo)
+	gradeMap := make(map[int]*core_api.GradeInfo)
 	// 将入参切片（有序）填充入有序map
 	for _, item := range mapperRes {
-		gradeInfo, exists := gradeMap[item.Info.Grade]
+		gradeInfo, exists := gradeMap[int(item.Info.Grade)]
 		// 响应中年级尚不存在 创建该年级
 		if !exists {
 			gradeInfo = &core_api.GradeInfo{
 				Grade:   item.Info.Grade,
 				Classes: make([]*core_api.ClassInfo, 0),
 			}
-			gradeMap[item.Info.Grade] = gradeInfo
+			gradeMap[int(item.Info.Grade)] = gradeInfo
 		}
 		// 年级已存在
 		uNum := item.UserNum
@@ -768,8 +768,8 @@ func aggregateAndSort(mapperRes []*user.ClassStatResult, clsTeachers user.ClassT
 			Class:        item.Info.Class,
 			UserNum:      uNum,
 			AlarmNum:     aNum,
-			TeacherName:  clsTeachers[item.Info.Grade][item.Info.Class].Name,
-			TeacherPhone: clsTeachers[item.Info.Grade][item.Info.Class].Code,
+			TeacherName:  clsTeachers[int(item.Info.Grade)][int(item.Info.Class)].Name,
+			TeacherPhone: clsTeachers[int(item.Info.Grade)][int(item.Info.Class)].Code,
 		})
 	}
 
@@ -885,8 +885,8 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 			User: &core_api.UserVO{
 				Code:  dbUser.Code,
 				Name:  dbUser.Name,
-				Grade: dbUser.Grade,
-				Class: dbUser.Class,
+				Grade: int32(dbUser.Grade),
+				Class: int32(dbUser.Class),
 			},
 			Level:    int32(dbUser.RiskLevel),
 			Keywords: make([]string, 0),
@@ -944,8 +944,8 @@ func (s *DashboardService) DashboardUserConvRecords(ctx context.Context, req *co
 			Id:     targetUser.ID.Hex(),
 			Name:   targetUser.Name,
 			Gender: strconv.Itoa(targetUser.Gender),
-			Grade:  targetUser.Grade,
-			Class:  targetUser.Class,
+			Grade:  int32(targetUser.Grade),
+			Class:  int32(targetUser.Class),
 		},
 		UserConvTrend: userConvTrend,
 		ConvDetail:    convDetail,

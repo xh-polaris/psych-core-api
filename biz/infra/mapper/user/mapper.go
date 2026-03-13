@@ -271,7 +271,7 @@ func (m *mongoMapper) RiskDistributionStats(ctx context.Context, unitId *bson.Ob
 	return results, nil
 }
 
-type ClassTeachers map[int32]map[int32]*User
+type ClassTeachers map[int]map[int]*User
 
 func (m *mongoMapper) FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID) (ClassTeachers, error) {
 	filter := bson.M{
@@ -285,7 +285,7 @@ func (m *mongoMapper) FindUnitClassTeachers(ctx context.Context, unitId bson.Obj
 		return nil, err
 	}
 
-	clsTeachers := make(map[int32]map[int32]*User)
+	clsTeachers := make(map[int]map[int]*User)
 	for _, u := range clsTeacherUsers {
 		clsTeachers[u.Grade][u.Class] = u
 	}
