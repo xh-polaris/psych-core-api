@@ -33,6 +33,9 @@ update:
 	for file in $$files; do \
   	  sed -i  -e 's/func init\(\).*//' $$file; \
   	done
+update-macos:
+	hz --verbose update $(IDL_OPTIONS) --mod $(MODULE_NAME) $(EXTRA_OPTIONS)
+	@find biz/application/dto -name "*.go" | xargs perl -i -pe 's/func init\(\).*//'
 new:
 	hz new $(IDL_OPTIONS) $(OUTPUT_OPTIONS) --service $(SERVICE_NAME) --mod $(MODULE_NAME) $(EXTRA_OPTIONS)
 clean:

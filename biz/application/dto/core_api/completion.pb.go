@@ -505,6 +505,70 @@ func (x *Message) GetIndex() int32 {
 	return 0
 }
 
+// SSEEvent
+type SSEEvent struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	EventData string `protobuf:"bytes,1,opt,name=eventData,proto3" form:"eventData" json:"eventData" query:"eventData"`  // 事件数据
+	EventId   int32  `protobuf:"varint,2,opt,name=eventId,proto3" form:"eventId" json:"eventId" query:"eventId"`         // 事件id
+	EventType int32  `protobuf:"varint,3,opt,name=eventType,proto3" form:"eventType" json:"eventType" query:"eventType"` // 事件类型
+}
+
+func (x *SSEEvent) Reset() {
+	*x = SSEEvent{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_completion_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *SSEEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SSEEvent) ProtoMessage() {}
+
+func (x *SSEEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_completion_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SSEEvent.ProtoReflect.Descriptor instead.
+func (*SSEEvent) Descriptor() ([]byte, []int) {
+	return file_core_api_completion_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *SSEEvent) GetEventData() string {
+	if x != nil {
+		return x.EventData
+	}
+	return ""
+}
+
+func (x *SSEEvent) GetEventId() int32 {
+	if x != nil {
+		return x.EventId
+	}
+	return 0
+}
+
+func (x *SSEEvent) GetEventType() int32 {
+	if x != nil {
+		return x.EventType
+	}
+	return 0
+}
+
 var File_core_api_completion_proto protoreflect.FileDescriptor
 
 var file_core_api_completion_proto_rawDesc = []byte{
@@ -573,12 +637,18 @@ var file_core_api_completion_proto_rawDesc = []byte{
 	0x01, 0x28, 0x09, 0x52, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x12, 0x12, 0x0a, 0x04,
 	0x72, 0x6f, 0x6c, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x72, 0x6f, 0x6c, 0x65,
 	0x12, 0x14, 0x0a, 0x05, 0x69, 0x6e, 0x64, 0x65, 0x78, 0x18, 0x03, 0x20, 0x01, 0x28, 0x05, 0x52,
-	0x05, 0x69, 0x6e, 0x64, 0x65, 0x78, 0x42, 0x43, 0x5a, 0x41, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62,
-	0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x78, 0x68, 0x2d, 0x70, 0x6f, 0x6c, 0x61, 0x72, 0x69, 0x73, 0x2f,
-	0x70, 0x73, 0x79, 0x63, 0x68, 0x2d, 0x63, 0x6f, 0x72, 0x65, 0x2d, 0x61, 0x70, 0x69, 0x2f, 0x62,
-	0x69, 0x7a, 0x2f, 0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x64,
-	0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x62, 0x06, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x33,
+	0x05, 0x69, 0x6e, 0x64, 0x65, 0x78, 0x22, 0x60, 0x0a, 0x08, 0x53, 0x53, 0x45, 0x45, 0x76, 0x65,
+	0x6e, 0x74, 0x12, 0x1c, 0x0a, 0x09, 0x65, 0x76, 0x65, 0x6e, 0x74, 0x44, 0x61, 0x74, 0x61, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x65, 0x76, 0x65, 0x6e, 0x74, 0x44, 0x61, 0x74, 0x61,
+	0x12, 0x18, 0x0a, 0x07, 0x65, 0x76, 0x65, 0x6e, 0x74, 0x49, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x05, 0x52, 0x07, 0x65, 0x76, 0x65, 0x6e, 0x74, 0x49, 0x64, 0x12, 0x1c, 0x0a, 0x09, 0x65, 0x76,
+	0x65, 0x6e, 0x74, 0x54, 0x79, 0x70, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x05, 0x52, 0x09, 0x65,
+	0x76, 0x65, 0x6e, 0x74, 0x54, 0x79, 0x70, 0x65, 0x42, 0x43, 0x5a, 0x41, 0x67, 0x69, 0x74, 0x68,
+	0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x78, 0x68, 0x2d, 0x70, 0x6f, 0x6c, 0x61, 0x72, 0x69,
+	0x73, 0x2f, 0x70, 0x73, 0x79, 0x63, 0x68, 0x2d, 0x63, 0x6f, 0x72, 0x65, 0x2d, 0x61, 0x70, 0x69,
+	0x2f, 0x62, 0x69, 0x7a, 0x2f, 0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e,
+	0x2f, 0x64, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x62, 0x06, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -593,7 +663,7 @@ func file_core_api_completion_proto_rawDescGZIP() []byte {
 	return file_core_api_completion_proto_rawDescData
 }
 
-var file_core_api_completion_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_core_api_completion_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_core_api_completion_proto_goTypes = []interface{}{
 	(*CreateConversationReq)(nil),   // 0: core_api.CreateConversationReq
 	(*CreateConversationResp)(nil),  // 1: core_api.CreateConversationResp
@@ -603,21 +673,22 @@ var file_core_api_completion_proto_goTypes = []interface{}{
 	(*GetConversationResp)(nil),     // 5: core_api.GetConversationResp
 	(*Conversation)(nil),            // 6: core_api.Conversation
 	(*Message)(nil),                 // 7: core_api.Message
-	(*basic.PaginationOptions)(nil), // 8: basic.PaginationOptions
-	(*basic.Pagination)(nil),        // 9: basic.Pagination
+	(*SSEEvent)(nil),                // 8: core_api.SSEEvent
+	(*basic.PaginationOptions)(nil), // 9: basic.PaginationOptions
+	(*basic.Pagination)(nil),        // 10: basic.Pagination
 }
 var file_core_api_completion_proto_depIdxs = []int32{
-	8, // 0: core_api.ListConversationsReq.paginationOptions:type_name -> basic.PaginationOptions
-	6, // 1: core_api.ListConversationsResp.conversationList:type_name -> core_api.Conversation
-	9, // 2: core_api.ListConversationsResp.pagination:type_name -> basic.Pagination
-	8, // 3: core_api.GetConversationReq.paginationOptions:type_name -> basic.PaginationOptions
-	9, // 4: core_api.GetConversationResp.pagination:type_name -> basic.Pagination
-	7, // 5: core_api.GetConversationResp.messageList:type_name -> core_api.Message
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	9,  // 0: core_api.ListConversationsReq.paginationOptions:type_name -> basic.PaginationOptions
+	6,  // 1: core_api.ListConversationsResp.conversationList:type_name -> core_api.Conversation
+	10, // 2: core_api.ListConversationsResp.pagination:type_name -> basic.Pagination
+	9,  // 3: core_api.GetConversationReq.paginationOptions:type_name -> basic.PaginationOptions
+	10, // 4: core_api.GetConversationResp.pagination:type_name -> basic.Pagination
+	7,  // 5: core_api.GetConversationResp.messageList:type_name -> core_api.Message
+	6,  // [6:6] is the sub-list for method output_type
+	6,  // [6:6] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func file_core_api_completion_proto_init() {
@@ -721,6 +792,18 @@ func file_core_api_completion_proto_init() {
 				return nil
 			}
 		}
+		file_core_api_completion_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*SSEEvent); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -728,7 +811,7 @@ func file_core_api_completion_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_core_api_completion_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
