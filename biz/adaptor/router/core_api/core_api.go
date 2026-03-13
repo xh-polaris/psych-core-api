@@ -50,7 +50,6 @@ func Register(r *server.Hertz) {
 		_unit.GET("/get_info", append(_unitgetinfoMw(), core_api.UnitGetInfo)...)
 		_unit.POST("/link_user", append(_unitlinkuserMw(), core_api.UnitLinkUser)...)
 		_unit.POST("/sign_in", append(_unitsigninMw(), core_api.UnitSignIn)...)
-		_unit.POST("/sign_up", append(_unitsignupMw(), core_api.UnitSignUp)...)
 		_unit.POST("/update_info", append(_unitupdateinfoMw(), core_api.UnitUpdateInfo)...)
 		_unit.POST("/update_password", append(_unitupdatepasswordMw(), core_api.UnitUpdatePassword)...)
 	}
@@ -58,7 +57,6 @@ func Register(r *server.Hertz) {
 		_user := root.Group("/user", _userMw()...)
 		_user.GET("/get_info", append(_usergetinfoMw(), core_api.UserGetInfo)...)
 		_user.POST("/sign_in", append(_usersigninMw(), core_api.UserSignIn)...)
-		_user.POST("/sign_up", append(_usersignupMw(), core_api.UserSignUp)...)
 		_user.POST("/update_info", append(_userupdateinfoMw(), core_api.UserUpdateInfo)...)
 		_user.POST("/update_password", append(_userupdatepasswordMw(), core_api.UserUpdatePassword)...)
 	}

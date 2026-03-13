@@ -24,7 +24,6 @@ import (
 var _ IUnitService = (*UnitService)(nil)
 
 type IUnitService interface {
-	UnitSignUp(ctx context.Context, req *core_api.UnitSignUpReq) (*core_api.UnitSignUpResp, error)
 	UnitSignIn(ctx context.Context, req *core_api.UnitSignInReq) (*core_api.UnitSignInResp, error)
 	UnitGetInfo(ctx context.Context, req *core_api.UnitGetInfoReq) (*core_api.UnitGetInfoResp, error)
 	UnitUpdateInfo(ctx context.Context, req *core_api.UnitUpdateInfoReq) (*basic.Response, error)
@@ -42,86 +41,6 @@ var UnitServiceSet = wire.NewSet(
 	wire.Struct(new(UnitService), "*"),
 	wire.Bind(new(IUnitService), new(*UnitService)),
 )
-
-func (u *UnitService) UnitSignUp(ctx context.Context, req *core_api.UnitSignUpReq) (*core_api.UnitSignUpResp, error) {
-	// 参数校验
-	if req.Unit == nil {
-		return nil, errorx.New(errno.ErrMissingEntity, errorx.KV("entity", "单位用户"))
-	}
-	if req.Unit.Name == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位名称"))
-	}
-	if req.Unit.Phone == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "电话号码"))
-	}
-	if req.Unit.Password == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "密码"))
-	}
-
-	// 手机号格式校验
-	if !reg.CheckMobile(req.Unit.Phone) {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "电话号码"))
-	}
-
-	// 检查手机号是否已注册
-	if exists, err := u.UnitMapper.ExistsByPhone(ctx, req.Unit.Phone); err != nil {
-		logs.Errorf("check phone exists error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	} else if exists {
-		return nil, errorx.New(errno.ErrPhoneAlreadyExist)
-	}
-
-	// 密码加密
-	hashedPwd, err := encrypt.BcryptEncrypt(req.Unit.Password)
-	if err != nil {
-		logs.Errorf("bcrypt encrypt error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-
-	// 构造 Unit
-	unitDAO := &unit.Unit{
-		ID:         bson.NewObjectID(),
-		Phone:      req.Unit.Phone,
-		Password:   hashedPwd,
-		Name:       req.Unit.Name,
-		Address:    req.Unit.Address,
-		Contact:    req.Unit.Contact,
-		Level:      int(req.Unit.Level),
-		Status:     enum.Active,
-		CreateTime: time.Now(),
-		UpdateTime: time.Now(),
-	}
-
-	// 插入数据库
-	if err := u.UnitMapper.Insert(ctx, unitDAO); err != nil {
-		logs.Errorf("insert unit error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-
-	// 获得单位状态
-	statusStr, ok := enum.GetStatus(unitDAO.Status)
-	if !ok {
-		return nil, errorx.New(errno.ErrInternalError)
-	}
-
-	// 构造返回结果
-	return &core_api.UnitSignUpResp{
-		Unit: &core_api.UnitVO{
-			Id:         unitDAO.ID.Hex(),
-			Phone:      unitDAO.Phone,
-			Name:       unitDAO.Name,
-			Address:    unitDAO.Address,
-			Contact:    unitDAO.Contact,
-			Level:      int32(unitDAO.Level),
-			Status:     statusStr,
-			CreateTime: unitDAO.CreateTime.Unix(),
-			UpdateTime: unitDAO.UpdateTime.Unix(),
-			DeleteTime: unitDAO.DeleteTime.Unix(),
-		},
-		Code: 0,
-		Msg:  "success",
-	}, nil
-}
 
 // UnitSignIn 单位Admin登录
 func (u *UnitService) UnitSignIn(ctx context.Context, req *core_api.UnitSignInReq) (*core_api.UnitSignInResp, error) {

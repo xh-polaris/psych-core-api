@@ -15,7 +15,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/util/convert"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util/encrypt"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util/enum"
-	"github.com/xh-polaris/psych-core-api/biz/infra/util/reg"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
@@ -27,7 +26,6 @@ import (
 var _ IUserService = (*UserService)(nil)
 
 type IUserService interface {
-	UserSignUp(ctx context.Context, req *core_api.UserSignUpReq) (*core_api.UserSignUpResp, error)
 	UserSignIn(ctx context.Context, req *core_api.UserSignInReq) (*core_api.UserSignInResp, error)
 	UserGetInfo(ctx context.Context, req *core_api.UserGetInfoReq) (*core_api.UserGetInfoResp, error)
 	UserUpdateInfo(ctx context.Context, req *core_api.UserUpdateInfoReq) (*basic.Response, error)
@@ -43,118 +41,6 @@ var UserServiceSet = wire.NewSet(
 	wire.Struct(new(UserService), "*"),
 	wire.Bind(new(IUserService), new(*UserService)),
 )
-
-// UserSignUp 用户不能直接注册 即使注册也需要绑定unitId
-func (u *UserService) UserSignUp(ctx context.Context, req *core_api.UserSignUpReq) (*core_api.UserSignUpResp, error) {
-	// 默认用户通过注册接口，使用手机号注册
-	// 参数校验
-	if req.User == nil {
-		return nil, errorx.New(errno.ErrMissingEntity, errorx.KV("entity", "用户"))
-	}
-	if req.User.Code == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "电话号码"))
-	}
-	if req.User.Password == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "密码"))
-	}
-	if req.User.Name == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "姓名"))
-	}
-
-	// 手机号格式校验
-	if !reg.CheckMobile(req.User.Code) {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "电话号码"))
-	}
-
-	// 检查手机号是否已注册
-	if exists, err := u.UserMapper.ExistsByCode(ctx, req.User.Code); err != nil {
-		logs.Errorf("check phone exists error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	} else if exists {
-		return nil, errorx.New(errno.ErrPhoneAlreadyExist)
-	}
-
-	// 加密
-	hashedPwd, err := encrypt.BcryptEncrypt(req.User.Password)
-	if err != nil {
-		logs.Errorf("bcrypt encrypt error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-
-	// 转换枚举值
-	gender, ok := enum.ParseGender(req.User.Gender)
-	if !ok {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "性别"))
-	}
-
-	// 转换unitID
-	var unitId bson.ObjectID
-	if req.User.UnitId != "" {
-		unitId, err = bson.ObjectIDFromHex(req.User.UnitId)
-		if err != nil {
-			logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
-			return nil, err
-		}
-	}
-
-	// 构造用户
-	userDAO := &user.User{
-		ID:         bson.NewObjectID(),
-		CodeType:   enum.CodeTypePhone,
-		Code:       req.User.Code,
-		Password:   hashedPwd,
-		Name:       req.User.Name,
-		Birth:      time.Unix(req.User.Birth, 0),
-		Gender:     gender,
-		Status:     enum.Active,
-		Class:      req.User.Class,
-		Grade:      req.User.Grade,
-		EnrollYear: req.User.EnrollYear,
-		UnitID:     unitId,
-		UpdateTime: time.Now(),
-		CreateTime: time.Now(),
-	}
-
-	// 插入用户
-	if err = u.UserMapper.Insert(ctx, userDAO); err != nil {
-		logs.Errorf("insert user error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-
-	// 获得枚举值
-	genderStr, ok := enum.GetGender(userDAO.Gender)
-	if !ok {
-		return nil, errorx.New(errno.ErrInternalError)
-	}
-	statusStr, ok := enum.GetStatus(userDAO.Status)
-	if !ok {
-		return nil, errorx.New(errno.ErrInternalError)
-	}
-	codeTypeStr, ok := enum.GetCodeType(userDAO.CodeType)
-	if !ok {
-		return nil, errorx.New(errno.ErrInternalError)
-	}
-
-	// 构造响应
-	return &core_api.UserSignUpResp{
-		User: &core_api.UserVO{
-			Id:         userDAO.ID.Hex(),
-			CodeType:   codeTypeStr,
-			Code:       userDAO.Code,
-			Name:       userDAO.Name,
-			Gender:     genderStr,
-			Birth:      userDAO.Birth.Unix(),
-			Class:      userDAO.Class,
-			Grade:      userDAO.Grade,
-			EnrollYear: userDAO.EnrollYear,
-			Status:     statusStr,
-			CreateTime: userDAO.CreateTime.Unix(),
-			UpdateTime: userDAO.UpdateTime.Unix(),
-		},
-		Code: 0,
-		Msg:  "success",
-	}, nil
-}
 
 func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInReq) (*core_api.UserSignInResp, error) {
 	// 参数校验
