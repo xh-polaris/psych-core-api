@@ -7,8 +7,10 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
-	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/biz/cst"
+	"github.com/xh-polaris/psych-core-api/pkg/httpx"
+	"github.com/xh-polaris/psych-core-api/provider"
 )
 
 // UserSignUp .
@@ -22,9 +24,9 @@ func UserSignUp(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.UserSignUpResp)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.UserService.UserSignUp(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // UserSignIn .
@@ -38,9 +40,9 @@ func UserSignIn(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.UserSignInResp)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.UserService.UserSignIn(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // UserGetInfo .
@@ -48,15 +50,11 @@ func UserSignIn(ctx context.Context, c *app.RequestContext) {
 func UserGetInfo(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req core_api.UserGetInfoReq
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		c.String(consts.StatusBadRequest, err.Error())
-		return
-	}
+	req.UserId = c.Query(cst.QueryUserID)
 
-	resp := new(core_api.UserGetInfoResp)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.UserService.UserGetInfo(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // UserUpdateInfo .
@@ -70,9 +68,9 @@ func UserUpdateInfo(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(basic.Response)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.UserService.UserUpdateInfo(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // UserUpdatePassword .
@@ -86,7 +84,7 @@ func UserUpdatePassword(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(basic.Response)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.UserService.UserUpdatePassword(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }

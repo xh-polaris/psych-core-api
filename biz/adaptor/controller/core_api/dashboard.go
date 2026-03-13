@@ -7,7 +7,10 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/xh-polaris/psych-core-api/biz/adaptor/middleware"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/pkg/httpx"
+	"github.com/xh-polaris/psych-core-api/provider"
 )
 
 // DashboardGetDataOverview .
@@ -21,9 +24,10 @@ func DashboardGetDataOverview(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.DashboardGetDataOverviewResp)
-
-	c.JSON(consts.StatusOK, resp)
+	middleware.StoreToken(ctx, c, &req)
+	p := provider.Get()
+	resp, err := p.DashboardService.DashboardGetDataOverview(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // DashboardGetDataTrend .
@@ -37,9 +41,10 @@ func DashboardGetDataTrend(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.DashboardGetDataTrendResp)
-
-	c.JSON(consts.StatusOK, resp)
+	middleware.StoreToken(ctx, c, &req)
+	p := provider.Get()
+	resp, err := p.DashboardService.DashboardGetDataTrend(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // DashboardListUnits .
@@ -53,9 +58,10 @@ func DashboardListUnits(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.DashboardListUnitsResp)
-
-	c.JSON(consts.StatusOK, resp)
+	middleware.StoreToken(ctx, c, &req)
+	p := provider.Get()
+	resp, err := p.DashboardService.DashboardListUnits(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // DashboardGetPsychTrend .
@@ -69,9 +75,10 @@ func DashboardGetPsychTrend(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.DashboardGetPsychTrendResp)
-
-	c.JSON(consts.StatusOK, resp)
+	middleware.StoreToken(ctx, c, &req)
+	p := provider.Get()
+	resp, err := p.DashboardService.DashboardGetPsychTrend(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // DashboardGetAlarmOverview .
@@ -85,9 +92,10 @@ func DashboardGetAlarmOverview(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.DashboardGetAlarmOverviewResp)
-
-	c.JSON(consts.StatusOK, resp)
+	middleware.StoreToken(ctx, c, &req)
+	p := provider.Get()
+	resp, err := p.AlarmService.Overview(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // DashboardListAlarmRecords .
@@ -101,9 +109,10 @@ func DashboardListAlarmRecords(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.DashboardListAlarmRecordsResp)
-
-	c.JSON(consts.StatusOK, resp)
+	middleware.StoreToken(ctx, c, &req)
+	p := provider.Get()
+	resp, err := p.AlarmService.ListRecords(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // DashboardUpdateAlarm .
@@ -117,9 +126,10 @@ func DashboardUpdateAlarm(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.DashboardUpdateAlarmResp)
-
-	c.JSON(consts.StatusOK, resp)
+	middleware.StoreToken(ctx, c, &req)
+	p := provider.Get()
+	resp, err := p.AlarmService.UpdateAlarm(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // DashboardListClasses .
@@ -133,9 +143,10 @@ func DashboardListClasses(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.DashboardListClassesResp)
-
-	c.JSON(consts.StatusOK, resp)
+	middleware.StoreToken(ctx, c, &req)
+	p := provider.Get()
+	resp, err := p.DashboardService.DashboardListClasses(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // DashboardListUsers .
@@ -149,9 +160,10 @@ func DashboardListUsers(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.DashboardListUsersResp)
-
-	c.JSON(consts.StatusOK, resp)
+	middleware.StoreToken(ctx, c, &req)
+	p := provider.Get()
+	resp, err := p.DashboardService.DashboardListUsers(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // DashboardUserConvRecords .
@@ -165,9 +177,10 @@ func DashboardUserConvRecords(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.DashboardUserConvRecordsResp)
-
-	c.JSON(consts.StatusOK, resp)
+	middleware.StoreToken(ctx, c, &req)
+	p := provider.Get()
+	resp, err := p.DashboardService.DashboardUserConvRecords(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // DashboardUnitConvRecords .
@@ -181,9 +194,10 @@ func DashboardUnitConvRecords(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.DashboardUnitConvRecordsResp)
-
-	c.JSON(consts.StatusOK, resp)
+	middleware.StoreToken(ctx, c, &req)
+	p := provider.Get()
+	resp, err := p.DashboardService.DashboardUnitConvRecords(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // DashboardGetReport .
@@ -197,7 +211,8 @@ func DashboardGetReport(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.DashboardGetReportResp)
-
-	c.JSON(consts.StatusOK, resp)
+	middleware.StoreToken(ctx, c, &req)
+	p := provider.Get()
+	resp, err := p.DashboardService.DashboardGetReport(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }

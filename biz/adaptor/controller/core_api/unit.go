@@ -7,8 +7,10 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
-	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/biz/cst"
+	"github.com/xh-polaris/psych-core-api/pkg/httpx"
+	"github.com/xh-polaris/psych-core-api/provider"
 )
 
 // UnitSignUp .
@@ -22,9 +24,9 @@ func UnitSignUp(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.UnitSignUpResp)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.UnitService.UnitSignUp(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // UnitSignIn .
@@ -38,9 +40,9 @@ func UnitSignIn(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.UnitSignInResp)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.UnitService.UnitSignIn(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // UnitGetInfo .
@@ -48,15 +50,11 @@ func UnitSignIn(ctx context.Context, c *app.RequestContext) {
 func UnitGetInfo(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req core_api.UnitGetInfoReq
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		c.String(consts.StatusBadRequest, err.Error())
-		return
-	}
+	req.UnitId = c.Query(cst.QueryUnitID)
 
-	resp := new(core_api.UnitGetInfoResp)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.UnitService.UnitGetInfo(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // UnitUpdateInfo .
@@ -70,9 +68,9 @@ func UnitUpdateInfo(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(basic.Response)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.UnitService.UnitUpdateInfo(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // UnitUpdatePassword .
@@ -86,9 +84,9 @@ func UnitUpdatePassword(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(basic.Response)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.UnitService.UnitUpdatePassword(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // UnitLinkUser .
@@ -102,9 +100,9 @@ func UnitLinkUser(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(basic.Response)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.UnitService.UnitLinkUser(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // UnitCreateAndLinkUser .
@@ -118,7 +116,7 @@ func UnitCreateAndLinkUser(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.UnitCreateAndLinkUserResp)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.UnitService.UnitCreateAndLinkUser(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }

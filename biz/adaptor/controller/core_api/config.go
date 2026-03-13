@@ -7,8 +7,9 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
-	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/pkg/httpx"
+	"github.com/xh-polaris/psych-core-api/provider"
 )
 
 // ConfigCreate .
@@ -22,9 +23,9 @@ func ConfigCreate(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(basic.Response)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.ConfigService.ConfigCreate(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // ConfigUpdateInfo .
@@ -38,9 +39,9 @@ func ConfigUpdateInfo(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(basic.Response)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.ConfigService.ConfigUpdateInfo(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // ConfigGetByUnitID .
@@ -54,7 +55,7 @@ func ConfigGetByUnitID(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	resp := new(core_api.ConfigGetByUnitIdResp)
-
-	c.JSON(consts.StatusOK, resp)
+	p := provider.Get()
+	resp, err := p.ConfigService.ConfigGetByUnitID(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
