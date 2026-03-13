@@ -2,8 +2,9 @@ package service
 
 import (
 	"context"
-	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"time"
+
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
@@ -137,7 +138,7 @@ func (u *UserService) UserSignUp(ctx context.Context, req *core_api.UserSignUpRe
 
 	// 构造响应
 	return &core_api.UserSignUpResp{
-		User: &core_api.User{
+		User: &core_api.UserVO{
 			Id:         userDAO.ID.Hex(),
 			CodeType:   codeTypeStr,
 			Code:       userDAO.Code,
@@ -260,7 +261,7 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 	}
 
 	return &core_api.UserGetInfoResp{
-		User: &core_api.User{
+		User: &core_api.UserVO{
 			Id:         userDAO.ID.Hex(),
 			CodeType:   codeTypeStr,
 			Code:       userDAO.Code,

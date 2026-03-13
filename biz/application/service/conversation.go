@@ -90,9 +90,9 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 		return nil, errorx.New(errno.ErrListConversation)
 	}
 
-	convs := make([]*core_api.Conversation, 0, len(dbConvs))
+	convs := make([]*core_api.ConversationVO, 0, len(dbConvs))
 	for _, dbConv := range dbConvs {
-		conv := &core_api.Conversation{
+		conv := &core_api.ConversationVO{
 			ConversationId: dbConv.ID.Hex(),
 			Brief:          dbConv.Title,
 			CreateTime:     dbConv.CreateTime.Unix(),

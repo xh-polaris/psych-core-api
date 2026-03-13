@@ -106,7 +106,7 @@ func (u *UnitService) UnitSignUp(ctx context.Context, req *core_api.UnitSignUpRe
 
 	// 构造返回结果
 	return &core_api.UnitSignUpResp{
-		Unit: &core_api.Unit{
+		Unit: &core_api.UnitVO{
 			Id:         unitDAO.ID.Hex(),
 			Phone:      unitDAO.Phone,
 			Name:       unitDAO.Name,
@@ -207,7 +207,7 @@ func (u *UnitService) UnitGetInfo(ctx context.Context, req *core_api.UnitGetInfo
 
 	// 构造返回结果
 	return &core_api.UnitGetInfoResp{
-		Unit: &core_api.Unit{
+		Unit: &core_api.UnitVO{
 			Id:         unitDAO.ID.Hex(),
 			Phone:      unitDAO.Phone,
 			Name:       unitDAO.Name,

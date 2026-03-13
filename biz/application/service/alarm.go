@@ -192,7 +192,7 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 				Emotion:  alarm.EmotionItoS[al.Emotion],
 				Keywords: al.Keywords,
 				Status:   alarm.StatusItoS[al.Status],
-				User: &core_api.User{
+				User: &core_api.UserVO{
 					Code:  dbUser.Code,
 					Name:  dbUser.Name,
 					Grade: dbUser.Grade,

@@ -882,7 +882,7 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 	riskUsers := make([]*core_api.RiskUser, end-start+1)
 	for i, dbUser := range targetUsers {
 		riskUsers[i] = &core_api.RiskUser{
-			User: &core_api.User{
+			User: &core_api.UserVO{
 				Code:  dbUser.Code,
 				Name:  dbUser.Name,
 				Grade: dbUser.Grade,
@@ -940,7 +940,7 @@ func (s *DashboardService) DashboardUserConvRecords(ctx context.Context, req *co
 	}
 
 	resp := &core_api.DashboardUserConvRecordsResp{
-		User: &core_api.User{
+		User: &core_api.UserVO{
 			Id:     targetUser.ID.Hex(),
 			Name:   targetUser.Name,
 			Gender: strconv.Itoa(targetUser.Gender),

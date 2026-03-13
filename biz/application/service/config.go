@@ -303,10 +303,10 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 }
 
 // 将数据库Config对象字段转化为DTO对象
-func adminConfig(configDAO *config.Config) *core_api.Config {
+func adminConfig(configDAO *config.Config) *core_api.ConfigVO {
 	t, _ := enum.GetConfigType(configDAO.Type)
 	st, _ := enum.GetStatus(configDAO.Status)
-	return &core_api.Config{
+	return &core_api.ConfigVO{
 		UnitId: configDAO.UnitID.Hex(),
 		Type:   t,
 
@@ -339,7 +339,7 @@ func adminConfig(configDAO *config.Config) *core_api.Config {
 }
 
 // 隐藏Config的一些敏感字段
-func publicConfig(configDAO *config.Config) *core_api.Config {
+func publicConfig(configDAO *config.Config) *core_api.ConfigVO {
 	conf := adminConfig(configDAO)
 	conf.Chat.AppId = "" // AppID 模型平台标识符
 	conf.Tts.AppId = ""
