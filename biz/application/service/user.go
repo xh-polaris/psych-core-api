@@ -74,12 +74,12 @@ func (u *UserService) UserSignUp(ctx context.Context, req *core_api.UserSignUpRe
 		return nil, errorx.New(errno.ErrPhoneAlreadyExist)
 	}
 
-	// 不加密直接明文存密码
-	//hashedPwd, err := encrypt.BcryptEncrypt(req.User.Password)
-	//if err != nil {
-	//	logs.Errorf("bcrypt encrypt error: %s", errorx.ErrorWithoutStack(err))
-	//	return nil, err
-	//}
+	// 加密
+	hashedPwd, err := encrypt.BcryptEncrypt(req.User.Password)
+	if err != nil {
+		logs.Errorf("bcrypt encrypt error: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
 
 	// 转换枚举值
 	gender, ok := enum.ParseGender(req.User.Gender)
@@ -89,7 +89,6 @@ func (u *UserService) UserSignUp(ctx context.Context, req *core_api.UserSignUpRe
 
 	// 转换unitID
 	var unitId bson.ObjectID
-	var err error
 	if req.User.UnitId != "" {
 		unitId, err = bson.ObjectIDFromHex(req.User.UnitId)
 		if err != nil {
@@ -103,7 +102,7 @@ func (u *UserService) UserSignUp(ctx context.Context, req *core_api.UserSignUpRe
 		ID:         bson.NewObjectID(),
 		CodeType:   enum.CodeTypePhone,
 		Code:       req.User.Code,
-		Password:   req.User.Password,
+		Password:   hashedPwd,
 		Name:       req.User.Name,
 		Birth:      time.Unix(req.User.Birth, 0),
 		Gender:     gender,
@@ -193,8 +192,15 @@ func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInRe
 		return nil, errorx.New(errno.ErrWrongAccountOrPassword)
 	}
 
-	// 明文密码验证
-	if req.VerifyCode != userDAO.Password {
+	// 加密密码
+	hashedPwd, err := encrypt.BcryptEncrypt(req.VerifyCode)
+	if err != nil {
+		logs.Errorf("bcrypt encrypt error: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	// 密码验证
+	if hashedPwd != userDAO.Password {
 		return nil, errorx.New(errno.ErrWrongAccountOrPassword)
 	}
 	codeType, _ := enum.GetCodeType(userDAO.CodeType)
