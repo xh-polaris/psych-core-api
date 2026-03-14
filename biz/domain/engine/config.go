@@ -16,73 +16,32 @@ import (
 
 // config 配置app与workflow
 func (e *Engine) config() error {
-	var err error
-	var cf *core.Config
-	var wfc *core.WorkFlowConfig
-	var configResp *core_api.ConfigGetByUnitIdResp
+	var (
+		err        error
+		cf         *core.Config
+		wfc        *core.WorkFlowConfig
+		configResp *core_api.ConfigGetByUnitIdResp
+	)
 
 	// 获取配置
 	req := &core_api.ConfigGetByUnitIdReq{UnitId: e.info[cst.JsonUnitID].(string), Admin: true}
-	if e.cfgSvc != nil {
-		if configResp, err = e.cfgSvc.ConfigGetByUnitID(e.ctx, req); err != nil {
-			logs.Error("[engine] [%s] UnitAppConfigGetByUnitId err: %v", core.AConfig, err)
-			return e.MWrite(core.MErr, core.ToErr(errorx.WrapByCode(err, errno.GetConfigErr)))
-		}
-	} else {
-		// 本地fallback: 从 conf.ModelConfig 中选取第一个可用 provider 来构造最小 Config
-		confLocal := conf.GetConfig()
-		var chatProvider string
-		var ttsProvider string
-		if confLocal != nil && confLocal.ModelConfig != nil {
-			for k := range confLocal.ModelConfig.Chat {
-				chatProvider = k
-				break
-			}
-			for k := range confLocal.ModelConfig.TTS {
-				ttsProvider = k
-				break
-			}
-		}
-		configResp = &core_api.ConfigGetByUnitIdResp{
-			Config: &core_api.Config{
-				Type: "",
-				Chat: &core_api.ChatApp{
-					Name:        "",
-					Description: "",
-					Provider:    chatProvider,
-					AppId:       "",
-				},
-				Tts: &core_api.TTSApp{
-					Name:        "",
-					Description: "",
-					Provider:    ttsProvider,
-					AppId:       "",
-					Speaker:     "",
-				},
-				Report: &core_api.ReportApp{
-					Name:        "",
-					Description: "",
-					Provider:    "",
-					AppId:       "",
-				},
-			},
-			Code: 0,
-			Msg:  "local-fallback",
-		}
+	if configResp, err = e.cfgSvc.ConfigGetByUnitID(e.ctx, req); err != nil {
+		logs.Error("[engine] [%s] UnitAppConfigGetByUnitId err: %v", core.AConfig, err)
+		return e.MWrite(core.MErr, core.ToErr(errorx.WrapByCode(err, errno.GetConfigErr)))
 	}
+	util.DPrint("configResp: %+v\n", configResp)
 
 	// 构造配置
 	if cf, wfc, err = e.buildConfig(configResp); err != nil {
 		logs.Error("[workflow] [config] build config err: %v", err)
 		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "llm"))
 	}
-
 	// 构造llm
 	if e.llm, err = app.NewChatApp(e.ctx, e.uSession, wfc.ChatConfig); err != nil {
 		logs.Error("[workflow] [config] new chatApp err: %v", err)
 		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "llm"))
 	}
-	util.DPrint("llm: %+v", e.llm)
+	util.DPrint("llm: %+v\n", e.llm)
 	// 构造asr
 	if e.asr, err = app.NewASRApp(e.uSession, wfc.ASRConfig); err != nil {
 		logs.Error("[workflow] [config] new asrApp err: %v", err)
@@ -93,7 +52,7 @@ func (e *Engine) config() error {
 		logs.Error("[workflow] [config] new asrApp err: %v", err)
 		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "tts"))
 	}
-	util.DPrint("tts: %+v", e.tts)
+	util.DPrint("tts: %+v\n", e.tts)
 	// 返回前端
 	util.DPrint("[engine] [config] workflow config: %+v\n conf: %+v\n", wfc, cf)
 	return e.MWrite(core.MConfig, cf)
@@ -105,7 +64,7 @@ func (e *Engine) buildConfig(resp *core_api.ConfigGetByUnitIdResp) (c *core.Conf
 	if wfc.ChatConfig, err = conf.GetConfig().ChatConf(resp.Config.Chat); err != nil {
 		return
 	}
-	wfc.ChatConfig.UserId = e.info[cst.UserID].(string)
+	wfc.ChatConfig.UserId = e.info[cst.JsonUserID].(string)
 	if wfc.TTSConfig, err = conf.GetConfig().TTSConf(resp.Config.Tts); err != nil {
 		return
 	}
@@ -115,7 +74,7 @@ func (e *Engine) buildConfig(resp *core_api.ConfigGetByUnitIdResp) (c *core.Conf
 	if wfc.ASRConfig, err = conf.GetConfig().ASRConf(); err != nil {
 		return
 	}
-	c = &core.Config{Type: resp.Config.Type, ModelName: "", ModelView: "", ChatConfig: core.ChatConfig{},
+	c = &core.Config{Type: int(resp.Config.Type), ModelName: "", ModelView: "", ChatConfig: core.ChatConfig{},
 		ASRConfig: core.ASRConfig{Format: wfc.ASRConfig.Format, Codec: wfc.ASRConfig.Codec, Rate: wfc.ASRConfig.Rate,
 			Bits: wfc.ASRConfig.Bits, Channels: wfc.ASRConfig.Channels, ResultType: wfc.ASRConfig.ResultType},
 		TTSConfig: core.TTSConfig{Format: wfc.TTSConfig.AudioParams.Format, Codec: wfc.TTSConfig.AudioParams.Codec,

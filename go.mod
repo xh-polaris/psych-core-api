@@ -14,7 +14,7 @@ require (
 	github.com/hertz-contrib/websocket v0.2.0
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/xh-polaris/gopkg v0.0.0-20250312141711-7327267f4ea6
-	github.com/xh-polaris/psych-idl v0.0.0-20260307124857-2a4d7dea5233
+	github.com/xh-polaris/psych-idl v0.0.0-20260314060746-b45b9a7b65e9
 	github.com/zeromicro/go-zero v1.9.0
 	go.opentelemetry.io/contrib/propagators/b3 v1.37.0
 	go.opentelemetry.io/otel v1.38.0
@@ -33,6 +33,7 @@ require (
 	github.com/redis/go-redis/v9 v9.12.1
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/swag v1.16.1
+	github.com/yanyiwu/gojieba v1.4.6
 	go.mongodb.org/mongo-driver/v2 v2.3.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0
 	golang.org/x/crypto v0.41.0
@@ -121,7 +122,6 @@ require (
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
-	github.com/yanyiwu/gojieba v1.4.6 // indirect
 	github.com/yargevad/filepathx v1.0.0 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect

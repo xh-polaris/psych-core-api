@@ -2,7 +2,11 @@ package impl
 
 import (
 	"context"
+	"errors"
+	"io"
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
@@ -28,8 +32,26 @@ type CozeModel struct {
 	botId string
 }
 
+var cozeDial = &net.Dialer{
+	Timeout:   30 * time.Second,
+	KeepAlive: 30 * time.Second,
+}
+
+var cozeHttpCli = &http.Client{
+	Transport: &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           cozeDial.DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	},
+	Timeout: 0,
+}
+
 func NewCozeModel(ctx context.Context, url, sk, uid, botId string) (_ model.ToolCallingChatModel, err error) {
-	cozeCli := coze.NewCozeAPI(coze.NewTokenAuth(sk), coze.WithBaseURL(url), coze.WithHttpClient(http.DefaultClient))
+	cozeCli := coze.NewCozeAPI(coze.NewTokenAuth(sk), coze.WithBaseURL(url), coze.WithHttpClient(cozeHttpCli))
 	return &CozeModel{Coze, &cozeCli, uid, botId}, nil
 }
 
@@ -72,7 +94,7 @@ func process(ctx context.Context, reader coze.Stream[coze.ChatEvent], writer *sc
 			return
 		default:
 			if event, err = reader.Recv(); err != nil {
-				logs.Errorf("[coze] process recv err: %s", err)
+				logs.CondErrorf(errors.Is(err, io.EOF), "[coze] process recv err: %s", err)
 				writer.Send(nil, err)
 				return
 			}

@@ -17,7 +17,7 @@ func (e *Engine) auth(auth *core.Auth) (bool, error) {
 	var alreadyAuth *core.Auth // 返回额外信息
 
 	switch auth.AuthType {
-	case core.AlreadyAuth: // 已经在其他环节登录过
+	case int(core.AlreadyAuth): // 已经在其他环节登录过
 		alreadyAuth, merr = e.already(auth)
 	default:
 		alreadyAuth, merr = e.unAuth(auth)
@@ -32,8 +32,8 @@ func (e *Engine) auth(auth *core.Auth) (bool, error) {
 	} else {
 		e.uSession = bson.NewObjectID().Hex()
 	}
-	util.DPrint("[engine] [auth] info: %+v, merr: %+v\n", alreadyAuth, merr) // debug
-	return true, e.MWrite(core.MAuth, alreadyAuth)                           // 前端收到Auth响应后, 需要显示配置中
+	util.DPrint("[engine] [auth] info: %+v, merr: %+v, uSession: %s\n", alreadyAuth, merr, e.uSession) // debug
+	return true, e.MWrite(core.MAuth, alreadyAuth)                                                     // 前端收到Auth响应后, 需要显示配置中
 }
 
 // 已登录
@@ -65,13 +65,13 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 	}
 	signReq := &core_api.UserSignInReq{
 		UnitId:     auth.Info[cst.JsonUnitID].(string),
-		AuthType:   auth.AuthType,
+		AuthType:   int32(auth.AuthType),
 		AuthId:     auth.AuthID,
 		VerifyCode: auth.VerifyCode,
 	}
 	signResp, err := e.usrSvc.UserSignIn(e.ctx, signReq)
 	if err != nil {
-		logs.Error("[engine] [%s] UserSignIn err: %v", core.AAuth, err)
+		logs.Errorf("[engine] [%s] UserSignIn err: %v", core.AAuth, err)
 		// UserService 已返回带业务 code 的错误，直接透传
 		merr = core.ToErr(err)
 		return

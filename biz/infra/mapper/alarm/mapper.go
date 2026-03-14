@@ -3,7 +3,10 @@ package alarm
 import (
 	"context"
 	"errors"
+
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
+	"github.com/xh-polaris/psych-core-api/types/enum"
+
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
@@ -27,6 +30,7 @@ const (
 
 type IMongoMapper interface {
 	Insert(ctx context.Context, alarm *Alarm) error
+	FindOneById(ctx context.Context, id bson.ObjectID) (*Alarm, error)
 	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
 	RetrieveByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time, opt *options.FindOptionsBuilder) ([]*Alarm, error)
 	CountByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (int32, error)
@@ -60,7 +64,8 @@ func (m *mongoMapper) RetrieveByTime(ctx context.Context, unitID bson.ObjectID, 
 		tf[cst.LT] = end
 	}
 
-	f := bson.M{cst.UnitID: unitID, cst.Status: bson.M{cst.NE: cst.DeletedStatus}}
+	//f := bson.M{cst.UnitID: unitID, cst.Status: bson.M{cst.NE: enum.AlarmStatus}}
+	f := bson.M{cst.UnitID: unitID}
 	if len(tf) > 0 {
 		f[cst.CreateTime] = tf
 	}
@@ -82,7 +87,8 @@ func (m *mongoMapper) CountByTime(ctx context.Context, unitID bson.ObjectID, sta
 		tf[cst.LT] = end
 	}
 	// 若有传入时间限制 将时间过滤器tf，填入filter
-	f := bson.M{cst.UnitID: unitID, cst.Status: bson.M{cst.NE: cst.DeletedStatus}}
+	//f := bson.M{cst.UnitID: unitID, cst.Status: bson.M{cst.NE: cst.DeletedStatus}}
+	f := bson.M{cst.UnitID: unitID}
 	if len(tf) != 0 {
 		f[cst.CreateTime] = tf
 	}
@@ -96,7 +102,8 @@ func (m *mongoMapper) CountByTime(ctx context.Context, unitID bson.ObjectID, sta
 }
 
 func (m *mongoMapper) ExistsById(ctx context.Context, userID bson.ObjectID) (bool, error) {
-	c, err := m.conn.CountDocuments(ctx, bson.M{cst.UserID: userID, cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
+	//c, err := m.conn.CountDocuments(ctx, bson.M{cst.UserID: userID, cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
+	c, err := m.conn.CountDocuments(ctx, bson.M{cst.UserID: userID})
 	if err != nil {
 		logs.Errorf("[alarm mapper] find err:%s", errorx.ErrorWithoutStack(err))
 		return false, err
@@ -130,7 +137,7 @@ func (m *mongoMapper) AggregateStats(ctx context.Context, unitID bson.ObjectID, 
 	pipeline := mongo.Pipeline{
 		{{Key: "$match", Value: bson.M{
 			cst.UnitID: unitID,
-			cst.Status: bson.M{cst.NE: cst.DeletedStatus},
+			//cst.Status: bson.M{cst.NE: cst.DeletedStatus},
 		}}},
 		{{Key: "$facet", Value: bson.M{
 			"currentWeek": []bson.M{
@@ -199,7 +206,7 @@ func parseWeekData(weekData weekData) (map[int32]int32, int32) {
 	for _, result := range weekData {
 		cnt := int32(result.Count)
 		status := result.ID
-		if status == StatusStoI[cst.Processed] || status == StatusStoI[cst.Pending] {
+		if status == enum.AlarmStatusProcessed || status == enum.AlarmStatusPending {
 			statusMap[status] = cnt
 			total += cnt
 		}
@@ -207,13 +214,13 @@ func parseWeekData(weekData weekData) (map[int32]int32, int32) {
 	return statusMap, total
 }
 
-type EmotionDistribution map[string]int32
+type EmotionDistribution map[int]int32
 
 // EmotionDistribution 计算某Unit的情绪分布
 // unitId传入零值bson.ObjectID{}则计算所有Unit的情绪分布
 func (m *mongoMapper) EmotionDistribution(ctx context.Context, unitId *bson.ObjectID) (*EmotionDistribution, error) {
 	match := bson.M{
-		cst.Status: bson.M{cst.NE: cst.DeletedStatus},
+		//cst.Status: bson.M{cst.NE: cst.DeletedStatus},
 	}
 	if unitId != nil {
 		match[cst.UnitID] = *unitId
@@ -228,7 +235,7 @@ func (m *mongoMapper) EmotionDistribution(ctx context.Context, unitId *bson.Obje
 	}
 
 	var results []struct {
-		Emotion int32 `bson:"_id"`
+		Emotion int   `bson:"_id"`
 		Count   int32 `bson:"count"`
 	}
 
@@ -239,7 +246,7 @@ func (m *mongoMapper) EmotionDistribution(ctx context.Context, unitId *bson.Obje
 
 	distribution := make(EmotionDistribution)
 	for _, result := range results {
-		distribution[EmotionItoS[result.Emotion]] = result.Count
+		distribution[result.Emotion] = result.Count
 	}
 
 	return &distribution, nil

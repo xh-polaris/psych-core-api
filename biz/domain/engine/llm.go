@@ -28,7 +28,7 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	}
 
 	// 创建用户消息
-	oids, err := util.ObjectIDsFromHex(e.uSession, e.info[cst.UserID].(string))
+	oids, err := util.ObjectIDsFromHex(e.uSession, e.info[cst.JsonUserID].(string))
 	if err != nil {
 		return errorx.WrapByCode(err, errno.RetrieveHisErr)
 	}
@@ -44,22 +44,24 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	// 创建模型消息
 	astMsg := convert.AssistantMMsg(oids[0], oids[1], "", index+1)
 
-	util.DPrint("mMsgs:%s", mMsgs)
+	util.DPrint("mMsgs:%+v", mMsgs)
 	// 调用大模型
 	eMsgs := convert.MMsgToEMsgList(mMsgs) // 存储域消息转模型域
-	//ctx, e.llmCancel = context.WithCancel(ctx)
-	stream, err := e.llm.Stream(ctx, eMsgs)
+
+	var subctx context.Context
+	subctx, e.llmCancel = context.WithCancel(ctx)
+	stream, err := e.llm.Stream(subctx, eMsgs)
 	if err != nil {
-		return errorx.WrapByCode(err, errno.RetrieveHisErr)
+		return errorx.WrapByCode(err, errno.LLMStreamErr)
 	}
 
 	// 拷贝流以用作不同用途
 	streams := stream.Copy(2)
 	ret, tts := streams[0], streams[1] // 分别用于返回给前端与TTS音频生成
 	// 返回给前端
-	go e.execLLMResponse(ctx, cmd.ID, ret, astMsg)
+	go e.execLLMResponse(subctx, cmd.ID, ret, astMsg)
 	// 启用tts发送
-	go e.execTTS(ctx, cmd.ID, tts)
+	go e.execTTS(subctx, cmd.ID, tts)
 	return err
 }
 

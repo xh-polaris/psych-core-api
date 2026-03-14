@@ -27,7 +27,7 @@ type Report struct {
 	Title     string   `bson:"title" json:"title"`                    // 报表标题
 	Keywords  []string `bson:"keywords" json:"keywords,omitempty"`    // 关键词
 	Digest    string   `bson:"digest" json:"digest,omitempty"`        // 对话摘要
-	Emotion   string   `bson:"emotion" json:"emotion,omitempty"`      // 用户情绪状态
+	Emotion   int      `bson:"emotion" json:"emotion,omitempty"`      // 用户情绪状态 1-4: Danger | Depress | Negative | Normal
 	Body      string   `bson:"body" json:"body,omitempty"`            // 正文
 	NeedAlarm bool     `bson:"need_alarm" json:"needAlarm,omitempty"` // 是否需要创建预警
 }

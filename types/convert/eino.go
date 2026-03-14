@@ -6,6 +6,7 @@ import (
 	"github.com/cloudwego/eino/schema"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	mmsg "github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
+	"github.com/xh-polaris/psych-core-api/types/enum"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
@@ -16,12 +17,12 @@ func UserMMsg(conversationId, userId bson.ObjectID, content string, index int) *
 		ConversationId: conversationId,
 		SectionId:      conversationId,
 		UserId:         userId,
-		Index:          int32(index),
+		Index:          index,
 		Content:        content,
 		ContentType:    cst.ContentTypeText,
 		MessageType:    cst.MessageTypeText,
 		Ext:            &mmsg.Ext{},
-		Role:           cst.UserEnum,
+		Role:           enum.MsgRoleUser,
 		CreateTime:     now,
 		UpdateTime:     now,
 		Status:         0,
@@ -35,12 +36,12 @@ func AssistantMMsg(conversationId, userId bson.ObjectID, content string, index i
 		ConversationId: conversationId,
 		SectionId:      conversationId,
 		UserId:         userId,
-		Index:          int32(index),
+		Index:          index,
 		Content:        content,
 		ContentType:    cst.ContentTypeText,
 		MessageType:    cst.MessageTypeText,
 		Ext:            &mmsg.Ext{},
-		Role:           cst.AssistantEnum,
+		Role:           enum.MsgRoleAssistant,
 		CreateTime:     now,
 		UpdateTime:     now,
 		Status:         0,
@@ -50,7 +51,7 @@ func AssistantMMsg(conversationId, userId bson.ObjectID, content string, index i
 // MMsgToEMsg 将单个 core_api.Message 转换为 eino/schema.Message
 func MMsgToEMsg(msg *mmsg.Message) *schema.Message {
 	m := &schema.Message{
-		Role:    schema.RoleType(mmsg.RoleItoS[msg.Role]),
+		Role:    schema.RoleType(enum.MsgRoleItoA[msg.Role]),
 		Content: msg.Content,
 		Name:    msg.MessageId.Hex(),
 	}

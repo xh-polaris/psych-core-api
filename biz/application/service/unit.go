@@ -2,15 +2,17 @@ package service
 
 import (
 	"context"
+	"time"
+
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
-	"time"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
+	"github.com/xh-polaris/psych-core-api/types/enum"
 
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util/encrypt"
-	"github.com/xh-polaris/psych-core-api/biz/infra/util/enum"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util/reg"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
@@ -23,11 +25,8 @@ import (
 var _ IUnitService = (*UnitService)(nil)
 
 type IUnitService interface {
-	UnitSignUp(ctx context.Context, req *core_api.UnitSignUpReq) (*core_api.UnitSignUpResp, error)
-	UnitSignIn(ctx context.Context, req *core_api.UnitSignInReq) (*core_api.UnitSignInResp, error)
 	UnitGetInfo(ctx context.Context, req *core_api.UnitGetInfoReq) (*core_api.UnitGetInfoResp, error)
 	UnitUpdateInfo(ctx context.Context, req *core_api.UnitUpdateInfoReq) (*basic.Response, error)
-	UnitUpdatePassword(ctx context.Context, req *core_api.UnitUpdatePasswordReq) (*basic.Response, error)
 	UnitLinkUser(ctx context.Context, req *core_api.UnitLinkUserReq) (*basic.Response, error)
 	UnitCreateAndLinkUser(ctx context.Context, req *core_api.UnitCreateAndLinkUserReq) (*core_api.UnitCreateAndLinkUserResp, error)
 }
@@ -42,141 +41,19 @@ var UnitServiceSet = wire.NewSet(
 	wire.Bind(new(IUnitService), new(*UnitService)),
 )
 
-func (u *UnitService) UnitSignUp(ctx context.Context, req *core_api.UnitSignUpReq) (*core_api.UnitSignUpResp, error) {
-	// 参数校验
-	if req.Unit == nil {
-		return nil, errorx.New(errno.ErrMissingEntity, errorx.KV("entity", "单位用户"))
-	}
-	if req.Unit.Name == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位名称"))
-	}
-	if req.Unit.Phone == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "电话号码"))
-	}
-	if req.Unit.Password == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "密码"))
-	}
-
-	// 手机号格式校验
-	if !reg.CheckMobile(req.Unit.Phone) {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "电话号码"))
-	}
-
-	// 检查手机号是否已注册
-	if exists, err := u.UnitMapper.ExistsByPhone(ctx, req.Unit.Phone); err != nil {
-		logs.Errorf("check phone exists error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	} else if exists {
-		return nil, errorx.New(errno.ErrPhoneAlreadyExist)
-	}
-
-	// 密码加密
-	hashedPwd, err := encrypt.BcryptEncrypt(req.Unit.Password)
-	if err != nil {
-		logs.Errorf("bcrypt encrypt error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-
-	// 构造 Unit
-	unitDAO := &unit.Unit{
-		ID:         bson.NewObjectID(),
-		Phone:      req.Unit.Phone,
-		Password:   hashedPwd,
-		Name:       req.Unit.Name,
-		Address:    req.Unit.Address,
-		Contact:    req.Unit.Contact,
-		Level:      int(req.Unit.Level),
-		Status:     enum.Active,
-		CreateTime: time.Now(),
-		UpdateTime: time.Now(),
-	}
-
-	// 插入数据库
-	if err := u.UnitMapper.Insert(ctx, unitDAO); err != nil {
-		logs.Errorf("insert unit error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-
-	// 获得单位状态
-	statusStr, ok := enum.GetStatus(unitDAO.Status)
-	if !ok {
-		return nil, errorx.New(errno.ErrInternalError)
-	}
-
-	// 构造返回结果
-	return &core_api.UnitSignUpResp{
-		Unit: &core_api.Unit{
-			Id:         unitDAO.ID.Hex(),
-			Phone:      unitDAO.Phone,
-			Name:       unitDAO.Name,
-			Address:    unitDAO.Address,
-			Contact:    unitDAO.Contact,
-			Level:      int32(unitDAO.Level),
-			Status:     statusStr,
-			CreateTime: unitDAO.CreateTime.Unix(),
-			UpdateTime: unitDAO.UpdateTime.Unix(),
-			DeleteTime: unitDAO.DeleteTime.Unix(),
-		},
-		Code: 0,
-		Msg:  "success",
-	}, nil
-}
-
-func (u *UnitService) UnitSignIn(ctx context.Context, req *core_api.UnitSignInReq) (*core_api.UnitSignInResp, error) {
-	// 参数校验
-	if req.AuthId == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "电话号码"))
-	}
-	//if req.AuthType == "" {
-	//	return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "验证方式"))
-	//}
-	if req.VerifyCode == "" && req.AuthType == cst.AuthTypePassword {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "密码"))
-	}
-	if req.VerifyCode == "" && req.AuthType == cst.AuthTypeCode {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "验证码"))
-	}
-
-	if !reg.CheckMobile(req.AuthId) {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "电话号码"))
-	}
-
-	// 验证方式
-	var err error
-	unitDAO := &unit.Unit{}
-	switch req.AuthType {
-	// 密码登录
-	case cst.AuthTypePassword:
-		// 获得用户
-		unitDAO, err = u.UnitMapper.FindOneByPhone(ctx, req.AuthId)
-		if err != nil {
-			logs.Errorf("find unit by phone error: %s", errorx.ErrorWithoutStack(err))
-			return nil, err
-		} else if unitDAO == nil {
-			return nil, errorx.New(errno.ErrWrongAccountOrPassword)
-		}
-
-		// 获得密码
-		if !encrypt.BcryptCheck(req.VerifyCode, unitDAO.Password) {
-			return nil, errorx.New(errno.ErrWrongAccountOrPassword)
-		}
-	// 验证码登录
-	case cst.AuthTypeCode:
-		return nil, errorx.New(errno.ErrUnImplement) // TODO: 验证码登录
-	}
-
-	// 构造返回结果
-	return &core_api.UnitSignInResp{
-		UnitId: unitDAO.ID.Hex(),
-		Code:   0,
-		Msg:    "success",
-	}, nil
-}
-
 func (u *UnitService) UnitGetInfo(ctx context.Context, req *core_api.UnitGetInfoReq) (*core_api.UnitGetInfoResp, error) {
 	// 参数校验
 	if req.UnitId == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
+	}
+
+	// 鉴权
+	m, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !m.HasUnitAdminAuth() {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
 	unitId, err := bson.ObjectIDFromHex(req.UnitId)
@@ -192,22 +69,15 @@ func (u *UnitService) UnitGetInfo(ctx context.Context, req *core_api.UnitGetInfo
 		return nil, err
 	}
 
-	// 获得单位状态
-	statusStr, ok := enum.GetStatus(unitDAO.Status)
-	if !ok {
-		return nil, errorx.New(errno.ErrInternalError)
-	}
-
 	// 构造返回结果
 	return &core_api.UnitGetInfoResp{
-		Unit: &core_api.Unit{
+		Unit: &core_api.UnitVO{
 			Id:         unitDAO.ID.Hex(),
-			Phone:      unitDAO.Phone,
 			Name:       unitDAO.Name,
 			Address:    unitDAO.Address,
 			Contact:    unitDAO.Contact,
 			Level:      int32(unitDAO.Level),
-			Status:     statusStr,
+			Status:     int32(unitDAO.Status),
 			CreateTime: unitDAO.CreateTime.Unix(),
 			UpdateTime: unitDAO.UpdateTime.Unix(),
 			DeleteTime: unitDAO.DeleteTime.Unix(),
@@ -221,6 +91,15 @@ func (u *UnitService) UnitUpdateInfo(ctx context.Context, req *core_api.UnitUpda
 	// 参数校验
 	if req.Unit.Id == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
+	}
+
+	// 鉴权
+	m, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !m.HasUnitAdminAuth() {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
 	// 不允许修改手机号、密码、验证方式、level、状态
@@ -259,72 +138,6 @@ func (u *UnitService) UnitUpdateInfo(ctx context.Context, req *core_api.UnitUpda
 	}, nil
 }
 
-func (u *UnitService) UnitUpdatePassword(ctx context.Context, req *core_api.UnitUpdatePasswordReq) (*basic.Response, error) {
-	// 参数校验
-	if req.Id == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
-	}
-	//if req.AuthType == "" {
-	//	return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "验证方式"))
-	//}
-	if req.VerifyCode == "" && req.AuthType == cst.AuthTypePassword {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "旧密码"))
-	}
-	if req.VerifyCode == "" && req.AuthType == cst.AuthTypeCode {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "验证码"))
-	}
-	if req.NewPassword == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "新密码"))
-	}
-
-	unitId, err := bson.ObjectIDFromHex(req.Id)
-	if err != nil {
-		logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-
-	// 验证方式
-	unitDAO := &unit.Unit{}
-	switch req.AuthType {
-	// 验证码
-	case cst.AuthTypeCode:
-		return nil, errorx.New(errno.ErrUnImplement) // TODO: 验证码登录
-	// 密码
-	case cst.AuthTypePassword:
-		// 获取密码
-		unitDAO, err = u.UnitMapper.FindOneById(ctx, unitId)
-		if err != nil {
-			logs.Errorf("find unit by phone error: %s", errorx.ErrorWithoutStack(err))
-			return nil, err
-		}
-		if !encrypt.BcryptCheck(req.VerifyCode, unitDAO.Password) {
-			return nil, errorx.New(errno.ErrWrongPassword)
-		}
-	}
-
-	// 加密密码
-	newPwd, err := encrypt.BcryptEncrypt(req.NewPassword)
-	if err != nil {
-		logs.Errorf("bcrypt encrypt error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-
-	// 更新密码
-	if err = u.UnitMapper.UpdateFields(ctx, unitDAO.ID, bson.M{
-		cst.Password:   newPwd,
-		cst.UpdateTime: time.Now().Unix(),
-	}); err != nil {
-		logs.Errorf("update unit error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-
-	// 构造返回结果
-	return &basic.Response{
-		Code: 0,
-		Msg:  "success",
-	}, nil
-}
-
 func (u *UnitService) UnitLinkUser(ctx context.Context, req *core_api.UnitLinkUserReq) (*basic.Response, error) {
 	// 参数校验
 	if req.UnitId == "" {
@@ -332,6 +145,15 @@ func (u *UnitService) UnitLinkUser(ctx context.Context, req *core_api.UnitLinkUs
 	}
 	if req.UserId == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "用户ID"))
+	}
+
+	// 鉴权
+	m, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !m.HasUnitAdminAuth() {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
 	// 转换ID
@@ -363,17 +185,20 @@ func (u *UnitService) UnitCreateAndLinkUser(ctx context.Context, req *core_api.U
 	if req.UnitId == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
 	}
-	if req.CodeType == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "验证方式"))
-	}
+	//if req.CodeType == "" {
+	//	return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "验证方式"))
+	//}
 	if len(req.Users) == 0 {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "用户列表"))
 	}
 
-	// 提取枚举值
-	codeType, ok := enum.ParseCodeType(req.CodeType)
-	if !ok {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "验证方式"))
+	// 鉴权
+	m, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !m.HasUnitAdminAuth() && m.UnitId != req.GetUnitId() {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
 	// 转换ID
@@ -384,7 +209,7 @@ func (u *UnitService) UnitCreateAndLinkUser(ctx context.Context, req *core_api.U
 	}
 
 	// 验证方式标记
-	isCodeTypePhone := codeType == enum.CodeTypePhone
+	isCodeTypePhone := req.CodeType == enum.AuthTypeCode
 
 	// 找出所有属于这个单位的用户
 	users, err := u.UserMapper.FindAllByUnitID(ctx, unitId)
@@ -461,29 +286,19 @@ func (u *UnitService) UnitCreateAndLinkUser(ctx context.Context, req *core_api.U
 			return nil, err
 		}
 
-		// 提取枚举值
-		gender, ok := enum.ParseGender(userReq.Gender)
-		if !ok {
-			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "性别"))
-		}
-		codeType, ok := enum.ParseCodeType(req.CodeType)
-		if !ok {
-			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "验证方式"))
-		}
-
 		// 构造用户
 		userDAO := &user.User{
 			ID:         bson.NewObjectID(),
-			CodeType:   codeType,
+			CodeType:   int(req.CodeType),
 			Code:       userReq.Code,
 			Password:   hashedPwd,
 			Name:       userReq.Name,
 			Birth:      time.Unix(userReq.Birth, 0),
-			Gender:     gender,
-			Status:     enum.Active,
-			Class:      userReq.Class,
-			Grade:      userReq.Grade,
-			EnrollYear: userReq.EnrollYear,
+			Gender:     int(userReq.Gender),
+			Status:     enum.UserStatusActive,
+			Class:      int(userReq.Class),
+			Grade:      int(userReq.Grade),
+			EnrollYear: int(userReq.EnrollYear),
 			UnitID:     unitId,
 			UpdateTime: time.Now(),
 			CreateTime: time.Now(),

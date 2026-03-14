@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/xh-polaris/psych-core-api/biz/application/service"
 	"io"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/xh-polaris/psych-core-api/biz/application/service"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/hertz-contrib/websocket"

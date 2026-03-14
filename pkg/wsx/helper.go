@@ -56,9 +56,9 @@ func (ws *WSClient) classifyErr(err error) error {
 		return NormalCloseErr
 	case websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived):
 		// 为了避免内部错误被隐藏, 此处日志记录错误原因
-		logs.Error("[WSClient] close error%s", err)
+		logs.Errorf("[WSClient] close error: %v", err)
 		ws.closed = true
-		return AbnormalCloseErr
+		return err
 	default:
 		return err
 	}
@@ -96,7 +96,7 @@ func NewWSClientWithDial(ctx context.Context, url string, header http.Header) (*
 	// 连接失败若有响应, 打印错误日志
 	if r != nil {
 		if body, parseErr := io.ReadAll(r.Body); parseErr == nil {
-			logs.Error("[WSClient] parse conn resp body:%s", string(body))
+			logs.Errorf("[WSClient] parse conn resp body:%s", string(body))
 		}
 	}
 	return nil, err

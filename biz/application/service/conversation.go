@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"time"
+
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
@@ -12,7 +14,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"time"
 )
 
 type IConversationService interface {
@@ -23,7 +24,7 @@ type IConversationService interface {
 }
 
 type ConversationService struct {
-	MessageMapper      message.MongoMapper
+	MessageMapper      message.IMongoMapper
 	ConversationMapper conversation.IMongoMapper
 }
 
@@ -33,15 +34,20 @@ var ConversationServiceSet = wire.NewSet(
 )
 
 func (c *ConversationService) CreateConversation(ctx context.Context, req *core_api.CreateConversationReq) (resp *core_api.CreateConversationResp, err error) {
-	//userMeta, err := util.ExtraUserMeta(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
+	userMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	userOID, err := bson.ObjectIDFromHex(userMeta.UserId)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams)
+	}
 
 	temp := bson.NewObjectID()
 	if err := c.ConversationMapper.Insert(ctx, &conversation.Conversation{
-		ID: temp,
-		//UserID: userMeta.UserId, // TODO 鉴权时从token获得
+		ID:         temp,
+		UserID:     userOID,
 		CreateTime: time.Now(),
 		UpdateTime: time.Now(),
 	}); err != nil {
@@ -56,13 +62,15 @@ func (c *ConversationService) CreateConversation(ctx context.Context, req *core_
 }
 
 func (c *ConversationService) ListConversations(ctx context.Context, req *core_api.ListConversationsReq) (resp *core_api.ListConversationsResp, err error) {
-	//userMeta, err := util.ExtraUserMeta(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
+	userMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	userId := bson.NewObjectID() // TODO
-	userId, _ = bson.ObjectIDFromHex("69abcc4f7f113a15afc12fda")
+	userId, err := bson.ObjectIDFromHex(userMeta.UserId)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams)
+	}
 	total, err := c.ConversationMapper.CountByUser(ctx, userId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrListConversation)
@@ -82,9 +90,9 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 		return nil, errorx.New(errno.ErrListConversation)
 	}
 
-	convs := make([]*core_api.Conversation, 0, len(dbConvs))
+	convs := make([]*core_api.ConversationVO, 0, len(dbConvs))
 	for _, dbConv := range dbConvs {
-		conv := &core_api.Conversation{
+		conv := &core_api.ConversationVO{
 			ConversationId: dbConv.ID.Hex(),
 			Brief:          dbConv.Title,
 			CreateTime:     dbConv.CreateTime.Unix(),
@@ -102,12 +110,6 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 }
 
 func (c *ConversationService) GetConversation(ctx context.Context, req *core_api.GetConversationReq) (resp *core_api.GetConversationResp, err error) {
-	// 鉴权
-	//userMeta, err := util.ExtraUserMeta(ctx)
-	//if err != nil {
-	//	return nil, err
-	//}
-
 	// RetrieveMessage仅返回意外异常 消息搜索结果为空时返回空切片，和nil err
 	// 非空时，返回index倒序的列表
 	rawMsgs, err := his.Mgr.RetrieveMessage(ctx, req.ConversationId, -1)
@@ -122,8 +124,8 @@ func (c *ConversationService) GetConversation(ctx context.Context, req *core_api
 	for _, rawMsg := range rawMsgs[startIdx:endIdx] {
 		msgs = append(msgs, &core_api.Message{
 			Content: rawMsg.Content,
-			Role:    message.RoleItoS[rawMsg.Role],
-			Index:   rawMsg.Index,
+			Role:    int32(rawMsg.Role),
+			Index:   int32(rawMsg.Index),
 		})
 	}
 

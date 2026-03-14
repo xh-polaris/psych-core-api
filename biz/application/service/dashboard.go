@@ -3,13 +3,14 @@ package service
 import (
 	"context"
 	"errors"
+	"sort"
+	"sync"
+	"time"
+
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
-	"sort"
-	"strconv"
-	"sync"
-	"time"
+	"github.com/xh-polaris/psych-core-api/types/enum"
 
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
@@ -20,7 +21,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 
 	"github.com/google/wire"
-	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
@@ -47,13 +47,14 @@ type IDashboardService interface {
 
 	// 对话记录
 	DashboardUserConvRecords(ctx context.Context, req *core_api.DashboardUserConvRecordsReq) (*core_api.DashboardUserConvRecordsResp, error)
+	DashboardUnitConvRecords(ctx context.Context, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error)
 	DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error)
 }
 
 type DashboardService struct {
 	UserMapper         user.IMongoMapper
 	UnitMapper         unit.IMongoMapper
-	MessageMapper      message.MongoMapper
+	MessageMapper      message.IMongoMapper
 	ConversationMapper conversation.IMongoMapper
 	ReportMapper       report.IMongoMapper
 	AlarmMapper        alarm.IMongoMapper
@@ -65,19 +66,36 @@ var DashboardServiceSet = wire.NewSet(
 )
 
 func (s *DashboardService) DashboardGetDataOverview(ctx context.Context, req *core_api.DashboardGetDataOverviewReq) (*core_api.DashboardGetDataOverviewResp, error) {
+	// 提取用户Meta
+	userMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
 	weekBefore := now.AddDate(0, 0, -7)
 	twoWeeksBefore := now.AddDate(0, 0, -14)
 
 	// 区分管理端 / 单位端
 	if req.UnitId == nil || req.GetUnitId() == "" {
+		// 管理端 - 需要超级管理员权限
+		if !userMeta.HasSuperAdminAuth() {
+			return nil, errorx.New(errno.ErrInsufficientAuth)
+		}
 		return s.dashboardOverviewAdmin(ctx, twoWeeksBefore, weekBefore, now)
 	}
 
+	// 单位端 - 检查用户是否属于该单位
 	unitOID, err := bson.ObjectIDFromHex(req.GetUnitId())
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 	}
+
+	// 验证用户是否属于该单位（如果不是管理员）
+	if !userMeta.HasUnitAdminAuth() && userMeta.UnitId != req.GetUnitId() {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
+	}
+
 	return s.dashboardOverviewUnit(ctx, unitOID, twoWeeksBefore, weekBefore, now)
 }
 
@@ -328,6 +346,12 @@ func (s *DashboardService) dashboardOverviewUnit(ctx context.Context, unitOID bs
 }
 
 func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_api.DashboardGetDataTrendReq) (*core_api.DashboardGetDataTrendResp, error) {
+	// 提取用户Meta
+	userMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
 	// 计算本周一 00:00 和下周一 00:00（用于按周内 7 天切分）
 	// Go 的 Weekday: Sunday=0, Monday=1 ... Saturday=6
@@ -341,11 +365,20 @@ func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_
 
 	var unitOID *bson.ObjectID
 	if req.UnitId != nil && req.GetUnitId() != "" {
+		// 单位端 - 验证用户权限
+		if !userMeta.HasUnitAdminAuth() && userMeta.UnitId != req.GetUnitId() {
+			return nil, errorx.New(errno.ErrInsufficientAuth)
+		}
 		id, err := bson.ObjectIDFromHex(req.GetUnitId())
 		if err != nil {
 			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 		}
 		unitOID = &id
+	} else {
+		// 管理端 - 需要管理员权限
+		if !userMeta.HasUnitAdminAuth() {
+			return nil, errorx.New(errno.ErrInsufficientAuth)
+		}
 	}
 
 	// 活跃趋势（按天）
@@ -449,6 +482,17 @@ func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_
 }
 
 func (s *DashboardService) DashboardListUnits(ctx context.Context, req *core_api.DashboardListUnitsReq) (*core_api.DashboardListUnitsResp, error) {
+	// 提取用户Meta并检查管理员权限
+	userMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// 需要管理员权限
+	if !userMeta.HasUnitAdminAuth() {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
+	}
+
 	// 查询所有单位
 	units, err := s.UnitMapper.FindAll(ctx)
 	if err != nil {
@@ -503,14 +547,29 @@ func (s *DashboardService) DashboardListUnits(ctx context.Context, req *core_api
 }
 
 func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core_api.DashboardGetPsychTrendReq) (*core_api.DashboardGetPsychTrendResp, error) {
+	// 提取用户Meta
+	userMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	unitIdStr := req.GetUnitId()
 	var unitOID *bson.ObjectID
 	if unitIdStr != "" {
+		// 单位端 - 验证用户权限
+		if !userMeta.HasUnitAdminAuth() && userMeta.UnitId != unitIdStr {
+			return nil, errorx.New(errno.ErrInsufficientAuth)
+		}
 		id, err := bson.ObjectIDFromHex(unitIdStr)
 		if err != nil {
 			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 		}
 		unitOID = &id
+	} else {
+		// 管理端 - 需要管理员权限
+		if !userMeta.HasUnitAdminAuth() {
+			return nil, errorx.New(errno.ErrInsufficientAuth)
+		}
 	}
 
 	// 统计风险等级分布（按性别拆分）
@@ -520,20 +579,17 @@ func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardAlarmUserStat)
 	}
 
-	// level: 0=正常 1=低危 2=中危 3=高危
 	// user.RiskLevel: High=1, Medium=2, Low=3, Normal=4
 	levelMap := func(dbLevel int32) int32 {
 		switch dbLevel {
-		case user.RiskLevelStoI[cst.High]:
+		case enum.UserRiskLevelHigh:
+			return 4
+		case enum.UserRiskLevelMedium:
 			return 3
-		case user.RiskLevelStoI[cst.Medium]:
+		case enum.UserRiskLevelLow:
 			return 2
-		case user.RiskLevelStoI[cst.Low]:
-			return 1
-		case user.RiskLevelStoI[cst.Normal]:
-			return 0
 		default:
-			return 0
+			return 1
 		}
 	}
 
@@ -616,7 +672,7 @@ func (s *DashboardService) getEmotionRatio(ctx context.Context, unitOID *bson.Ob
 	}
 
 	if total == 0 {
-		return &core_api.EmotionRatio{Total: 0, Ratio: make(map[string]int32)}, nil
+		return &core_api.EmotionRatio{Total: 0, Ratio: make(map[int32]int32)}, nil
 	}
 
 	emotionDistribution, err := s.AlarmMapper.EmotionDistribution(ctx, unitOID)
@@ -625,12 +681,12 @@ func (s *DashboardService) getEmotionRatio(ctx context.Context, unitOID *bson.Ob
 		return nil, err
 	}
 	if emotionDistribution == nil {
-		return &core_api.EmotionRatio{Total: total, Ratio: make(map[string]int32)}, nil
+		return &core_api.EmotionRatio{Total: total, Ratio: make(map[int32]int32)}, nil
 	}
 
-	ratio := make(map[string]int32, len(*emotionDistribution))
+	ratio := make(map[int32]int32, len(*emotionDistribution))
 	for emo, cnt := range *emotionDistribution {
-		ratio[emo] = cnt
+		ratio[int32(emo)] = cnt
 	}
 
 	return &core_api.EmotionRatio{
@@ -647,9 +703,20 @@ func (s *DashboardService) getKeywords(ctx context.Context, unitOID *bson.Object
 }
 
 func (s *DashboardService) DashboardListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (*core_api.DashboardListClassesResp, error) {
+	// 提取用户Meta
+	userMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
+	}
+
+	// 验证用户权限 - 必须是管理员或者属于该单位
+	if !userMeta.HasUnitAdminAuth() && userMeta.UnitId != req.UnitId {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 	// 筛选参数
 	var grades, classes []int32
@@ -661,35 +728,34 @@ func (s *DashboardService) DashboardListClasses(ctx context.Context, req *core_a
 	}
 
 	// 查询结果
-	res, err := s.UserMapper.CountByClasses(ctx, unitOID, grades, classes)
+	clsStats, err := s.UserMapper.CountByClasses(ctx, unitOID, grades, classes)
+	clsTeachers, err := s.UserMapper.FindUnitClassTeachers(ctx, unitOID)
 	if err != nil {
 		return nil, errorx.New(errno.ErrCountUserByClasses)
 	}
 
 	// 整理结果，构建响应
 	return &core_api.DashboardListClassesResp{
-		Grades: aggregateAndSort(res),
-		Code:   0,
-		Msg:    "success",
+		Grades: aggregateAndSort(clsStats, clsTeachers),
 	}, nil
 }
 
-func aggregateAndSort(mapperRes []*user.ClassStatResult) []*core_api.GradeInfo {
+func aggregateAndSort(mapperRes []*user.ClassStatResult, clsTeachers user.ClassTeachers) []*core_api.GradeInfo {
 	if len(mapperRes) == 0 {
 		return make([]*core_api.GradeInfo, 0)
 	}
 
-	gradeMap := make(map[int32]*core_api.GradeInfo)
+	gradeMap := make(map[int]*core_api.GradeInfo)
 	// 将入参切片（有序）填充入有序map
 	for _, item := range mapperRes {
-		gradeInfo, exists := gradeMap[item.Info.Grade]
+		gradeInfo, exists := gradeMap[int(item.Info.Grade)]
 		// 响应中年级尚不存在 创建该年级
 		if !exists {
 			gradeInfo = &core_api.GradeInfo{
 				Grade:   item.Info.Grade,
 				Classes: make([]*core_api.ClassInfo, 0),
 			}
-			gradeMap[item.Info.Grade] = gradeInfo
+			gradeMap[int(item.Info.Grade)] = gradeInfo
 		}
 		// 年级已存在
 		uNum := item.UserNum
@@ -698,8 +764,8 @@ func aggregateAndSort(mapperRes []*user.ClassStatResult) []*core_api.GradeInfo {
 			Class:        item.Info.Class,
 			UserNum:      uNum,
 			AlarmNum:     aNum,
-			TeacherName:  "",
-			TeacherPhone: "",
+			TeacherName:  clsTeachers[int(item.Info.Grade)][int(item.Info.Class)].Name,
+			TeacherPhone: clsTeachers[int(item.Info.Grade)][int(item.Info.Class)].Code,
 		})
 	}
 
@@ -717,9 +783,20 @@ func aggregateAndSort(mapperRes []*user.ClassStatResult) []*core_api.GradeInfo {
 }
 
 func (s *DashboardService) DashboardListUsers(ctx context.Context, req *core_api.DashboardListUsersReq) (*core_api.DashboardListUsersResp, error) {
+	// 提取用户Meta
+	userMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
+	}
+
+	// 验证用户权限 - 必须是管理员或者属于该单位
+	if !userMeta.HasUnitAdminAuth() && userMeta.UnitId != req.UnitId {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 	// 查找所有用户并按风险高→低排序
 	dbUsers, err := s.UserMapper.FindAllByUnitID(ctx, unitOID)
@@ -740,8 +817,6 @@ func (s *DashboardService) DashboardListUsers(ctx context.Context, req *core_api
 	return &core_api.DashboardListUsersResp{
 		RiskUsers:  riskUsers,
 		Pagination: pg,
-		Code:       0,
-		Msg:        "success",
 	}, err2
 
 }
@@ -803,11 +878,11 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 	riskUsers := make([]*core_api.RiskUser, end-start+1)
 	for i, dbUser := range targetUsers {
 		riskUsers[i] = &core_api.RiskUser{
-			User: &core_api.User{
+			User: &core_api.UserVO{
 				Code:  dbUser.Code,
 				Name:  dbUser.Name,
-				Grade: dbUser.Grade,
-				Class: dbUser.Class,
+				Grade: int32(dbUser.Grade),
+				Class: int32(dbUser.Class),
 			},
 			Level:    int32(dbUser.RiskLevel),
 			Keywords: make([]string, 0),
@@ -825,16 +900,27 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 }
 
 func (s *DashboardService) DashboardUserConvRecords(ctx context.Context, req *core_api.DashboardUserConvRecordsReq) (*core_api.DashboardUserConvRecordsResp, error) {
+	// 提取用户Meta
+	userMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	userOID, err := bson.ObjectIDFromHex(req.UserId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UserID"), errorx.KV("value", "用户ID"))
 	}
 
-	// 获取用户基本信息
-	usr, err := s.UserMapper.FindOneById(ctx, userOID)
+	// 首先获取目标用户信息以检查权限
+	targetUser, err := s.UserMapper.FindOneById(ctx, userOID)
 	if err != nil {
 		logs.Errorf("get user info error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardGetUserInfo)
+	}
+
+	// 验证权限：要么是管理员，要么是同一单位的用户
+	if !userMeta.HasUnitAdminAuth() && userMeta.UnitId != targetUser.UnitID.Hex() {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
 	// 获取用户对话频率趋势
@@ -850,12 +936,12 @@ func (s *DashboardService) DashboardUserConvRecords(ctx context.Context, req *co
 	}
 
 	resp := &core_api.DashboardUserConvRecordsResp{
-		User: &core_api.User{
-			Id:     usr.ID.Hex(),
-			Name:   usr.Name,
-			Gender: strconv.Itoa(usr.Gender),
-			Grade:  usr.Grade,
-			Class:  usr.Class,
+		User: &core_api.UserVO{
+			Id:     targetUser.ID.Hex(),
+			Name:   targetUser.Name,
+			Gender: int32(targetUser.Gender),
+			Grade:  int32(targetUser.Grade),
+			Class:  int32(targetUser.Class),
 		},
 		UserConvTrend: userConvTrend,
 		ConvDetail:    convDetail,
@@ -1017,9 +1103,27 @@ func (s *DashboardService) getPagedUserConvs(ctx context.Context, userOID bson.O
 }
 
 func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error) {
+	// 提取用户Meta
+	userMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	convOID, err := bson.ObjectIDFromHex(req.ConversationId)
 	if err != nil {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "ConversationId"), errorx.KV("value", "对话ID"))
+	}
+
+	// 获取对话信息以检查权限
+	conv, err := s.ConversationMapper.FindOneById(ctx, convOID)
+	if err != nil {
+		logs.Errorf("get conversation error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "对话"))
+	}
+
+	// 管理员可查看所有报告，普通用户只能查看自己的对话报告
+	if !userMeta.HasUnitAdminAuth() && conv.UserID.Hex() != userMeta.UserId {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
 	rpt, err := s.ReportMapper.FindByConversation(ctx, convOID)
@@ -1032,10 +1136,51 @@ func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api
 		Title:     rpt.Title,
 		Keywords:  rpt.Keywords,
 		Digest:    rpt.Digest,
-		Emotion:   rpt.Emotion,
+		Emotion:   int32(rpt.Emotion),
 		Body:      rpt.Body,
 		NeedAlarm: rpt.NeedAlarm,
 		Code:      0,
 		Msg:       "success",
 	}, nil
+}
+
+func (s *DashboardService) DashboardUnitConvRecords(ctx context.Context, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error) {
+	// 提取用户Meta
+	userMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if uid := req.GetUnitId(); uid != "" {
+		// 单位端 - 验证用户权限
+		if !userMeta.HasUnitAdminAuth() && userMeta.UnitId != uid {
+			return nil, errorx.New(errno.ErrInsufficientAuth)
+		}
+		return s.getOneUnitConvs(ctx, req)
+	}
+
+	// 管理端 - 需要管理员权限
+	if !userMeta.HasUnitAdminAuth() {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
+	}
+	return s.getAllUnitsConvs(ctx, req)
+}
+
+// req包含unitId
+func (s *DashboardService) getOneUnitConvs(ctx context.Context, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error) {
+	unitOID, err := bson.ObjectIDFromHex(req.GetUnitId())
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitId"), errorx.KV("value", "用户ID"))
+	}
+
+	_, err = s.ConversationMapper.CountByUnit(ctx, &unitOID)
+	if err != nil {
+		return nil, errorx.New(errno.ErrDashboardGetConversations)
+	}
+
+	return nil, errorx.New(errno.UnImplementErr)
+}
+
+func (s *DashboardService) getAllUnitsConvs(ctx context.Context, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error) {
+	return nil, errorx.New(errno.UnImplementErr)
 }

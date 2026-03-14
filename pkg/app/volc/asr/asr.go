@@ -6,7 +6,6 @@ package asr
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -127,7 +126,7 @@ func (asr *VcASRApp) Receive(_ context.Context) (text string, last bool, err err
 		case websocket.TextMessage:
 			return asr.receiveText(msg)
 		default:
-			return "", false, fmt.Errorf("[volc asr] Receive: invalid websocket message")
+			return "", false, err
 		}
 	}
 	return "", false, err
@@ -150,7 +149,6 @@ func (asr *VcASRApp) Close() (err error) {
 // buildHTTPHeader 构造鉴权请求头
 func (asr *VcASRApp) buildHTTPHeader() {
 	asr.header = http.Header{
-		"X-Tt-Logid":        []string{asr.uSession},
 		"X-Api-Resource-Id": []string{asr.setting.ResourceId},
 		"X-Api-Access-Key":  []string{asr.setting.AccessKey},
 		"X-Api-App-Key":     []string{asr.setting.AppID},
