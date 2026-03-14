@@ -189,9 +189,9 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 		if userExists {
 			records[i] = &core_api.AlarmRecord{
 				Id:       al.ID.Hex(),
-				Emotion:  alarm.EmotionItoS[al.Emotion],
+				Emotion:  int32(al.Emotion),
 				Keywords: al.Keywords,
-				Status:   alarm.StatusItoS[al.Status],
+				Status:   int32(al.Status),
 				User: &core_api.UserVO{
 					Code:  dbUser.Code,
 					Name:  dbUser.Name,
@@ -250,13 +250,7 @@ func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardU
 	update := bson.M{}
 
 	// 更新情绪状态
-	if req.Alarm.Emotion != "" {
-		emotionValue, ok := alarm.EmotionStoI[req.Alarm.Emotion]
-		if !ok {
-			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "情绪状态"))
-		}
-		update[cst.Emotion] = emotionValue
-	}
+	update[cst.Emotion] = req.Alarm.Emotion
 
 	// 更新关键词
 	if len(req.Alarm.Keywords) > 0 {
@@ -264,13 +258,7 @@ func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardU
 	}
 
 	// 更新处理状态
-	if req.Alarm.Status != "" {
-		statusValue, ok := alarm.StatusStoI[req.Alarm.Status]
-		if !ok {
-			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "处理状态"))
-		}
-		update[cst.Status] = statusValue
-	}
+	update[cst.Status] = req.Alarm.Status
 
 	// 更新时间
 	update[cst.UpdateTime] = time.Now()

@@ -15,7 +15,7 @@ import (
 type AppDependency struct {
 	// infra
 	Cache              cache.Cmdable             // Cache 缓存
-	MessageMapper      message.MongoMapper       // MessageMapper 消息持久层
+	MessageMapper      message.IMongoMapper      // MessageMapper 消息持久层
 	ConversationMapper conversation.IMongoMapper // ConversationMapper 对话元信息持久层
 	ReportMapper       report.IMongoMapper
 }

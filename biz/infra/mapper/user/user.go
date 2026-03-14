@@ -3,31 +3,22 @@ package user
 import (
 	"time"
 
-	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"go.mongodb.org/mongo-driver/v2/bson"
-)
-
-var (
-	RiskLevelStoI = map[string]int32{cst.High: 1, cst.Medium: 2, cst.Low: 3, cst.Normal: 4}
-	RiskLevelItoS = map[int32]string{1: cst.High, 2: cst.Medium, 3: cst.Low, 4: cst.Normal}
-
-	RoleStoI = map[string]int32{cst.Student: 0, cst.Teacher: 1, cst.ClassTeacher: 2}
-	RoleItoS = map[int32]string{0: cst.Student, 1: cst.Teacher, 2: cst.ClassTeacher}
 )
 
 type User struct {
 	ID         bson.ObjectID  `json:"id,omitempty" bson:"_id,omitempty"`
-	CodeType   int            `json:"codeType,omitempty" bson:"code_type,omitempty"` // Phone | StudentID
+	CodeType   int            `json:"codeType,omitempty" bson:"code_type,omitempty"` // 1-2: Phone | StudentID
 	Code       string         `json:"code,omitempty" bson:"code,omitempty"`
 	Password   string         `json:"password,omitempty" bson:"password,omitempty"`
 	UnitID     bson.ObjectID  `json:"unitId,omitempty" bson:"unit_id,omitempty"`
 	Name       string         `json:"name,omitempty" bson:"name,omitempty"`
 	Birth      time.Time      `json:"birth,omitempty" bson:"birth,omitempty"`
-	Gender     int            `json:"gender,omitempty" bson:"gender,omitempty"`
-	RiskLevel  int            `json:"riskLevel,omitempty" bson:"risk_level,omitempty"`
-	Status     int            `json:"status,omitempty" bson:"status,omitempty"`
+	Gender     int            `json:"gender,omitempty" bson:"gender,omitempty"`        // 1-3: Male | Female | Other
+	RiskLevel  int            `json:"riskLevel,omitempty" bson:"risk_level,omitempty"` // 1-4: High | Medium | Low | Normal
+	Status     int            `json:"status,omitempty" bson:"status,omitempty"`        //  1-2: Active | Deleted
 	EnrollYear int            `json:"enrollYear,omitempty" bson:"enroll_year,omitempty"`
-	Role       int            `json:"role,omitempty" bson:"role,omitempty"`
+	Role       int            `json:"role,omitempty" bson:"role,omitempty"` // 1-5: Student | Teacher | ClassTeacher | UnitAdmin | SuperAdmin
 	Grade      int            `json:"grade,omitempty" bson:"grade,omitempty"`
 	Class      int            `json:"class,omitempty" bson:"class,omitempty"`
 	Options    map[string]any `json:"option,omitempty" bson:"option,omitempty"`

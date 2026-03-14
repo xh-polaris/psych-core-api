@@ -25,7 +25,7 @@ func SendAuthMessage(conn *websocket.Conn, meta *core.Meta, reader *bufio.Reader
 	} else {
 		auth = core.Auth{
 			AuthID:     promptInput(reader, "请输入用户ID"),
-			AuthType:   authType2Int32[promptInput(reader, "请输入认证类型")],
+			AuthType:   int(authType2Int32[promptInput(reader, "请输入认证类型")]),
 			VerifyCode: promptInput(reader, "请输入凭证"),
 			Info:       make(map[string]any),
 		}

@@ -1,27 +1,7 @@
 package cst
 
 const (
-	// System is the role of a system, means the message is a system message.
-	System     = "system"
-	SystemEnum = 0
-	// Assistant is the role of an assistant, means the message is returned by ChatModel.
-	Assistant     = "assistant"
-	AssistantEnum = 1
-	// User is the role of a user, means the message is a user message.
-	User     = "user"
-	UserEnum = 2
-	// Tool is the role of a tool, means the message is a tool call output.
-	Tool     = "tool"
-	ToolEnum = 3
-
 	CtxKeyToken = "token"
-
-	// userMeta-权限相关枚举值 与User.Role一致
-	AuthLevelUnitStudent      = 0
-	AuthLevelUnitTeacher      = 1
-	AuthLevelUnitClassTeacher = 2
-	AuthLevelUnitAdmin        = 3
-	AuthLevelSuperAdmin       = 4
 )
 
 // json字段枚举
@@ -59,12 +39,8 @@ const (
 	RiskLevel      = "risk_level"
 	Remark         = "remark"
 
-	Status        = "status"
-	DeletedStatus = -1
-
-	Student      = "student"
-	Teacher      = "teacher"
-	ClassTeacher = "class_teacher"
+	Status = "status"
+	Type   = "type"
 
 	Emotion   = "emotion"
 	Meta      = "$meta"
@@ -80,21 +56,6 @@ const (
 	Regex     = "$regex"
 	Options   = "$options"
 
-	// 预警管理
-	// 情绪类型
-	Danger   = "danger"
-	Depress  = "depress"
-	Negative = "negative"
-	Normal   = "normal"
-	// 预警记录状态
-	Processed = "processed"
-	Pending   = "pending"
-
-	// 用户风险等级
-	High   = "high"
-	Medium = "medium"
-	Low    = "low"
-
 	// 报表内容相关字段 应严格和psych-post字段统一
 	Keywords = "keywords"
 	Digest   = "digest"
@@ -102,10 +63,8 @@ const (
 
 // 原profile 前端字段相关
 const (
-	AuthTypePassword = 0
-	AuthTypeCode     = 1
-	QueryUnitID      = "unitId"
-	QueryUserID      = "userId"
+	QueryUnitID = "unitId"
+	QueryUserID = "userId"
 )
 
 // Event中各种类型枚举值
@@ -138,13 +97,4 @@ const (
 	SuggestStart = "<suggest>"
 	SuggestEnd   = "</suggest>"
 	CodeBound    = "```"
-)
-
-// app type
-const (
-	All       = -1
-	ChatApp   = 0
-	TtsApp    = 1
-	AsrApp    = 2
-	ReportApp = 3
 )

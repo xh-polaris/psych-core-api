@@ -24,7 +24,7 @@ type IConversationService interface {
 }
 
 type ConversationService struct {
-	MessageMapper      message.MongoMapper
+	MessageMapper      message.IMongoMapper
 	ConversationMapper conversation.IMongoMapper
 }
 
@@ -124,8 +124,8 @@ func (c *ConversationService) GetConversation(ctx context.Context, req *core_api
 	for _, rawMsg := range rawMsgs[startIdx:endIdx] {
 		msgs = append(msgs, &core_api.Message{
 			Content: rawMsg.Content,
-			Role:    message.RoleItoS[rawMsg.Role],
-			Index:   rawMsg.Index,
+			Role:    int32(rawMsg.Role),
+			Index:   int32(rawMsg.Index),
 		})
 	}
 

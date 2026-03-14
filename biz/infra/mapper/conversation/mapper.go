@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
+	"github.com/xh-polaris/psych-core-api/types/enum"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"github.com/xh-polaris/psych-core-api/biz/conf"
@@ -54,7 +55,7 @@ func NewConversationMongoMapper(config *conf.Config) IMongoMapper {
 }
 
 func (m *mongoMapper) Exists(ctx context.Context, conversationId bson.ObjectID) (bool, error) {
-	count, err := m.conn.CountDocuments(ctx, bson.M{cst.ID: conversationId, cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
+	count, err := m.conn.CountDocuments(ctx, bson.M{cst.ID: conversationId, cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}})
 	if err != nil {
 		logs.Errorf("[conversation mapper] exists err: %s", errorx.ErrorWithoutStack(err))
 		return false, err
@@ -65,14 +66,14 @@ func (m *mongoMapper) Exists(ctx context.Context, conversationId bson.ObjectID) 
 // CountByUnit 统计对话数量，unitId 为空表示全平台
 func (m *mongoMapper) CountByUnit(ctx context.Context, unitId *bson.ObjectID) (int32, error) {
 	if unitId == nil {
-		cnt, err := m.conn.CountDocuments(ctx, bson.M{cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
+		cnt, err := m.conn.CountDocuments(ctx, bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}})
 		return int32(cnt), err
 	}
 	return m.countWithUnitFilter(ctx, unitId, nil, nil)
 }
 
 func (m *mongoMapper) CountByUser(ctx context.Context, userId bson.ObjectID) (int32, error) {
-	cnt, err := m.conn.CountDocuments(ctx, bson.M{cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
+	cnt, err := m.conn.CountDocuments(ctx, bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}})
 	if err != nil {
 		return 0, err
 	}
@@ -89,7 +90,7 @@ func (m *mongoMapper) CountUserConvByPeriod(ctx context.Context, userId *bson.Ob
 }
 
 func (m *mongoMapper) countWithUnitFilter(ctx context.Context, unitId *bson.ObjectID, start, end *time.Time) (int32, error) {
-	matchStage := bson.M{cst.Status: bson.M{cst.NE: cst.DeletedStatus}}
+	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
 	if start != nil && !start.IsZero() || end != nil && !end.IsZero() {
 		ct := bson.M{}
 		if start != nil && !start.IsZero() {
@@ -143,7 +144,7 @@ func (m *mongoMapper) AverageDurationByPeriod(ctx context.Context, unitId *bson.
 }
 
 func (m *mongoMapper) averageDurationWithFilter(ctx context.Context, unitId *bson.ObjectID, start, end *time.Time) (float64, error) {
-	matchStage := bson.M{cst.Status: bson.M{cst.NE: cst.DeletedStatus}}
+	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
 	if start != nil && !start.IsZero() || end != nil && !end.IsZero() {
 		ct := bson.M{}
 		if start != nil && !start.IsZero() {
@@ -204,7 +205,7 @@ func (m *mongoMapper) averageDurationWithFilter(ctx context.Context, unitId *bso
 
 // CountActiveUsers 统计活跃用户数：在给定时间段内（根据 endTime）有对话的去重用户数
 func (m *mongoMapper) CountActiveUsers(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error) {
-	matchStage := bson.M{cst.Status: bson.M{cst.NE: cst.DeletedStatus}}
+	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
 
 	timeFilter := bson.M{}
 	if !start.IsZero() {
@@ -266,7 +267,7 @@ func (m *mongoMapper) BatchConvStats(ctx context.Context, userIds []bson.ObjectI
 		{
 			"$match": bson.M{
 				cst.UserID: bson.M{cst.In: userIds},
-				cst.Status: bson.M{cst.NE: cst.DeletedStatus}, // 非删除状态
+				cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}, // 非删除状态
 			},
 		},
 		{
@@ -312,7 +313,7 @@ func (m *mongoMapper) CountUserDailyConv(ctx context.Context, userId bson.Object
 		// 匹配特定用户和时间范围的对话记录
 		{"$match": bson.M{
 			cst.UserID: userId,
-			cst.Status: bson.M{cst.NE: cst.DeletedStatus},
+			cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
 			cst.CreateTime: bson.M{
 				"$gte": oneWeekAgo,
 				"$lte": now,
@@ -357,7 +358,7 @@ func (m *mongoMapper) CountUserDailyConv(ctx context.Context, userId bson.Object
 
 func (m *mongoMapper) FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error) {
 	// 按时间顺序返回
-	c, err := m.FindManyWithOption(ctx, bson.M{cst.UserID: userId, cst.Status: bson.M{cst.NE: cst.DeletedStatus}}, options.Find().SetSort(bson.M{cst.UpdateTime: -1}))
+	c, err := m.FindManyWithOption(ctx, bson.M{cst.UserID: userId, cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}, options.Find().SetSort(bson.M{cst.UpdateTime: -1}))
 	if err != nil {
 		logs.Errorf("[conversation mapper] find all by user err: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
@@ -366,7 +367,7 @@ func (m *mongoMapper) FindAllByUserId(ctx context.Context, userId bson.ObjectID)
 }
 
 func (m *mongoMapper) FindManyByUserId(ctx context.Context, userId bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error) {
-	c, err := m.FindManyWithOption(ctx, bson.M{cst.UserID: userId, cst.Status: bson.M{cst.NE: cst.DeletedStatus}}, opt)
+	c, err := m.FindManyWithOption(ctx, bson.M{cst.UserID: userId, cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}, opt)
 	if err != nil {
 		logs.Errorf("[conversation mapper] paged find many by user err: %s", errorx.ErrorWithoutStack(err))
 		return nil, err

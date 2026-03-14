@@ -32,7 +32,7 @@ type Provider struct {
 	UserService         service.UserService
 	UnitService         service.UnitService
 	ConversationService service.ConversationService
-	MessageMapper       message.MongoMapper
+	MessageMapper       message.IMongoMapper
 	ConversationMapper  conversation.IMongoMapper
 	ReportMapper        report.IMongoMapper
 }

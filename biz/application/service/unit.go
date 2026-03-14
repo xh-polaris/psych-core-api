@@ -6,12 +6,12 @@ import (
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/types/enum"
 
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util/encrypt"
-	"github.com/xh-polaris/psych-core-api/biz/infra/util/enum"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util/reg"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
@@ -59,12 +59,6 @@ func (u *UnitService) UnitGetInfo(ctx context.Context, req *core_api.UnitGetInfo
 		return nil, err
 	}
 
-	// 获得单位状态
-	statusStr, ok := enum.GetStatus(unitDAO.Status)
-	if !ok {
-		return nil, errorx.New(errno.ErrInternalError)
-	}
-
 	// 构造返回结果
 	return &core_api.UnitGetInfoResp{
 		Unit: &core_api.UnitVO{
@@ -73,7 +67,7 @@ func (u *UnitService) UnitGetInfo(ctx context.Context, req *core_api.UnitGetInfo
 			Address:    unitDAO.Address,
 			Contact:    unitDAO.Contact,
 			Level:      int32(unitDAO.Level),
-			Status:     statusStr,
+			Status:     int32(unitDAO.Status),
 			CreateTime: unitDAO.CreateTime.Unix(),
 			UpdateTime: unitDAO.UpdateTime.Unix(),
 			DeleteTime: unitDAO.DeleteTime.Unix(),
@@ -163,17 +157,11 @@ func (u *UnitService) UnitCreateAndLinkUser(ctx context.Context, req *core_api.U
 	if req.UnitId == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
 	}
-	if req.CodeType == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "验证方式"))
-	}
+	//if req.CodeType == "" {
+	//	return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "验证方式"))
+	//}
 	if len(req.Users) == 0 {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "用户列表"))
-	}
-
-	// 提取枚举值
-	codeType, ok := enum.ParseCodeType(req.CodeType)
-	if !ok {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "验证方式"))
 	}
 
 	// 转换ID
@@ -184,7 +172,7 @@ func (u *UnitService) UnitCreateAndLinkUser(ctx context.Context, req *core_api.U
 	}
 
 	// 验证方式标记
-	isCodeTypePhone := codeType == enum.CodeTypePhone
+	isCodeTypePhone := req.CodeType == enum.AuthTypeCode
 
 	// 找出所有属于这个单位的用户
 	users, err := u.UserMapper.FindAllByUnitID(ctx, unitId)
@@ -261,26 +249,16 @@ func (u *UnitService) UnitCreateAndLinkUser(ctx context.Context, req *core_api.U
 			return nil, err
 		}
 
-		// 提取枚举值
-		gender, ok := enum.ParseGender(userReq.Gender)
-		if !ok {
-			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "性别"))
-		}
-		codeType, ok := enum.ParseCodeType(req.CodeType)
-		if !ok {
-			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "验证方式"))
-		}
-
 		// 构造用户
 		userDAO := &user.User{
 			ID:         bson.NewObjectID(),
-			CodeType:   codeType,
+			CodeType:   int(req.CodeType),
 			Code:       userReq.Code,
 			Password:   hashedPwd,
 			Name:       userReq.Name,
 			Birth:      time.Unix(userReq.Birth, 0),
-			Gender:     gender,
-			Status:     enum.Active,
+			Gender:     int(userReq.Gender),
+			Status:     enum.UserStatusActive,
 			Class:      int(userReq.Class),
 			Grade:      int(userReq.Grade),
 			EnrollYear: int(userReq.EnrollYear),

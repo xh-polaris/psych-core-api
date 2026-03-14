@@ -11,8 +11,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/types/enum"
 
-	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"github.com/yanyiwu/gojieba"
@@ -158,7 +158,7 @@ func (wce *WordCloudExtractor) Free() {
 func (wce *WordCloudExtractor) FromHisMsg(msgs []*message.Message) (*core_api.Keywords, error) {
 	var builder strings.Builder
 	for _, msg := range msgs {
-		if msg.Role == message.RoleStoI[cst.User] {
+		if msg.Role == enum.MsgRoleUser {
 			// 预处理消息内容：去除多余空白和标点
 			content := preprocessText(msg.Content)
 			if content != "" {

@@ -264,7 +264,6 @@ func (m *mongoMapper) BatchFindBySession(ctx context.Context, sessionIds []bson.
 	var reports []*Report
 	filter := bson.M{
 		cst.ConversationID: bson.M{cst.In: sessionIds},
-		cst.Status:         bson.M{cst.NE: cst.DeletedStatus},
 	}
 
 	err := m.conn.Find(ctx, &reports, filter)

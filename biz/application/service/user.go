@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
+	"github.com/xh-polaris/psych-core-api/types/enum"
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
@@ -14,7 +15,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util/convert"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util/encrypt"
-	"github.com/xh-polaris/psych-core-api/biz/infra/util/enum"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
@@ -51,9 +51,9 @@ func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInRe
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
 	}
 	switch req.AuthType {
-	case cst.AuthTypeCode:
+	case enum.AuthTypeCode:
 		return nil, errorx.New(errno.ErrUnImplement) // TODO: 验证码登录
-	case cst.AuthTypePassword: //
+	case enum.AuthTypePassword: //
 		if req.VerifyCode == "" {
 			return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "密码"))
 		}
@@ -89,7 +89,6 @@ func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInRe
 	if hashedPwd != userDAO.Password {
 		return nil, errorx.New(errno.ErrWrongAccountOrPassword)
 	}
-	codeType, _ := enum.GetCodeType(userDAO.CodeType)
 
 	// 签发jwt
 	token, err := util.GenerateJwt(map[string]any{
@@ -106,7 +105,7 @@ func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInRe
 		UnitId:    userDAO.UnitID.Hex(),
 		UserId:    userDAO.ID.Hex(),
 		CodeValue: userDAO.Code,
-		CodeType:  codeType,
+		CodeType:  int32(userDAO.CodeType),
 		Token:     token,
 		Code:      0,
 		Msg:       "success",
@@ -133,20 +132,6 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 		return nil, err
 	}
 
-	// 获得枚举值
-	genderStr, ok := enum.GetGender(userDAO.Gender)
-	if !ok {
-		return nil, errorx.New(errno.ErrInternalError)
-	}
-	statusStr, ok := enum.GetStatus(userDAO.Status)
-	if !ok {
-		return nil, errorx.New(errno.ErrInternalError)
-	}
-	codeTypeStr, ok := enum.GetCodeType(userDAO.CodeType)
-	if !ok {
-		return nil, errorx.New(errno.ErrInternalError)
-	}
-
 	optionsAny, err := convert.Any2Anypb(userDAO.Options)
 	if err != nil {
 		return nil, err
@@ -155,13 +140,13 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 	return &core_api.UserGetInfoResp{
 		User: &core_api.UserVO{
 			Id:         userDAO.ID.Hex(),
-			CodeType:   codeTypeStr,
+			CodeType:   int32(userDAO.CodeType),
 			Code:       userDAO.Code,
 			UnitId:     userDAO.UnitID.Hex(),
 			Name:       userDAO.Name,
-			Gender:     genderStr,
+			Gender:     int32(userDAO.Gender),
 			Birth:      userDAO.Birth.Unix(),
-			Status:     statusStr,
+			Status:     int32(userDAO.Status),
 			EnrollYear: int32(userDAO.EnrollYear),
 			Class:      int32(userDAO.Class),
 			Grade:      int32(userDAO.Grade),
@@ -194,24 +179,20 @@ func (u *UserService) UserUpdateInfo(ctx context.Context, req *core_api.UserUpda
 	if req.User.Name != "" {
 		update[cst.Name] = req.User.Name
 	}
-	if req.User.Gender != "" {
-		gender, ok := enum.ParseGender(req.User.Gender)
-		if !ok {
-			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "性别"))
-		}
-		update[cst.Gender] = gender
+	if req.User.Gender != 0 {
+		update[cst.Gender] = int(req.User.Gender)
 	}
 	if req.User.Birth != 0 {
-		update[cst.Birth] = req.User.Birth
+		update[cst.Birth] = time.Unix(req.User.Birth, 0)
 	}
 	if req.User.EnrollYear != 0 {
-		update[cst.EnrollYear] = req.User.EnrollYear
+		update[cst.EnrollYear] = int(req.User.EnrollYear)
 	}
 	if req.User.Class != 0 {
-		update[cst.Class] = req.User.Class
+		update[cst.Class] = int(req.User.Class)
 	}
 	if req.User.Grade != 0 {
-		update[cst.Grade] = req.User.Grade
+		update[cst.Grade] = int(req.User.Grade)
 	}
 	if req.User.Options != nil {
 		optionsAnypb, err := convert.Anypb2Any(req.User.Options)
@@ -248,10 +229,10 @@ func (u *UserService) UserUpdatePassword(ctx context.Context, req *core_api.User
 	//if req.AuthType == "" {
 	//	return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "验证方式"))
 	//}
-	if req.VerifyCode == "" && req.AuthType == cst.AuthTypePassword {
+	if req.VerifyCode == "" && req.AuthType == enum.AuthTypePassword {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "旧密码"))
 	}
-	if req.VerifyCode == "" && req.AuthType == cst.AuthTypeCode {
+	if req.VerifyCode == "" && req.AuthType == enum.AuthTypeCode {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "验证码"))
 	}
 	if req.NewPassword == "" {
@@ -268,10 +249,10 @@ func (u *UserService) UserUpdatePassword(ctx context.Context, req *core_api.User
 	userDAO := &user.User{}
 	switch req.AuthType {
 	// 验证码
-	case cst.AuthTypeCode:
+	case enum.AuthTypeCode:
 		return nil, errorx.New(errno.ErrUnImplement) // TODO: 验证码登录
 	// 密码
-	case cst.AuthTypePassword:
+	case enum.AuthTypePassword:
 		// 获取密码
 		userDAO, err = u.UserMapper.FindOneById(ctx, userId)
 		if err != nil {

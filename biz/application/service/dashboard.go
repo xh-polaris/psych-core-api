@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
+	"github.com/xh-polaris/psych-core-api/types/enum"
 
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
@@ -21,7 +21,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 
 	"github.com/google/wire"
-	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
@@ -55,7 +54,7 @@ type IDashboardService interface {
 type DashboardService struct {
 	UserMapper         user.IMongoMapper
 	UnitMapper         unit.IMongoMapper
-	MessageMapper      message.MongoMapper
+	MessageMapper      message.IMongoMapper
 	ConversationMapper conversation.IMongoMapper
 	ReportMapper       report.IMongoMapper
 	AlarmMapper        alarm.IMongoMapper
@@ -580,20 +579,17 @@ func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardAlarmUserStat)
 	}
 
-	// level: 0=正常 1=低危 2=中危 3=高危
 	// user.RiskLevel: High=1, Medium=2, Low=3, Normal=4
 	levelMap := func(dbLevel int32) int32 {
 		switch dbLevel {
-		case user.RiskLevelStoI[cst.High]:
+		case enum.UserRiskLevelHigh:
+			return 4
+		case enum.UserRiskLevelMedium:
 			return 3
-		case user.RiskLevelStoI[cst.Medium]:
+		case enum.UserRiskLevelLow:
 			return 2
-		case user.RiskLevelStoI[cst.Low]:
-			return 1
-		case user.RiskLevelStoI[cst.Normal]:
-			return 0
 		default:
-			return 0
+			return 1
 		}
 	}
 
@@ -676,7 +672,7 @@ func (s *DashboardService) getEmotionRatio(ctx context.Context, unitOID *bson.Ob
 	}
 
 	if total == 0 {
-		return &core_api.EmotionRatio{Total: 0, Ratio: make(map[string]int32)}, nil
+		return &core_api.EmotionRatio{Total: 0, Ratio: make(map[int32]int32)}, nil
 	}
 
 	emotionDistribution, err := s.AlarmMapper.EmotionDistribution(ctx, unitOID)
@@ -685,12 +681,12 @@ func (s *DashboardService) getEmotionRatio(ctx context.Context, unitOID *bson.Ob
 		return nil, err
 	}
 	if emotionDistribution == nil {
-		return &core_api.EmotionRatio{Total: total, Ratio: make(map[string]int32)}, nil
+		return &core_api.EmotionRatio{Total: total, Ratio: make(map[int32]int32)}, nil
 	}
 
-	ratio := make(map[string]int32, len(*emotionDistribution))
+	ratio := make(map[int32]int32, len(*emotionDistribution))
 	for emo, cnt := range *emotionDistribution {
-		ratio[emo] = cnt
+		ratio[int32(emo)] = cnt
 	}
 
 	return &core_api.EmotionRatio{
@@ -943,7 +939,7 @@ func (s *DashboardService) DashboardUserConvRecords(ctx context.Context, req *co
 		User: &core_api.UserVO{
 			Id:     targetUser.ID.Hex(),
 			Name:   targetUser.Name,
-			Gender: strconv.Itoa(targetUser.Gender),
+			Gender: int32(targetUser.Gender),
 			Grade:  int32(targetUser.Grade),
 			Class:  int32(targetUser.Class),
 		},
@@ -1140,7 +1136,7 @@ func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api
 		Title:     rpt.Title,
 		Keywords:  rpt.Keywords,
 		Digest:    rpt.Digest,
-		Emotion:   rpt.Emotion,
+		Emotion:   int32(rpt.Emotion),
 		Body:      rpt.Body,
 		NeedAlarm: rpt.NeedAlarm,
 		Code:      0,
