@@ -25,6 +25,7 @@ const (
 type IMongoMapper interface {
 	FindOneByCode(ctx context.Context, phone string) (*User, error)
 	FindOneByCodeAndUnitID(ctx context.Context, phone string, unitId bson.ObjectID) (*User, error)
+	FindOneByCodeAndRole(ctx context.Context, code string, role int) (*User, error)
 	FindOneById(ctx context.Context, id bson.ObjectID) (*User, error)
 	Insert(ctx context.Context, user *User) error
 	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
@@ -64,6 +65,11 @@ func (m *mongoMapper) FindOneByCode(ctx context.Context, code string) (*User, er
 // FindOneByCodeAndUnitID 根据电话号码和UnitID查询用户
 func (m *mongoMapper) FindOneByCodeAndUnitID(ctx context.Context, code string, unitId bson.ObjectID) (*User, error) {
 	return m.FindOneByFields(ctx, bson.M{cst.Code: code, cst.UnitID: unitId})
+}
+
+// FindOneByCodeAndRole 根据电话号码和角色查询用户
+func (m *mongoMapper) FindOneByCodeAndRole(ctx context.Context, code string, role int) (*User, error) {
+	return m.FindOneByFields(ctx, bson.M{cst.Code: code, cst.Role: role})
 }
 
 // ExistsByCode 根据电话号码或学号查询用户是否存在

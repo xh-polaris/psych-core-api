@@ -10,7 +10,7 @@ const (
 	JsonUnitID         = "unitId"
 	JsonConversationID = "conversationId"
 	JsonCode           = "code"
-	JsonAdmin          = "admin"
+	JsonRole           = "admin"
 )
 
 // mapper层字段枚举

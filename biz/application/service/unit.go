@@ -6,6 +6,7 @@ import (
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/types/enum"
 
 	"github.com/xh-polaris/psych-core-api/biz/cst"
@@ -46,6 +47,15 @@ func (u *UnitService) UnitGetInfo(ctx context.Context, req *core_api.UnitGetInfo
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
 	}
 
+	// 鉴权
+	m, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !m.HasUnitAdminAuth() {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
+	}
+
 	unitId, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
@@ -81,6 +91,15 @@ func (u *UnitService) UnitUpdateInfo(ctx context.Context, req *core_api.UnitUpda
 	// 参数校验
 	if req.Unit.Id == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
+	}
+
+	// 鉴权
+	m, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !m.HasUnitAdminAuth() {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
 	// 不允许修改手机号、密码、验证方式、level、状态
@@ -128,6 +147,15 @@ func (u *UnitService) UnitLinkUser(ctx context.Context, req *core_api.UnitLinkUs
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "用户ID"))
 	}
 
+	// 鉴权
+	m, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !m.HasUnitAdminAuth() {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
+	}
+
 	// 转换ID
 	unitId, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
@@ -162,6 +190,15 @@ func (u *UnitService) UnitCreateAndLinkUser(ctx context.Context, req *core_api.U
 	//}
 	if len(req.Users) == 0 {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "用户列表"))
+	}
+
+	// 鉴权
+	m, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !m.HasUnitAdminAuth() && m.UnitId != req.GetUnitId() {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
 	// 转换ID

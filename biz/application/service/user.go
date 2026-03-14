@@ -47,9 +47,6 @@ func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInRe
 	if req.AuthId == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "账号"))
 	}
-	if req.UnitId == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
-	}
 	switch req.AuthType {
 	case enum.AuthTypeCode:
 		return nil, errorx.New(errno.ErrUnImplement) // TODO: 验证码登录
@@ -61,48 +58,56 @@ func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInRe
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "登录方式"))
 	}
 
-	unitId, err := bson.ObjectIDFromHex(req.UnitId)
-	if err != nil {
-		logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-	logs.Infof("user sign in with unit id: %s", unitId)
-
-	// 获得用户
-	userDAO, err := u.UserMapper.FindOneByCodeAndUnitID(ctx, req.AuthId, unitId)
-	if err != nil {
-		logs.Errorf("find user by code %s and unit id %s error: %s", req.AuthId, unitId, errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-	if userDAO == nil {
-		return nil, errorx.New(errno.ErrWrongAccountOrPassword)
-	}
-
-	// 加密密码
-	hashedPwd, err := encrypt.BcryptEncrypt(req.VerifyCode)
-	if err != nil {
-		logs.Errorf("bcrypt encrypt error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
+	// 超级管理员不需要单位ID
+	var err error
+	unitId := ""
+	var userDAO *user.User
+	switch req.UnitId {
+	case "":
+		userDAO, err = u.UserMapper.FindOneByCodeAndRole(ctx, req.AuthId, enum.UserRoleSuperAdmin)
+		if err != nil {
+			logs.Errorf("find user by code %s error: %s", req.AuthId, errorx.ErrorWithoutStack(err))
+			return nil, errorx.New(errno.ErrWrongAccountOrPassword)
+		}
+		if userDAO == nil {
+			return nil, errorx.New(errno.ErrWrongAccountOrPassword)
+		}
+	default:
+		uid, err := bson.ObjectIDFromHex(req.UnitId)
+		if err != nil {
+			logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
+			return nil, err
+		}
+		// 获得用户
+		userDAO, err = u.UserMapper.FindOneByCodeAndUnitID(ctx, req.AuthId, uid)
+		if err != nil {
+			logs.Errorf("find user by code %s and unit id %s error: %s", req.AuthId, uid, errorx.ErrorWithoutStack(err))
+			return nil, err
+		}
+		if userDAO == nil {
+			return nil, errorx.New(errno.ErrUserNotFound)
+		}
+		unitId = userDAO.UnitID.Hex()
 	}
 
 	// 密码验证
-	if hashedPwd != userDAO.Password {
+	if isValid := encrypt.BcryptCheck(req.VerifyCode, userDAO.Password); !isValid {
 		return nil, errorx.New(errno.ErrWrongAccountOrPassword)
 	}
 
 	// 签发jwt
 	token, err := util.GenerateJwt(map[string]any{
-		cst.JsonUnitID: req.UnitId,
+		cst.JsonUnitID: unitId,
 		cst.JsonUserID: userDAO.ID.Hex(),
 		cst.JsonCode:   userDAO.Code, // 手机号或学号
-		cst.JsonAdmin:  userDAO.Role,
+		cst.JsonRole:   userDAO.Role,
 	})
 	if err != nil {
 		logs.Errorf("generate token for UserSignIn error: %s", errorx.ErrorWithoutStack(err))
 	}
 
 	return &core_api.UserSignInResp{
-		UnitId:    userDAO.UnitID.Hex(),
+		UnitId:    userDAO.UnitID.Hex(), // 超级管理员单位ID为""
 		UserId:    userDAO.ID.Hex(),
 		CodeValue: userDAO.Code,
 		CodeType:  int32(userDAO.CodeType),
@@ -150,6 +155,7 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 			EnrollYear: int32(userDAO.EnrollYear),
 			Class:      int32(userDAO.Class),
 			Grade:      int32(userDAO.Grade),
+			Role:       int32(userDAO.Role),
 			Options:    optionsAny,
 			CreateTime: userDAO.CreateTime.Unix(),
 			UpdateTime: userDAO.UpdateTime.Unix(),
