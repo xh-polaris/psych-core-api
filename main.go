@@ -13,12 +13,9 @@ import (
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	prometheus "github.com/hertz-contrib/monitor-prometheus"
 	"github.com/hertz-contrib/obs-opentelemetry/tracing"
-	"github.com/hertz-contrib/swagger"
-	swaggerFiles "github.com/swaggo/files"
 	"github.com/xh-polaris/gopkg/hertz/middleware"
 	logx "github.com/xh-polaris/gopkg/util/log"
 	"github.com/xh-polaris/psych-core-api/biz/application"
-	_ "github.com/xh-polaris/psych-core-api/docs"
 	"github.com/xh-polaris/psych-core-api/pkg/httpx"
 	"github.com/xh-polaris/psych-core-api/provider"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -38,12 +35,6 @@ func Init() {
 	http.DefaultTransport = otelhttp.NewTransport(http.DefaultTransport)
 }
 
-// @title           Psych Core API
-// @version         1.0
-// @description     Psych Core API
-// @host            localhost:8080
-// @BasePath        /
-// @query.collection.format multi
 func main() {
 	Init()
 	c := provider.Get().Config
@@ -56,9 +47,6 @@ func main() {
 		server.WithTracer(prometheus.NewServerTracer(":9091", "/server/metrics")),
 		tracer,
 	)
-
-	// Swagger 路由
-	h.GET("/swagger/*any", swagger.WrapHandler(swaggerFiles.Handler))
 
 	h.NoHijackConnPool = true
 
