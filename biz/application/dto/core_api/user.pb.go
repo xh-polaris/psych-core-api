@@ -29,14 +29,17 @@ type UserVO struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Id         string                `protobuf:"bytes,1,opt,name=id,proto3" form:"id" json:"id" query:"id"`
-	CodeType   int32                 `protobuf:"varint,2,opt,name=codeType,proto3" form:"codeType" json:"codeType" query:"codeType"`
-	Code       string                `protobuf:"bytes,3,opt,name=code,proto3" form:"code" json:"code" query:"code"`
-	Password   string                `protobuf:"bytes,4,opt,name=password,proto3" form:"password" json:"password" query:"password"`
-	UnitId     string                `protobuf:"bytes,5,opt,name=unitId,proto3" form:"unitId" json:"unitId" query:"unitId"`
-	Name       string                `protobuf:"bytes,6,opt,name=name,proto3" form:"name" json:"name" query:"name"`
-	Birth      int64                 `protobuf:"varint,7,opt,name=birth,proto3" form:"birth" json:"birth" query:"birth"`
-	Gender     int32                 `protobuf:"varint,8,opt,name=gender,proto3" form:"gender" json:"gender" query:"gender"`
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" form:"id" json:"id" query:"id"`
+	// 1-2: Phone | StudentID
+	CodeType int32  `protobuf:"varint,2,opt,name=codeType,proto3" form:"codeType" json:"codeType" query:"codeType"`
+	Code     string `protobuf:"bytes,3,opt,name=code,proto3" form:"code" json:"code" query:"code"`
+	Password string `protobuf:"bytes,4,opt,name=password,proto3" form:"password" json:"password" query:"password"`
+	UnitId   string `protobuf:"bytes,5,opt,name=unitId,proto3" form:"unitId" json:"unitId" query:"unitId"`
+	Name     string `protobuf:"bytes,6,opt,name=name,proto3" form:"name" json:"name" query:"name"`
+	Birth    int64  `protobuf:"varint,7,opt,name=birth,proto3" form:"birth" json:"birth" query:"birth"`
+	// 1-3: Male | Female | Other
+	Gender int32 `protobuf:"varint,8,opt,name=gender,proto3" form:"gender" json:"gender" query:"gender"`
+	// 1-2: Active | Deleted
 	Status     int32                 `protobuf:"varint,9,opt,name=status,proto3" form:"status" json:"status" query:"status"`
 	EnrollYear int32                 `protobuf:"varint,10,opt,name=enrollYear,proto3" form:"enrollYear" json:"enrollYear" query:"enrollYear"`
 	Grade      int32                 `protobuf:"varint,11,opt,name=grade,proto3" form:"grade" json:"grade" query:"grade"`
@@ -46,7 +49,8 @@ type UserVO struct {
 	CreateTime int64                 `protobuf:"varint,15,opt,name=createTime,proto3" form:"createTime" json:"createTime" query:"createTime"`
 	UpdateTime int64                 `protobuf:"varint,16,opt,name=updateTime,proto3" form:"updateTime" json:"updateTime" query:"updateTime"`
 	DeleteTime int64                 `protobuf:"varint,17,opt,name=deleteTime,proto3" form:"deleteTime" json:"deleteTime" query:"deleteTime"`
-	Role       int32                 `protobuf:"varint,18,opt,name=role,proto3" form:"role" json:"role" query:"role"`
+	// 1-5: Student | Teacher | ClassTeacher | UnitAdmin | SuperAdmin
+	Role int32 `protobuf:"varint,18,opt,name=role,proto3" form:"role" json:"role" query:"role"`
 }
 
 func (x *UserVO) Reset() {
@@ -267,6 +271,7 @@ type UserSignInReq struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// 1-2: Password | VerifyCode
 	AuthType   int32  `protobuf:"varint,1,opt,name=authType,proto3" form:"authType" json:"authType" query:"authType"`
 	AuthId     string `protobuf:"bytes,2,opt,name=authId,proto3" form:"authId" json:"authId" query:"authId"`
 	VerifyCode string `protobuf:"bytes,3,opt,name=verifyCode,proto3" form:"verifyCode" json:"verifyCode" query:"verifyCode"`
@@ -482,7 +487,8 @@ type UserUpdatePasswordReq struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Id          string `protobuf:"bytes,1,opt,name=id,proto3" form:"id" json:"id" query:"id"`
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" form:"id" json:"id" query:"id"`
+	// 1-2: Password | VerifyCode
 	AuthType    int32  `protobuf:"varint,2,opt,name=authType,proto3" form:"authType" json:"authType" query:"authType"`
 	VerifyCode  string `protobuf:"bytes,3,opt,name=verifyCode,proto3" form:"verifyCode" json:"verifyCode" query:"verifyCode"`
 	NewPassword string `protobuf:"bytes,4,opt,name=newPassword,proto3" form:"newPassword" json:"newPassword" query:"newPassword"`

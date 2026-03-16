@@ -37,6 +37,7 @@ type IMongoMapper interface {
 	ExistsById(ctx context.Context, id bson.ObjectID) (bool, error)
 	AggregateStats(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (*OverviewStats, error)
 	EmotionDistribution(ctx context.Context, unitId *bson.ObjectID) (*EmotionDistribution, error)
+	BatchExistsByConvId(ctx context.Context, convId []bson.ObjectID) (map[bson.ObjectID]bool, error)
 }
 
 type mongoMapper struct {
@@ -250,4 +251,32 @@ func (m *mongoMapper) EmotionDistribution(ctx context.Context, unitId *bson.Obje
 	}
 
 	return &distribution, nil
+}
+
+func (m *mongoMapper) BatchExistsByConvId(ctx context.Context, convId []bson.ObjectID) (map[bson.ObjectID]bool, error) {
+	result := make(map[bson.ObjectID]bool, len(convId))
+	if len(convId) == 0 {
+		return result, nil
+	}
+
+	for _, id := range convId {
+		result[id] = false
+	}
+
+	filter := bson.M{
+		cst.ConversationID: bson.M{cst.In: convId},
+		cst.Status:         enum.AlarmStatusPending,
+	}
+
+	var alarms []*Alarm
+	if err := m.conn.Find(ctx, &alarms, filter); err != nil {
+		logs.Errorf("[alarm mapper] batch exists by conv id err:%s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	for _, alarm := range alarms {
+		result[alarm.ConversationID] = true
+	}
+
+	return result, nil
 }

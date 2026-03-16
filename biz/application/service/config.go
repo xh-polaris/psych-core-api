@@ -42,6 +42,15 @@ func (c *ConfigService) ConfigCreate(ctx context.Context, req *core_api.ConfigCr
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 	}
 
+	// 鉴权
+	usrMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !usrMeta.HasUnitAdminAuth(req.Config.UnitId) {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
+	}
+
 	// 构造并插入数据库
 	now := time.Now()
 	confDAO := &config.Config{
@@ -84,16 +93,21 @@ func (c *ConfigService) ConfigCreate(ctx context.Context, req *core_api.ConfigCr
 }
 
 func (c *ConfigService) ConfigUpdateInfo(ctx context.Context, req *core_api.ConfigCreateOrUpdateReq) (resp *basic.Response, err error) {
-	// TODO鉴权
-	if !req.Admin {
-		return nil, errorx.New(errno.ErrNotAdmin)
-	}
-
 	// 参数校验
 	unitOid, err := bson.ObjectIDFromHex(req.Config.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "单位ID"))
 	}
+
+	// 鉴权
+	usrMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !usrMeta.HasUnitAdminAuth(req.Config.UnitId) {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
+	}
+
 	// 存在性验证
 	oldConf, err := c.ConfigMapper.FindOneByUnitID(ctx, unitOid)
 	if err != nil || oldConf == nil {
@@ -126,6 +140,15 @@ func (c *ConfigService) ConfigGetByUnitID(ctx context.Context, req *core_api.Con
 	unitOid, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "单位ID"))
+	}
+
+	// 鉴权
+	usrMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !usrMeta.HasUnitAdminAuth(req.UnitId) {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
 	// 获得配置对象

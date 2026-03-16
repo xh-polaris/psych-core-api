@@ -29,15 +29,16 @@ type UnitVO struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Id         string `protobuf:"bytes,1,opt,name=id,proto3" form:"id" json:"id" query:"id"`
-	Name       string `protobuf:"bytes,4,opt,name=name,proto3" form:"name" json:"name" query:"name"`
-	Address    string `protobuf:"bytes,5,opt,name=address,proto3" form:"address" json:"address" query:"address"`
-	Contact    string `protobuf:"bytes,6,opt,name=contact,proto3" form:"contact" json:"contact" query:"contact"`
-	Level      int32  `protobuf:"varint,7,opt,name=level,proto3" form:"level" json:"level" query:"level"`
-	Status     int32  `protobuf:"varint,8,opt,name=status,proto3" form:"status" json:"status" query:"status"`
-	CreateTime int64  `protobuf:"varint,9,opt,name=createTime,proto3" form:"createTime" json:"createTime" query:"createTime"`
-	UpdateTime int64  `protobuf:"varint,10,opt,name=updateTime,proto3" form:"updateTime" json:"updateTime" query:"updateTime"`
-	DeleteTime int64  `protobuf:"varint,11,opt,name=deleteTime,proto3" form:"deleteTime" json:"deleteTime" query:"deleteTime"`
+	Id      string `protobuf:"bytes,1,opt,name=id,proto3" form:"id" json:"id" query:"id"`
+	Name    string `protobuf:"bytes,4,opt,name=name,proto3" form:"name" json:"name" query:"name"`
+	Address string `protobuf:"bytes,5,opt,name=address,proto3" form:"address" json:"address" query:"address"`
+	Contact string `protobuf:"bytes,6,opt,name=contact,proto3" form:"contact" json:"contact" query:"contact"`
+	Level   int32  `protobuf:"varint,7,opt,name=level,proto3" form:"level" json:"level" query:"level"`
+	// 1-2: Active | Deleted
+	Status     int32 `protobuf:"varint,8,opt,name=status,proto3" form:"status" json:"status" query:"status"`
+	CreateTime int64 `protobuf:"varint,9,opt,name=createTime,proto3" form:"createTime" json:"createTime" query:"createTime"`
+	UpdateTime int64 `protobuf:"varint,10,opt,name=updateTime,proto3" form:"updateTime" json:"updateTime" query:"updateTime"`
+	DeleteTime int64 `protobuf:"varint,11,opt,name=deleteTime,proto3" form:"deleteTime" json:"deleteTime" query:"deleteTime"`
 }
 
 func (x *UnitVO) Reset() {

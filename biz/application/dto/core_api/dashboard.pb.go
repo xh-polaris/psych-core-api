@@ -24,7 +24,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// 数据看板
 // 指标总览
 type DashboardGetDataOverviewReq struct {
 	state         protoimpl.MessageState
@@ -78,17 +77,19 @@ type DashboardGetDataOverviewResp struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	TotalUsers                                   int32    `protobuf:"varint,1,opt,name=totalUsers,proto3" form:"totalUsers" json:"totalUsers" query:"totalUsers"`
-	WeeklyIncreaseUsers                          int32    `protobuf:"varint,2,opt,name=weeklyIncreaseUsers,proto3" form:"weeklyIncreaseUsers" json:"weeklyIncreaseUsers" query:"weeklyIncreaseUsers"`
-	WeeklyIncreaseUsersRate                      float64  `protobuf:"fixed64,3,opt,name=weeklyIncreaseUsersRate,proto3" form:"weeklyIncreaseUsersRate" json:"weeklyIncreaseUsersRate" query:"weeklyIncreaseUsersRate"`
-	ActiveUsers                                  *int32   `protobuf:"varint,4,opt,name=activeUsers,proto3,oneof" form:"activeUsers" json:"activeUsers" query:"activeUsers"`
-	WeeklyIncreaseActiveUsers                    *int32   `protobuf:"varint,5,opt,name=weeklyIncreaseActiveUsers,proto3,oneof" form:"weeklyIncreaseActiveUsers" json:"weeklyIncreaseActiveUsers" query:"weeklyIncreaseActiveUsers"`
-	WeeklyIncreaseActiveUsersRate                *float64 `protobuf:"fixed64,6,opt,name=weeklyIncreaseActiveUsersRate,proto3,oneof" form:"weeklyIncreaseActiveUsersRate" json:"weeklyIncreaseActiveUsersRate" query:"weeklyIncreaseActiveUsersRate"`
-	TotalConversations                           int32    `protobuf:"varint,7,opt,name=totalConversations,proto3" form:"totalConversations" json:"totalConversations" query:"totalConversations"`
-	WeeklyIncreaseConversations                  int32    `protobuf:"varint,8,opt,name=weeklyIncreaseConversations,proto3" form:"weeklyIncreaseConversations" json:"weeklyIncreaseConversations" query:"weeklyIncreaseConversations"`
-	WeeklyIncreaseConversationsRate              float64  `protobuf:"fixed64,9,opt,name=weeklyIncreaseConversationsRate,proto3" form:"weeklyIncreaseConversationsRate" json:"weeklyIncreaseConversationsRate" query:"weeklyIncreaseConversationsRate"`
-	AverageTimePerConversation                   float64  `protobuf:"fixed64,10,opt,name=averageTimePerConversation,proto3" form:"averageTimePerConversation" json:"averageTimePerConversation" query:"averageTimePerConversation"`                                                         // minutes
-	WeeklyIncreaseAverageTimePerConversation     float64  `protobuf:"fixed64,11,opt,name=weeklyIncreaseAverageTimePerConversation,proto3" form:"weeklyIncreaseAverageTimePerConversation" json:"weeklyIncreaseAverageTimePerConversation" query:"weeklyIncreaseAverageTimePerConversation"` // minutes
+	TotalUsers                      int32    `protobuf:"varint,1,opt,name=totalUsers,proto3" form:"totalUsers" json:"totalUsers" query:"totalUsers"`
+	WeeklyIncreaseUsers             int32    `protobuf:"varint,2,opt,name=weeklyIncreaseUsers,proto3" form:"weeklyIncreaseUsers" json:"weeklyIncreaseUsers" query:"weeklyIncreaseUsers"`
+	WeeklyIncreaseUsersRate         float64  `protobuf:"fixed64,3,opt,name=weeklyIncreaseUsersRate,proto3" form:"weeklyIncreaseUsersRate" json:"weeklyIncreaseUsersRate" query:"weeklyIncreaseUsersRate"`
+	ActiveUsers                     *int32   `protobuf:"varint,4,opt,name=activeUsers,proto3,oneof" form:"activeUsers" json:"activeUsers" query:"activeUsers"`
+	WeeklyIncreaseActiveUsers       *int32   `protobuf:"varint,5,opt,name=weeklyIncreaseActiveUsers,proto3,oneof" form:"weeklyIncreaseActiveUsers" json:"weeklyIncreaseActiveUsers" query:"weeklyIncreaseActiveUsers"`
+	WeeklyIncreaseActiveUsersRate   *float64 `protobuf:"fixed64,6,opt,name=weeklyIncreaseActiveUsersRate,proto3,oneof" form:"weeklyIncreaseActiveUsersRate" json:"weeklyIncreaseActiveUsersRate" query:"weeklyIncreaseActiveUsersRate"`
+	TotalConversations              int32    `protobuf:"varint,7,opt,name=totalConversations,proto3" form:"totalConversations" json:"totalConversations" query:"totalConversations"`
+	WeeklyIncreaseConversations     int32    `protobuf:"varint,8,opt,name=weeklyIncreaseConversations,proto3" form:"weeklyIncreaseConversations" json:"weeklyIncreaseConversations" query:"weeklyIncreaseConversations"`
+	WeeklyIncreaseConversationsRate float64  `protobuf:"fixed64,9,opt,name=weeklyIncreaseConversationsRate,proto3" form:"weeklyIncreaseConversationsRate" json:"weeklyIncreaseConversationsRate" query:"weeklyIncreaseConversationsRate"`
+	// minutes
+	AverageTimePerConversation float64 `protobuf:"fixed64,10,opt,name=averageTimePerConversation,proto3" form:"averageTimePerConversation" json:"averageTimePerConversation" query:"averageTimePerConversation"`
+	// minutes
+	WeeklyIncreaseAverageTimePerConversation     float64  `protobuf:"fixed64,11,opt,name=weeklyIncreaseAverageTimePerConversation,proto3" form:"weeklyIncreaseAverageTimePerConversation" json:"weeklyIncreaseAverageTimePerConversation" query:"weeklyIncreaseAverageTimePerConversation"`
 	WeeklyIncreaseAverageTimePerConversationRate float64  `protobuf:"fixed64,12,opt,name=weeklyIncreaseAverageTimePerConversationRate,proto3" form:"weeklyIncreaseAverageTimePerConversationRate" json:"weeklyIncreaseAverageTimePerConversationRate" query:"weeklyIncreaseAverageTimePerConversationRate"`
 	AlarmUsers                                   int32    `protobuf:"varint,13,opt,name=alarmUsers,proto3" form:"alarmUsers" json:"alarmUsers" query:"alarmUsers"`
 	WeeklyIncreaseAlarmUsers                     int32    `protobuf:"varint,14,opt,name=weeklyIncreaseAlarmUsers,proto3" form:"weeklyIncreaseAlarmUsers" json:"weeklyIncreaseAlarmUsers" query:"weeklyIncreaseAlarmUsers"`
@@ -325,9 +326,12 @@ type DashboardGetDataTrendResp struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ActivePoints          []*TrendPoint           `protobuf:"bytes,1,rep,name=activePoints,proto3" form:"activePoints" json:"activePoints" query:"activePoints"`                                     // 近一周学生活跃趋势
-	ConversationPoints    []*TrendPoint           `protobuf:"bytes,2,rep,name=conversationPoints,proto3" form:"conversationPoints" json:"conversationPoints" query:"conversationPoints"`             // 近一周对话频率趋势
-	ConversationDurations []*ConversationDuration `protobuf:"bytes,3,rep,name=conversationDurations,proto3" form:"conversationDurations" json:"conversationDurations" query:"conversationDurations"` // 对话时间分布
+	// 近一周学生活跃趋势
+	ActivePoints []*TrendPoint `protobuf:"bytes,1,rep,name=activePoints,proto3" form:"activePoints" json:"activePoints" query:"activePoints"`
+	// 近一周对话频率趋势
+	ConversationPoints []*TrendPoint `protobuf:"bytes,2,rep,name=conversationPoints,proto3" form:"conversationPoints" json:"conversationPoints" query:"conversationPoints"`
+	// 对话时间分布
+	ConversationDurations []*ConversationDuration `protobuf:"bytes,3,rep,name=conversationDurations,proto3" form:"conversationDurations" json:"conversationDurations" query:"conversationDurations"`
 	Code                  int32                   `protobuf:"varint,255,opt,name=code,proto3" form:"code" json:"code" query:"code"`
 	Msg                   string                  `protobuf:"bytes,256,opt,name=msg,proto3" form:"msg" json:"msg" query:"msg"`
 }
@@ -404,8 +408,10 @@ type TrendPoint struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Week  int32 `protobuf:"varint,1,opt,name=week,proto3" form:"week" json:"week" query:"week"` // 1=Mon ... 7=Sun
-	Hour  int32 `protobuf:"varint,2,opt,name=hour,proto3" form:"hour" json:"hour" query:"hour"` // 0–23
+	// 1=Mon ... 7=Sun
+	Week int32 `protobuf:"varint,1,opt,name=week,proto3" form:"week" json:"week" query:"week"`
+	// 0–23
+	Hour  int32 `protobuf:"varint,2,opt,name=hour,proto3" form:"hour" json:"hour" query:"hour"`
 	Count int32 `protobuf:"varint,3,opt,name=count,proto3" form:"count" json:"count" query:"count"`
 }
 
@@ -767,11 +773,14 @@ type DashboardGetPsychTrendResp struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	EmotionRatio *EmotionRatio       `protobuf:"bytes,1,opt,name=emotionRatio,proto3" form:"emotionRatio" json:"emotionRatio" query:"emotionRatio"` // 情绪分布
-	Risks        []*RiskDistribution `protobuf:"bytes,2,rep,name=risks,proto3" form:"risks" json:"risks" query:"risks"`                             // 分性别的风险等级统计
-	Keywords     *Keywords           `protobuf:"bytes,3,opt,name=keywords,proto3" form:"keywords" json:"keywords" query:"keywords"`                 // 关键词 用于词云
-	Code         int32               `protobuf:"varint,255,opt,name=code,proto3" form:"code" json:"code" query:"code"`
-	Msg          string              `protobuf:"bytes,256,opt,name=msg,proto3" form:"msg" json:"msg" query:"msg"`
+	// 情绪分布
+	EmotionRatio *EmotionRatio `protobuf:"bytes,1,opt,name=emotionRatio,proto3" form:"emotionRatio" json:"emotionRatio" query:"emotionRatio"`
+	// 分性别的风险等级统计
+	Risks []*RiskDistribution `protobuf:"bytes,2,rep,name=risks,proto3" form:"risks" json:"risks" query:"risks"`
+	// 关键词 用于词云
+	Keywords *Keywords `protobuf:"bytes,3,opt,name=keywords,proto3" form:"keywords" json:"keywords" query:"keywords"`
+	Code     int32     `protobuf:"varint,255,opt,name=code,proto3" form:"code" json:"code" query:"code"`
+	Msg      string    `protobuf:"bytes,256,opt,name=msg,proto3" form:"msg" json:"msg" query:"msg"`
 }
 
 func (x *DashboardGetPsychTrendResp) Reset() {
@@ -846,8 +855,10 @@ type RiskDistribution struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Level  int32 `protobuf:"varint,1,opt,name=level,proto3" form:"level" json:"level" query:"level"`     // 0=正常 1=低危 2=中危 3=高危
-	Gender int32 `protobuf:"varint,2,opt,name=gender,proto3" form:"gender" json:"gender" query:"gender"` // 0=all 1=male 2=female
+	// 1-4: High | Medium | Low | Normal
+	Level int32 `protobuf:"varint,1,opt,name=level,proto3" form:"level" json:"level" query:"level"`
+	// 0=all 1=male 2=female
+	Gender int32 `protobuf:"varint,2,opt,name=gender,proto3" form:"gender" json:"gender" query:"gender"`
 	Count  int32 `protobuf:"varint,3,opt,name=count,proto3" form:"count" json:"count" query:"count"`
 }
 
@@ -1067,16 +1078,24 @@ type DashboardGetAlarmOverviewResp struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Total           int32   `protobuf:"varint,1,opt,name=total,proto3" form:"total" json:"total" query:"total"`                                          // 当前高风险用户总数
-	Processed       int32   `protobuf:"varint,2,opt,name=processed,proto3" form:"processed" json:"processed" query:"processed"`                          // 当前已处理数
-	Pending         int32   `protobuf:"varint,3,opt,name=pending,proto3" form:"pending" json:"pending" query:"pending"`                                  // 当前待处理数
-	Track           int32   `protobuf:"varint,4,opt,name=track,proto3" form:"track" json:"track" query:"track"`                                          // 当前需追踪数
-	TotalChange     float64 `protobuf:"fixed64,5,opt,name=totalChange,proto3" form:"totalChange" json:"totalChange" query:"totalChange"`                 // 对比上周总数变化百分比
-	ProcessedChange float64 `protobuf:"fixed64,6,opt,name=processedChange,proto3" form:"processedChange" json:"processedChange" query:"processedChange"` // 对比上周已处理变化百分比
-	PendingChange   float64 `protobuf:"fixed64,7,opt,name=pendingChange,proto3" form:"pendingChange" json:"pendingChange" query:"pendingChange"`         // 对比上周待处理变化百分比
-	TrackChange     float64 `protobuf:"fixed64,8,opt,name=trackChange,proto3" form:"trackChange" json:"trackChange" query:"trackChange"`                 // 对比上周需追踪变化百分比
-	Code            int32   `protobuf:"varint,255,opt,name=code,proto3" form:"code" json:"code" query:"code"`
-	Msg             string  `protobuf:"bytes,256,opt,name=msg,proto3" form:"msg" json:"msg" query:"msg"`
+	// 当前高风险用户总数
+	Total int32 `protobuf:"varint,1,opt,name=total,proto3" form:"total" json:"total" query:"total"`
+	// 当前已处理数
+	Processed int32 `protobuf:"varint,2,opt,name=processed,proto3" form:"processed" json:"processed" query:"processed"`
+	// 当前待处理数
+	Pending int32 `protobuf:"varint,3,opt,name=pending,proto3" form:"pending" json:"pending" query:"pending"`
+	// 当前需追踪数
+	Track int32 `protobuf:"varint,4,opt,name=track,proto3" form:"track" json:"track" query:"track"`
+	// 对比上周总数变化百分比
+	TotalChange float64 `protobuf:"fixed64,5,opt,name=totalChange,proto3" form:"totalChange" json:"totalChange" query:"totalChange"`
+	// 对比上周已处理变化百分比
+	ProcessedChange float64 `protobuf:"fixed64,6,opt,name=processedChange,proto3" form:"processedChange" json:"processedChange" query:"processedChange"`
+	// 对比上周待处理变化百分比
+	PendingChange float64 `protobuf:"fixed64,7,opt,name=pendingChange,proto3" form:"pendingChange" json:"pendingChange" query:"pendingChange"`
+	// 对比上周需追踪变化百分比
+	TrackChange float64 `protobuf:"fixed64,8,opt,name=trackChange,proto3" form:"trackChange" json:"trackChange" query:"trackChange"`
+	Code        int32   `protobuf:"varint,255,opt,name=code,proto3" form:"code" json:"code" query:"code"`
+	Msg         string  `protobuf:"bytes,256,opt,name=msg,proto3" form:"msg" json:"msg" query:"msg"`
 }
 
 func (x *DashboardGetAlarmOverviewResp) Reset() {
@@ -1438,13 +1457,20 @@ type AlarmRecord struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Id                      string   `protobuf:"bytes,1,opt,name=id,proto3" form:"id" json:"id" query:"id"`                                                                                      // 唯一Id
-	Emotion                 int32    `protobuf:"varint,2,opt,name=emotion,proto3" form:"emotion" json:"emotion" query:"emotion"`                                                                 // 情绪状态
-	Keywords                []string `protobuf:"bytes,3,rep,name=keywords,proto3" form:"keywords" json:"keywords" query:"keywords"`                                                              // 关键词列表
-	Status                  int32    `protobuf:"varint,4,opt,name=status,proto3" form:"status" json:"status" query:"status"`                                                                     // 处理状态
-	User                    *UserVO  `protobuf:"bytes,5,opt,name=user,proto3" form:"user" json:"user" query:"user"`                                                                              // 用户信息
-	TotalConversationRounds int32    `protobuf:"varint,6,opt,name=totalConversationRounds,proto3" form:"totalConversationRounds" json:"totalConversationRounds" query:"totalConversationRounds"` // 总对话轮数
-	LastConversationTime    int64    `protobuf:"varint,7,opt,name=lastConversationTime,proto3" form:"lastConversationTime" json:"lastConversationTime" query:"lastConversationTime"`             // 上次对话时间（时间戳）
+	// 唯一Id
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" form:"id" json:"id" query:"id"`
+	// 情绪状态
+	Emotion int32 `protobuf:"varint,2,opt,name=emotion,proto3" form:"emotion" json:"emotion" query:"emotion"`
+	// 关键词列表
+	Keywords []string `protobuf:"bytes,3,rep,name=keywords,proto3" form:"keywords" json:"keywords" query:"keywords"`
+	// 处理状态
+	Status int32 `protobuf:"varint,4,opt,name=status,proto3" form:"status" json:"status" query:"status"`
+	// 用户信息
+	User *UserVO `protobuf:"bytes,5,opt,name=user,proto3" form:"user" json:"user" query:"user"`
+	// 总对话轮数
+	TotalConversationRounds int32 `protobuf:"varint,6,opt,name=totalConversationRounds,proto3" form:"totalConversationRounds" json:"totalConversationRounds" query:"totalConversationRounds"`
+	// 上次对话时间（时间戳）
+	LastConversationTime int64 `protobuf:"varint,7,opt,name=lastConversationTime,proto3" form:"lastConversationTime" json:"lastConversationTime" query:"lastConversationTime"`
 }
 
 func (x *AlarmRecord) Reset() {
@@ -1663,6 +1689,7 @@ func (x *GradeInfo) GetClasses() []*ClassInfo {
 	return nil
 }
 
+// 按班年级列出用户
 type DashboardListClassesReq struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1794,11 +1821,14 @@ type RiskUser struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	User                    *UserVO  `protobuf:"bytes,1,opt,name=user,proto3" form:"user" json:"user" query:"user"`
-	Level                   int32    `protobuf:"varint,2,opt,name=level,proto3" form:"level" json:"level" query:"level"`
-	TotalConversationRounds int32    `protobuf:"varint,3,opt,name=totalConversationRounds,proto3" form:"totalConversationRounds" json:"totalConversationRounds" query:"totalConversationRounds"` // 总对话轮数
-	LastConversationTime    int64    `protobuf:"varint,4,opt,name=lastConversationTime,proto3" form:"lastConversationTime" json:"lastConversationTime" query:"lastConversationTime"`             // 上次对话时间（分钟时间戳）
-	Keywords                []string `protobuf:"bytes,5,rep,name=keywords,proto3" form:"keywords" json:"keywords" query:"keywords"`
+	User *UserVO `protobuf:"bytes,1,opt,name=user,proto3" form:"user" json:"user" query:"user"`
+	// 1-4: High | Medium | Low | Normal
+	Level int32 `protobuf:"varint,2,opt,name=level,proto3" form:"level" json:"level" query:"level"`
+	// 总对话轮数
+	TotalConversationRounds int32 `protobuf:"varint,3,opt,name=totalConversationRounds,proto3" form:"totalConversationRounds" json:"totalConversationRounds" query:"totalConversationRounds"`
+	// 上次对话时间（分钟时间戳）
+	LastConversationTime int64    `protobuf:"varint,4,opt,name=lastConversationTime,proto3" form:"lastConversationTime" json:"lastConversationTime" query:"lastConversationTime"`
+	Keywords             []string `protobuf:"bytes,5,rep,name=keywords,proto3" form:"keywords" json:"keywords" query:"keywords"`
 }
 
 func (x *RiskUser) Reset() {
@@ -1873,9 +1903,11 @@ type DashboardListUsersReq struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	UnitId            string                   `protobuf:"bytes,1,opt,name=unitId,proto3" form:"unitId" json:"unitId" query:"unitId"`
-	Level             *int32                   `protobuf:"varint,2,opt,name=level,proto3,oneof" form:"level" json:"level" query:"level"`
-	Gender            *string                  `protobuf:"bytes,3,opt,name=gender,proto3,oneof" form:"gender" json:"gender" query:"gender"`
+	UnitId string `protobuf:"bytes,1,opt,name=unitId,proto3" form:"unitId" json:"unitId" query:"unitId"`
+	// 1-4: High | Medium | Low | Normal
+	Level *int32 `protobuf:"varint,2,opt,name=level,proto3,oneof" form:"level" json:"level" query:"level"`
+	// 0=all 1=male 2=female
+	Gender            *int32                   `protobuf:"varint,3,opt,name=gender,proto3,oneof" form:"gender" json:"gender" query:"gender"`
 	Keyword           *string                  `protobuf:"bytes,4,opt,name=keyword,proto3,oneof" form:"keyword" json:"keyword" query:"keyword"`
 	PaginationOptions *basic.PaginationOptions `protobuf:"bytes,5,opt,name=paginationOptions,proto3" form:"paginationOptions" json:"paginationOptions" query:"paginationOptions"`
 }
@@ -1926,11 +1958,11 @@ func (x *DashboardListUsersReq) GetLevel() int32 {
 	return 0
 }
 
-func (x *DashboardListUsersReq) GetGender() string {
+func (x *DashboardListUsersReq) GetGender() int32 {
 	if x != nil && x.Gender != nil {
 		return *x.Gender
 	}
-	return ""
+	return 0
 }
 
 func (x *DashboardListUsersReq) GetKeyword() string {
@@ -2422,7 +2454,7 @@ func (x *DashboardGetReportResp) GetMsg() string {
 	return ""
 }
 
-// 获取单位下用户的对话记录列表
+// 获取单位下对话记录列表
 type DashboardUnitConvRecordsReq struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -2483,9 +2515,10 @@ type DashboardUnitConvRecordsResp struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	ConversationList []*ConvOverview `protobuf:"bytes,1,rep,name=conversationList,proto3" form:"conversationList" json:"conversationList" query:"conversationList"`
-	Code             int32           `protobuf:"varint,255,opt,name=code,proto3" form:"code" json:"code" query:"code"`
-	Msg              string          `protobuf:"bytes,256,opt,name=msg,proto3" form:"msg" json:"msg" query:"msg"`
+	ConversationList []*ConvOverview   `protobuf:"bytes,1,rep,name=conversationList,proto3" form:"conversationList" json:"conversationList" query:"conversationList"`
+	Pagination       *basic.Pagination `protobuf:"bytes,3,opt,name=pagination,proto3" form:"pagination" json:"pagination" query:"pagination"`
+	Code             int32             `protobuf:"varint,255,opt,name=code,proto3" form:"code" json:"code" query:"code"`
+	Msg              string            `protobuf:"bytes,256,opt,name=msg,proto3" form:"msg" json:"msg" query:"msg"`
 }
 
 func (x *DashboardUnitConvRecordsResp) Reset() {
@@ -2527,6 +2560,13 @@ func (x *DashboardUnitConvRecordsResp) GetConversationList() []*ConvOverview {
 	return nil
 }
 
+func (x *DashboardUnitConvRecordsResp) GetPagination() *basic.Pagination {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
 func (x *DashboardUnitConvRecordsResp) GetCode() int32 {
 	if x != nil {
 		return x.Code
@@ -2546,10 +2586,10 @@ type ConvOverview struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	User      *UserVO  `protobuf:"bytes,1,opt,name=user,proto3" form:"user" json:"user" query:"user"`
-	Keywords  []string `protobuf:"bytes,2,rep,name=keywords,proto3" form:"keywords" json:"keywords" query:"keywords"`
-	Time      int64    `protobuf:"varint,3,opt,name=time,proto3" form:"time" json:"time" query:"time"`
-	NeedAlarm bool     `protobuf:"varint,4,opt,name=needAlarm,proto3" form:"needAlarm" json:"needAlarm" query:"needAlarm"`
+	User      *UserVO `protobuf:"bytes,1,opt,name=user,proto3" form:"user" json:"user" query:"user"`
+	Title     string  `protobuf:"bytes,2,opt,name=title,proto3" form:"title" json:"title" query:"title"`
+	Time      int64   `protobuf:"varint,3,opt,name=time,proto3" form:"time" json:"time" query:"time"`
+	NeedAlarm bool    `protobuf:"varint,4,opt,name=needAlarm,proto3" form:"needAlarm" json:"needAlarm" query:"needAlarm"`
 }
 
 func (x *ConvOverview) Reset() {
@@ -2591,11 +2631,11 @@ func (x *ConvOverview) GetUser() *UserVO {
 	return nil
 }
 
-func (x *ConvOverview) GetKeywords() []string {
+func (x *ConvOverview) GetTitle() string {
 	if x != nil {
-		return x.Keywords
+		return x.Title
 	}
-	return nil
+	return ""
 }
 
 func (x *ConvOverview) GetTime() int64 {
@@ -2934,7 +2974,7 @@ var file_core_api_dashboard_proto_rawDesc = []byte{
 	0x74, 0x49, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x75, 0x6e, 0x69, 0x74, 0x49,
 	0x64, 0x12, 0x19, 0x0a, 0x05, 0x6c, 0x65, 0x76, 0x65, 0x6c, 0x18, 0x02, 0x20, 0x01, 0x28, 0x05,
 	0x48, 0x00, 0x52, 0x05, 0x6c, 0x65, 0x76, 0x65, 0x6c, 0x88, 0x01, 0x01, 0x12, 0x1b, 0x0a, 0x06,
-	0x67, 0x65, 0x6e, 0x64, 0x65, 0x72, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x48, 0x01, 0x52, 0x06,
+	0x67, 0x65, 0x6e, 0x64, 0x65, 0x72, 0x18, 0x03, 0x20, 0x01, 0x28, 0x05, 0x48, 0x01, 0x52, 0x06,
 	0x67, 0x65, 0x6e, 0x64, 0x65, 0x72, 0x88, 0x01, 0x01, 0x12, 0x1d, 0x0a, 0x07, 0x6b, 0x65, 0x79,
 	0x77, 0x6f, 0x72, 0x64, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x48, 0x02, 0x52, 0x07, 0x6b, 0x65,
 	0x79, 0x77, 0x6f, 0x72, 0x64, 0x88, 0x01, 0x01, 0x12, 0x46, 0x0a, 0x11, 0x70, 0x61, 0x67, 0x69,
@@ -3017,29 +3057,32 @@ var file_core_api_dashboard_proto_rawDesc = []byte{
 	0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x18, 0x2e, 0x62, 0x61, 0x73, 0x69, 0x63, 0x2e, 0x50, 0x61,
 	0x67, 0x69, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x4f, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x52,
 	0x11, 0x70, 0x61, 0x67, 0x69, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x4f, 0x70, 0x74, 0x69, 0x6f,
-	0x6e, 0x73, 0x42, 0x09, 0x0a, 0x07, 0x5f, 0x75, 0x6e, 0x69, 0x74, 0x49, 0x64, 0x22, 0x8a, 0x01,
+	0x6e, 0x73, 0x42, 0x09, 0x0a, 0x07, 0x5f, 0x75, 0x6e, 0x69, 0x74, 0x49, 0x64, 0x22, 0xbd, 0x01,
 	0x0a, 0x1c, 0x44, 0x61, 0x73, 0x68, 0x62, 0x6f, 0x61, 0x72, 0x64, 0x55, 0x6e, 0x69, 0x74, 0x43,
 	0x6f, 0x6e, 0x76, 0x52, 0x65, 0x63, 0x6f, 0x72, 0x64, 0x73, 0x52, 0x65, 0x73, 0x70, 0x12, 0x42,
 	0x0a, 0x10, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x4c, 0x69,
 	0x73, 0x74, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x16, 0x2e, 0x63, 0x6f, 0x72, 0x65, 0x5f,
 	0x61, 0x70, 0x69, 0x2e, 0x43, 0x6f, 0x6e, 0x76, 0x4f, 0x76, 0x65, 0x72, 0x76, 0x69, 0x65, 0x77,
 	0x52, 0x10, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x4c, 0x69,
-	0x73, 0x74, 0x12, 0x13, 0x0a, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x18, 0xff, 0x01, 0x20, 0x01, 0x28,
-	0x05, 0x52, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x12, 0x11, 0x0a, 0x03, 0x6d, 0x73, 0x67, 0x18, 0x80,
-	0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6d, 0x73, 0x67, 0x22, 0x82, 0x01, 0x0a, 0x0c, 0x43,
-	0x6f, 0x6e, 0x76, 0x4f, 0x76, 0x65, 0x72, 0x76, 0x69, 0x65, 0x77, 0x12, 0x24, 0x0a, 0x04, 0x75,
-	0x73, 0x65, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x10, 0x2e, 0x63, 0x6f, 0x72, 0x65,
-	0x5f, 0x61, 0x70, 0x69, 0x2e, 0x55, 0x73, 0x65, 0x72, 0x56, 0x4f, 0x52, 0x04, 0x75, 0x73, 0x65,
-	0x72, 0x12, 0x1a, 0x0a, 0x08, 0x6b, 0x65, 0x79, 0x77, 0x6f, 0x72, 0x64, 0x73, 0x18, 0x02, 0x20,
-	0x03, 0x28, 0x09, 0x52, 0x08, 0x6b, 0x65, 0x79, 0x77, 0x6f, 0x72, 0x64, 0x73, 0x12, 0x12, 0x0a,
-	0x04, 0x74, 0x69, 0x6d, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x03, 0x52, 0x04, 0x74, 0x69, 0x6d,
-	0x65, 0x12, 0x1c, 0x0a, 0x09, 0x6e, 0x65, 0x65, 0x64, 0x41, 0x6c, 0x61, 0x72, 0x6d, 0x18, 0x04,
-	0x20, 0x01, 0x28, 0x08, 0x52, 0x09, 0x6e, 0x65, 0x65, 0x64, 0x41, 0x6c, 0x61, 0x72, 0x6d, 0x42,
-	0x43, 0x5a, 0x41, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x78, 0x68,
-	0x2d, 0x70, 0x6f, 0x6c, 0x61, 0x72, 0x69, 0x73, 0x2f, 0x70, 0x73, 0x79, 0x63, 0x68, 0x2d, 0x63,
-	0x6f, 0x72, 0x65, 0x2d, 0x61, 0x70, 0x69, 0x2f, 0x62, 0x69, 0x7a, 0x2f, 0x61, 0x70, 0x70, 0x6c,
-	0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x64, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x72, 0x65,
-	0x5f, 0x61, 0x70, 0x69, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x73, 0x74, 0x12, 0x31, 0x0a, 0x0a, 0x70, 0x61, 0x67, 0x69, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e,
+	0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x11, 0x2e, 0x62, 0x61, 0x73, 0x69, 0x63, 0x2e, 0x50,
+	0x61, 0x67, 0x69, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x0a, 0x70, 0x61, 0x67, 0x69, 0x6e,
+	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x13, 0x0a, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x18, 0xff, 0x01,
+	0x20, 0x01, 0x28, 0x05, 0x52, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x12, 0x11, 0x0a, 0x03, 0x6d, 0x73,
+	0x67, 0x18, 0x80, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6d, 0x73, 0x67, 0x22, 0x7c, 0x0a,
+	0x0c, 0x43, 0x6f, 0x6e, 0x76, 0x4f, 0x76, 0x65, 0x72, 0x76, 0x69, 0x65, 0x77, 0x12, 0x24, 0x0a,
+	0x04, 0x75, 0x73, 0x65, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x10, 0x2e, 0x63, 0x6f,
+	0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x2e, 0x55, 0x73, 0x65, 0x72, 0x56, 0x4f, 0x52, 0x04, 0x75,
+	0x73, 0x65, 0x72, 0x12, 0x14, 0x0a, 0x05, 0x74, 0x69, 0x74, 0x6c, 0x65, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x05, 0x74, 0x69, 0x74, 0x6c, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x74, 0x69, 0x6d,
+	0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x03, 0x52, 0x04, 0x74, 0x69, 0x6d, 0x65, 0x12, 0x1c, 0x0a,
+	0x09, 0x6e, 0x65, 0x65, 0x64, 0x41, 0x6c, 0x61, 0x72, 0x6d, 0x18, 0x04, 0x20, 0x01, 0x28, 0x08,
+	0x52, 0x09, 0x6e, 0x65, 0x65, 0x64, 0x41, 0x6c, 0x61, 0x72, 0x6d, 0x42, 0x43, 0x5a, 0x41, 0x67,
+	0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x78, 0x68, 0x2d, 0x70, 0x6f, 0x6c,
+	0x61, 0x72, 0x69, 0x73, 0x2f, 0x70, 0x73, 0x79, 0x63, 0x68, 0x2d, 0x63, 0x6f, 0x72, 0x65, 0x2d,
+	0x61, 0x70, 0x69, 0x2f, 0x62, 0x69, 0x7a, 0x2f, 0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74,
+	0x69, 0x6f, 0x6e, 0x2f, 0x64, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69,
+	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -3129,12 +3172,13 @@ var file_core_api_dashboard_proto_depIdxs = []int32{
 	12, // 26: core_api.ConvDetail.keywords:type_name -> core_api.Keywords
 	39, // 27: core_api.DashboardUnitConvRecordsReq.paginationOptions:type_name -> basic.PaginationOptions
 	36, // 28: core_api.DashboardUnitConvRecordsResp.conversationList:type_name -> core_api.ConvOverview
-	41, // 29: core_api.ConvOverview.user:type_name -> core_api.UserVO
-	30, // [30:30] is the sub-list for method output_type
-	30, // [30:30] is the sub-list for method input_type
-	30, // [30:30] is the sub-list for extension type_name
-	30, // [30:30] is the sub-list for extension extendee
-	0,  // [0:30] is the sub-list for field type_name
+	40, // 29: core_api.DashboardUnitConvRecordsResp.pagination:type_name -> basic.Pagination
+	41, // 30: core_api.ConvOverview.user:type_name -> core_api.UserVO
+	31, // [31:31] is the sub-list for method output_type
+	31, // [31:31] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func file_core_api_dashboard_proto_init() {

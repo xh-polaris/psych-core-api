@@ -250,14 +250,16 @@ type ConfigVO struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	UnitId     string     `protobuf:"bytes,1,opt,name=unitId,proto3" form:"unitId" json:"unitId" query:"unitId"`
-	Type       int32      `protobuf:"varint,2,opt,name=type,proto3" form:"type" json:"type" query:"type"` // chain | end2end
-	Chat       *ChatApp   `protobuf:"bytes,3,opt,name=chat,proto3" form:"chat" json:"chat" query:"chat"`
-	Tts        *TTSApp    `protobuf:"bytes,4,opt,name=tts,proto3" form:"tts" json:"tts" query:"tts"`
-	Report     *ReportApp `protobuf:"bytes,5,opt,name=report,proto3" form:"report" json:"report" query:"report"`
-	Status     int32      `protobuf:"varint,6,opt,name=status,proto3" form:"status" json:"status" query:"status"` // active | deleted
-	CreateTime int64      `protobuf:"varint,7,opt,name=createTime,proto3" form:"createTime" json:"createTime" query:"createTime"`
-	UpdateTime int64      `protobuf:"varint,8,opt,name=updateTime,proto3" form:"updateTime" json:"updateTime" query:"updateTime"`
+	UnitId string `protobuf:"bytes,1,opt,name=unitId,proto3" form:"unitId" json:"unitId" query:"unitId"`
+	Type   int32  `protobuf:"varint,2,opt,name=type,proto3" form:"type" json:"type" query:"type"`
+	// 1-2: Chain | End2End
+	Chat   *ChatApp   `protobuf:"bytes,3,opt,name=chat,proto3" form:"chat" json:"chat" query:"chat"`
+	Tts    *TTSApp    `protobuf:"bytes,4,opt,name=tts,proto3" form:"tts" json:"tts" query:"tts"`
+	Report *ReportApp `protobuf:"bytes,5,opt,name=report,proto3" form:"report" json:"report" query:"report"`
+	// 1-2: Active | Deleted
+	Status     int32 `protobuf:"varint,6,opt,name=status,proto3" form:"status" json:"status" query:"status"`
+	CreateTime int64 `protobuf:"varint,7,opt,name=createTime,proto3" form:"createTime" json:"createTime" query:"createTime"`
+	UpdateTime int64 `protobuf:"varint,8,opt,name=updateTime,proto3" form:"updateTime" json:"updateTime" query:"updateTime"`
 }
 
 func (x *ConfigVO) Reset() {

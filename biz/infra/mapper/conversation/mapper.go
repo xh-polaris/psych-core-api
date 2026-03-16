@@ -34,6 +34,7 @@ type IMongoMapper interface {
 	FindOneById(ctx context.Context, id bson.ObjectID) (*Conversation, error)
 	FindManyByUserId(ctx context.Context, userId bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error) // 分页查找
 	FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error)                                           // 查找全部
+	FindManyByUnitId(ctx context.Context, unitId *bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
 	// 聚合统计
 	CountUnitConvByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 	CountUserDailyConv(ctx context.Context, userId bson.ObjectID) (map[int32]int32, error)
@@ -370,6 +371,15 @@ func (m *mongoMapper) FindManyByUserId(ctx context.Context, userId bson.ObjectID
 	c, err := m.FindManyWithOption(ctx, bson.M{cst.UserID: userId, cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}, opt)
 	if err != nil {
 		logs.Errorf("[conversation mapper] paged find many by user err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+	return c, nil
+}
+
+func (m *mongoMapper) FindManyByUnitId(ctx context.Context, unitId *bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error) {
+	c, err := m.FindManyWithOption(ctx, bson.M{cst.UnitID: unitId}, opt)
+	if err != nil {
+		logs.Error("[conversation mapper] paged find many by unit err: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}
 	return c, nil

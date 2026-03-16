@@ -19,8 +19,8 @@ func (usrMeta *Meta) HasClassTeacherAuth() bool {
 	return usrMeta.Role >= enum.UserRoleClassTeacher
 }
 
-func (usrMeta *Meta) HasUnitAdminAuth() bool {
-	return usrMeta.Role >= enum.UserRoleUnitAdmin
+func (usrMeta *Meta) HasUnitAdminAuth(unitId string) bool {
+	return usrMeta.HasSuperAdminAuth() || (usrMeta.Role == enum.UserRoleUnitAdmin && usrMeta.UnitId == unitId)
 }
 
 func (usrMeta *Meta) HasSuperAdminAuth() bool {

@@ -448,8 +448,10 @@ type Message struct {
 	unknownFields protoimpl.UnknownFields
 
 	Content string `protobuf:"bytes,1,opt,name=content,proto3" form:"content" json:"content" query:"content"`
-	Role    int32  `protobuf:"varint,2,opt,name=role,proto3" form:"role" json:"role" query:"role"`
-	Index   int32  `protobuf:"varint,3,opt,name=index,proto3" form:"index" json:"index" query:"index"`
+	// 角色, system/assistant/user/tool, 依次为1,2,3,4
+	Role int32 `protobuf:"varint,2,opt,name=role,proto3" form:"role" json:"role" query:"role"`
+	// 消息索引
+	Index int32 `protobuf:"varint,3,opt,name=index,proto3" form:"index" json:"index" query:"index"`
 }
 
 func (x *Message) Reset() {
@@ -511,9 +513,12 @@ type SSEEvent struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	EventData string `protobuf:"bytes,1,opt,name=eventData,proto3" form:"eventData" json:"eventData" query:"eventData"`  // 事件数据
-	EventId   int32  `protobuf:"varint,2,opt,name=eventId,proto3" form:"eventId" json:"eventId" query:"eventId"`         // 事件id
-	EventType int32  `protobuf:"varint,3,opt,name=eventType,proto3" form:"eventType" json:"eventType" query:"eventType"` // 事件类型
+	// 事件数据
+	EventData string `protobuf:"bytes,1,opt,name=eventData,proto3" form:"eventData" json:"eventData" query:"eventData"`
+	// 事件id
+	EventId int32 `protobuf:"varint,2,opt,name=eventId,proto3" form:"eventId" json:"eventId" query:"eventId"`
+	// 事件类型
+	EventType int32 `protobuf:"varint,3,opt,name=eventType,proto3" form:"eventType" json:"eventType" query:"eventType"`
 }
 
 func (x *SSEEvent) Reset() {

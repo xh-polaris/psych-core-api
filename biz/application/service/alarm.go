@@ -48,7 +48,7 @@ func (s *AlarmService) Overview(ctx context.Context, req *core_api.DashboardGetA
 	}
 
 	if req.UnitId != "" {
-		if !userMeta.HasUnitAdminAuth() || userMeta.UserId != req.UnitId {
+		if !userMeta.HasUnitAdminAuth(req.UnitId) {
 			return nil, errorx.New(errno.ErrInsufficientAuth)
 		}
 	}
@@ -90,7 +90,7 @@ func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardL
 	}
 
 	if req.UnitId != "" {
-		if !userMeta.HasUnitAdminAuth() || userMeta.UserId != req.UnitId {
+		if !userMeta.HasUnitAdminAuth(req.UnitId) {
 			return nil, errorx.New(errno.ErrInsufficientAuth)
 		}
 	}
@@ -213,14 +213,9 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 }
 
 func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardUpdateAlarmReq) (resp *core_api.DashboardUpdateAlarmResp, err error) {
-	// 初步鉴权-需要有UnitAdmin权限
 	userMeta, err := util.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	if !userMeta.HasUnitAdminAuth() {
-		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
 	// 参数校验
@@ -235,14 +230,14 @@ func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardU
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "预警ID"))
 	}
 
-	// 二次鉴权：需要在统一unit下
+	// 鉴权：需要在同一unit下
 	oldAlarm, err := s.AlarmMapper.FindOneById(ctx, alarmId)
 	// optimize 查不到时考虑直接创建而非报错
 	if err != nil {
 		logs.Errorf("find alarm error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrNotFound)
 	}
-	if userMeta.UnitId != oldAlarm.UnitID.Hex() {
+	if !userMeta.HasUnitAdminAuth(oldAlarm.UnitID.Hex()) {
 		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 

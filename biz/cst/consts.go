@@ -22,6 +22,7 @@ const (
 	CreateTime     = "create_time"
 	UpdateTime     = "update_time"
 	DeleteTime     = "delete_time"
+	EndTime        = "end_time"
 	Code           = "code"
 	CodeType       = "code_type"
 	Role           = "role"

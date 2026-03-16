@@ -52,7 +52,7 @@ func (u *UnitService) UnitGetInfo(ctx context.Context, req *core_api.UnitGetInfo
 	if err != nil {
 		return nil, err
 	}
-	if !m.HasUnitAdminAuth() {
+	if !m.HasUnitAdminAuth(req.UnitId) {
 		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
@@ -98,7 +98,7 @@ func (u *UnitService) UnitUpdateInfo(ctx context.Context, req *core_api.UnitUpda
 	if err != nil {
 		return nil, err
 	}
-	if !m.HasUnitAdminAuth() {
+	if !m.HasUnitAdminAuth(req.Unit.Id) {
 		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
@@ -152,7 +152,7 @@ func (u *UnitService) UnitLinkUser(ctx context.Context, req *core_api.UnitLinkUs
 	if err != nil {
 		return nil, err
 	}
-	if !m.HasUnitAdminAuth() {
+	if !m.HasUnitAdminAuth(req.UnitId) {
 		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
@@ -197,7 +197,7 @@ func (u *UnitService) UnitCreateAndLinkUser(ctx context.Context, req *core_api.U
 	if err != nil {
 		return nil, err
 	}
-	if !m.HasUnitAdminAuth() && m.UnitId != req.GetUnitId() {
+	if !m.HasUnitAdminAuth(req.UnitId) {
 		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
