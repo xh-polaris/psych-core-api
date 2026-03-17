@@ -16,4 +16,46 @@ import (
 // Register register routes based on the IDL 'api.${HTTP Method}' annotation.
 func Register(r *server.Hertz) {
 
+	root := r.Group("/", rootMw()...)
+	{
+		_config := root.Group("/config", _configMw()...)
+		_config.POST("/create", append(_configcreateMw(), core_api.ConfigCreate)...)
+		_config.GET("/get_by_unit_id", append(_configgetbyunitidMw(), core_api.ConfigGetByUnitID)...)
+		_config.POST("/update_info", append(_configupdateinfoMw(), core_api.ConfigUpdateInfo)...)
+	}
+	{
+		_conversation := root.Group("/conversation", _conversationMw()...)
+		_conversation.POST("/create", append(_createconversationMw(), core_api.CreateConversation)...)
+		_conversation.POST("/get", append(_getconversationMw(), core_api.GetConversation)...)
+		_conversation.POST("/list", append(_listconversationsMw(), core_api.ListConversations)...)
+	}
+	{
+		_dashboard := root.Group("/dashboard", _dashboardMw()...)
+		_dashboard.POST("/alarm_overview", append(_dashboardgetalarmoverviewMw(), core_api.DashboardGetAlarmOverview)...)
+		_dashboard.POST("/alarm_records", append(_dashboardlistalarmrecordsMw(), core_api.DashboardListAlarmRecords)...)
+		_dashboard.POST("/classes", append(_dashboardlistclassesMw(), core_api.DashboardListClasses)...)
+		_dashboard.POST("/get_report", append(_dashboardgetreportMw(), core_api.DashboardGetReport)...)
+		_dashboard.POST("/overview", append(_dashboardgetdataoverviewMw(), core_api.DashboardGetDataOverview)...)
+		_dashboard.POST("/psych_trend", append(_dashboardgetpsychtrendMw(), core_api.DashboardGetPsychTrend)...)
+		_dashboard.POST("/trend", append(_dashboardgetdatatrendMw(), core_api.DashboardGetDataTrend)...)
+		_dashboard.POST("/unit_conversation_records", append(_dashboardunitconvrecordsMw(), core_api.DashboardUnitConvRecords)...)
+		_dashboard.POST("/units", append(_dashboardlistunitsMw(), core_api.DashboardListUnits)...)
+		_dashboard.POST("/update_alarm", append(_dashboardupdatealarmMw(), core_api.DashboardUpdateAlarm)...)
+		_dashboard.POST("/user_conversation_records", append(_dashboarduserconvrecordsMw(), core_api.DashboardUserConvRecords)...)
+		_dashboard.POST("/users", append(_dashboardlistusersMw(), core_api.DashboardListUsers)...)
+	}
+	{
+		_unit := root.Group("/unit", _unitMw()...)
+		_unit.POST("/create_and_link_user", append(_unitcreateandlinkuserMw(), core_api.UnitCreateAndLinkUser)...)
+		_unit.GET("/get_info", append(_unitgetinfoMw(), core_api.UnitGetInfo)...)
+		_unit.POST("/link_user", append(_unitlinkuserMw(), core_api.UnitLinkUser)...)
+		_unit.POST("/update_info", append(_unitupdateinfoMw(), core_api.UnitUpdateInfo)...)
+	}
+	{
+		_user := root.Group("/user", _userMw()...)
+		_user.GET("/get_info", append(_usergetinfoMw(), core_api.UserGetInfo)...)
+		_user.POST("/sign_in", append(_usersigninMw(), core_api.UserSignIn)...)
+		_user.POST("/update_info", append(_userupdateinfoMw(), core_api.UserUpdateInfo)...)
+		_user.POST("/update_password", append(_userupdatepasswordMw(), core_api.UserUpdatePassword)...)
+	}
 }

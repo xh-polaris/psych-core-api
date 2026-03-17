@@ -110,6 +110,11 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 }
 
 func (c *ConversationService) GetConversation(ctx context.Context, req *core_api.GetConversationReq) (resp *core_api.GetConversationResp, err error) {
+	_, err = util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// RetrieveMessage仅返回意外异常 消息搜索结果为空时返回空切片，和nil err
 	// 非空时，返回index倒序的列表
 	rawMsgs, err := his.Mgr.RetrieveMessage(ctx, req.ConversationId, -1)
