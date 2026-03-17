@@ -24,7 +24,7 @@ type IConversationService interface {
 }
 
 type ConversationService struct {
-	MessageMapper      message.MongoMapper
+	MessageMapper      message.IMongoMapper
 	ConversationMapper conversation.IMongoMapper
 }
 
@@ -90,9 +90,9 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 		return nil, errorx.New(errno.ErrListConversation)
 	}
 
-	convs := make([]*core_api.Conversation, 0, len(dbConvs))
+	convs := make([]*core_api.ConversationVO, 0, len(dbConvs))
 	for _, dbConv := range dbConvs {
-		conv := &core_api.Conversation{
+		conv := &core_api.ConversationVO{
 			ConversationId: dbConv.ID.Hex(),
 			Brief:          dbConv.Title,
 			CreateTime:     dbConv.CreateTime.Unix(),
@@ -110,6 +110,11 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 }
 
 func (c *ConversationService) GetConversation(ctx context.Context, req *core_api.GetConversationReq) (resp *core_api.GetConversationResp, err error) {
+	_, err = util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// RetrieveMessage仅返回意外异常 消息搜索结果为空时返回空切片，和nil err
 	// 非空时，返回index倒序的列表
 	rawMsgs, err := his.Mgr.RetrieveMessage(ctx, req.ConversationId, -1)
@@ -124,14 +129,16 @@ func (c *ConversationService) GetConversation(ctx context.Context, req *core_api
 	for _, rawMsg := range rawMsgs[startIdx:endIdx] {
 		msgs = append(msgs, &core_api.Message{
 			Content: rawMsg.Content,
-			Role:    message.RoleItoS[rawMsg.Role],
-			Index:   rawMsg.Index,
+			Role:    int32(rawMsg.Role),
+			Index:   int32(rawMsg.Index),
 		})
 	}
 
 	return &core_api.GetConversationResp{
 		Pagination:  util.PaginationRes(total, req.PaginationOptions),
 		MessageList: msgs,
+		Code:        0,
+		Msg:         "success",
 	}, nil
 }
 

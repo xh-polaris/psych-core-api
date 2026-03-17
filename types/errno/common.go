@@ -37,7 +37,7 @@ func init() {
 	)
 	code.Register(
 		ErrUnAuth,
-		"用户未登录",
+		"用户token无效，请检查登录状态",
 		code.WithAffectStability(false),
 	)
 	code.Register(

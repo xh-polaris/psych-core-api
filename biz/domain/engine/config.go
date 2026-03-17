@@ -74,7 +74,7 @@ func (e *Engine) buildConfig(resp *core_api.ConfigGetByUnitIdResp) (c *core.Conf
 	if wfc.ASRConfig, err = conf.GetConfig().ASRConf(); err != nil {
 		return
 	}
-	c = &core.Config{Type: resp.Config.Type, ModelName: "", ModelView: "", ChatConfig: core.ChatConfig{},
+	c = &core.Config{Type: int(resp.Config.Type), ModelName: "", ModelView: "", ChatConfig: core.ChatConfig{},
 		ASRConfig: core.ASRConfig{Format: wfc.ASRConfig.Format, Codec: wfc.ASRConfig.Codec, Rate: wfc.ASRConfig.Rate,
 			Bits: wfc.ASRConfig.Bits, Channels: wfc.ASRConfig.Channels, ResultType: wfc.ASRConfig.ResultType},
 		TTSConfig: core.TTSConfig{Format: wfc.TTSConfig.AudioParams.Format, Codec: wfc.TTSConfig.AudioParams.Codec,

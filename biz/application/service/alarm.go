@@ -48,7 +48,7 @@ func (s *AlarmService) Overview(ctx context.Context, req *core_api.DashboardGetA
 	}
 
 	if req.UnitId != "" {
-		if !userMeta.HasUnitAdminAuth() || userMeta.UserId != req.UnitId {
+		if !userMeta.HasUnitAdminAuth(req.UnitId) {
 			return nil, errorx.New(errno.ErrInsufficientAuth)
 		}
 	}
@@ -90,7 +90,7 @@ func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardL
 	}
 
 	if req.UnitId != "" {
-		if !userMeta.HasUnitAdminAuth() || userMeta.UserId != req.UnitId {
+		if !userMeta.HasUnitAdminAuth(req.UnitId) {
 			return nil, errorx.New(errno.ErrInsufficientAuth)
 		}
 	}
@@ -189,14 +189,14 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 		if userExists {
 			records[i] = &core_api.AlarmRecord{
 				Id:       al.ID.Hex(),
-				Emotion:  alarm.EmotionItoS[al.Emotion],
+				Emotion:  int32(al.Emotion),
 				Keywords: al.Keywords,
-				Status:   alarm.StatusItoS[al.Status],
-				User: &core_api.User{
+				Status:   int32(al.Status),
+				User: &core_api.UserVO{
 					Code:  dbUser.Code,
 					Name:  dbUser.Name,
-					Grade: dbUser.Grade,
-					Class: dbUser.Class,
+					Grade: int32(dbUser.Grade),
+					Class: int32(dbUser.Class),
 				},
 			}
 		}
@@ -213,14 +213,9 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 }
 
 func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardUpdateAlarmReq) (resp *core_api.DashboardUpdateAlarmResp, err error) {
-	// 初步鉴权-需要有UnitAdmin权限
 	userMeta, err := util.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	if !userMeta.HasUnitAdminAuth() {
-		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
 	// 参数校验
@@ -235,14 +230,14 @@ func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardU
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "预警ID"))
 	}
 
-	// 二次鉴权：需要在统一unit下
+	// 鉴权：需要在同一unit下
 	oldAlarm, err := s.AlarmMapper.FindOneById(ctx, alarmId)
 	// optimize 查不到时考虑直接创建而非报错
 	if err != nil {
 		logs.Errorf("find alarm error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrNotFound)
 	}
-	if userMeta.UnitId != oldAlarm.UnitID.Hex() {
+	if !userMeta.HasUnitAdminAuth(oldAlarm.UnitID.Hex()) {
 		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
@@ -250,13 +245,7 @@ func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardU
 	update := bson.M{}
 
 	// 更新情绪状态
-	if req.Alarm.Emotion != "" {
-		emotionValue, ok := alarm.EmotionStoI[req.Alarm.Emotion]
-		if !ok {
-			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "情绪状态"))
-		}
-		update[cst.Emotion] = emotionValue
-	}
+	update[cst.Emotion] = req.Alarm.Emotion
 
 	// 更新关键词
 	if len(req.Alarm.Keywords) > 0 {
@@ -264,13 +253,7 @@ func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardU
 	}
 
 	// 更新处理状态
-	if req.Alarm.Status != "" {
-		statusValue, ok := alarm.StatusStoI[req.Alarm.Status]
-		if !ok {
-			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "处理状态"))
-		}
-		update[cst.Status] = statusValue
-	}
+	update[cst.Status] = req.Alarm.Status
 
 	// 更新时间
 	update[cst.UpdateTime] = time.Now()

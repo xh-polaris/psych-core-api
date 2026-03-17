@@ -6,11 +6,12 @@ import (
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
-	"github.com/xh-polaris/psych-core-api/biz/infra/util/enum"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
+	"github.com/xh-polaris/psych-core-api/types/enum"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"go.mongodb.org/mongo-driver/v2/bson"
 
@@ -40,16 +41,21 @@ func (c *ConfigService) ConfigCreate(ctx context.Context, req *core_api.ConfigCr
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 	}
-	confType, ok := enum.ParseConfigType(req.Config.Type)
-	if !ok {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "配置类型"))
+
+	// 鉴权
+	usrMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !usrMeta.HasUnitAdminAuth(req.Config.UnitId) {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
 	// 构造并插入数据库
 	now := time.Now()
 	confDAO := &config.Config{
 		ID:     bson.NewObjectID(),
-		Type:   confType,
+		Type:   int(req.Config.Type),
 		UnitID: unitOID,
 		Chat: &config.Chat{
 			Name:        req.Config.Chat.Name,
@@ -70,7 +76,7 @@ func (c *ConfigService) ConfigCreate(ctx context.Context, req *core_api.ConfigCr
 			Provider:    req.Config.Report.Provider,
 			AppID:       req.Config.Report.AppId,
 		},
-		Status:     enum.Active,
+		Status:     enum.ConfigStatusActive,
 		CreateTime: now,
 		UpdateTime: now,
 	}
@@ -87,16 +93,21 @@ func (c *ConfigService) ConfigCreate(ctx context.Context, req *core_api.ConfigCr
 }
 
 func (c *ConfigService) ConfigUpdateInfo(ctx context.Context, req *core_api.ConfigCreateOrUpdateReq) (resp *basic.Response, err error) {
-	// TODO鉴权
-	if !req.Admin {
-		return nil, errorx.New(errno.ErrNotAdmin)
-	}
-
 	// 参数校验
 	unitOid, err := bson.ObjectIDFromHex(req.Config.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "单位ID"))
 	}
+
+	// 鉴权
+	usrMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !usrMeta.HasUnitAdminAuth(req.Config.UnitId) {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
+	}
+
 	// 存在性验证
 	oldConf, err := c.ConfigMapper.FindOneByUnitID(ctx, unitOid)
 	if err != nil || oldConf == nil {
@@ -131,6 +142,15 @@ func (c *ConfigService) ConfigGetByUnitID(ctx context.Context, req *core_api.Con
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "单位ID"))
 	}
 
+	// 鉴权
+	usrMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !usrMeta.HasUnitAdminAuth(req.UnitId) {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
+	}
+
 	// 获得配置对象
 	configDAO, err := c.ConfigMapper.FindOneByUnitID(ctx, unitOid)
 	if err != nil {
@@ -163,11 +183,6 @@ func validateCreateConfigReq(req *core_api.ConfigCreateOrUpdateReq) error { // D
 	// 基础字段
 	if req.Config.UnitId == "" {
 		return errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
-	}
-
-	// 验证配置类型
-	if _, ok := enum.ParseConfigType(req.Config.Type); !ok {
-		return errorx.New(errno.ErrInvalidParams, errorx.KV("field", "配置类型"))
 	}
 
 	// chat配置
@@ -229,18 +244,8 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 	now := time.Now().Unix()
 	conf := req.GetConfig()
 
-	// 基础字段 - 只更新非零值
-	if conf.GetType() != "" {
-		if configType, ok := enum.ParseConfigType(conf.GetType()); ok {
-			setUpdate["type"] = configType
-		}
-	}
-	if conf.GetStatus() != "" {
-		// 使用enum包验证和转换状态
-		if status, ok := enum.ParseStatus(conf.GetStatus()); ok {
-			setUpdate["status"] = status
-		}
-	}
+	setUpdate[cst.Type] = conf.Type
+	setUpdate[cst.Status] = conf.Status
 
 	// chat配置
 	if chat := conf.GetChat(); chat != nil {
@@ -303,12 +308,10 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 }
 
 // 将数据库Config对象字段转化为DTO对象
-func adminConfig(configDAO *config.Config) *core_api.Config {
-	t, _ := enum.GetConfigType(configDAO.Type)
-	st, _ := enum.GetStatus(configDAO.Status)
-	return &core_api.Config{
+func adminConfig(configDAO *config.Config) *core_api.ConfigVO {
+	return &core_api.ConfigVO{
 		UnitId: configDAO.UnitID.Hex(),
-		Type:   t,
+		Type:   int32(configDAO.Type),
 
 		Chat: &core_api.ChatApp{
 			Name:        configDAO.Chat.Name,
@@ -332,14 +335,14 @@ func adminConfig(configDAO *config.Config) *core_api.Config {
 			AppId:       configDAO.Report.AppID,
 		},
 
-		Status:     st,
+		Status:     int32(configDAO.Status),
 		CreateTime: configDAO.CreateTime.Unix(),
 		UpdateTime: configDAO.UpdateTime.Unix(),
 	}
 }
 
 // 隐藏Config的一些敏感字段
-func publicConfig(configDAO *config.Config) *core_api.Config {
+func publicConfig(configDAO *config.Config) *core_api.ConfigVO {
 	conf := adminConfig(configDAO)
 	conf.Chat.AppId = "" // AppID 模型平台标识符
 	conf.Tts.AppId = ""

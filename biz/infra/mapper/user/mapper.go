@@ -9,6 +9,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
+	"github.com/xh-polaris/psych-core-api/types/enum"
 	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/zeromicro/go-zero/core/stores/monc"
@@ -24,6 +25,7 @@ const (
 type IMongoMapper interface {
 	FindOneByCode(ctx context.Context, phone string) (*User, error)
 	FindOneByCodeAndUnitID(ctx context.Context, phone string, unitId bson.ObjectID) (*User, error)
+	FindOneByCodeAndRole(ctx context.Context, code string, role int) (*User, error)
 	FindOneById(ctx context.Context, id bson.ObjectID) (*User, error)
 	Insert(ctx context.Context, user *User) error
 	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
@@ -65,6 +67,11 @@ func (m *mongoMapper) FindOneByCodeAndUnitID(ctx context.Context, code string, u
 	return m.FindOneByFields(ctx, bson.M{cst.Code: code, cst.UnitID: unitId})
 }
 
+// FindOneByCodeAndRole 根据电话号码和角色查询用户
+func (m *mongoMapper) FindOneByCodeAndRole(ctx context.Context, code string, role int) (*User, error) {
+	return m.FindOneByFields(ctx, bson.M{cst.Code: code, cst.Role: role})
+}
+
 // ExistsByCode 根据电话号码或学号查询用户是否存在
 func (m *mongoMapper) ExistsByCode(ctx context.Context, code string) (bool, error) {
 	return m.ExistsByFields(ctx, bson.M{cst.Code: code})
@@ -77,14 +84,14 @@ func (m *mongoMapper) ExistsByCodeAndUnitID(ctx context.Context, code string, un
 
 // FindAllByUnitID 根据UnitID查询所有用户
 func (m *mongoMapper) FindAllByUnitID(ctx context.Context, unitId bson.ObjectID) ([]*User, error) {
-	return m.FindAllByFields(ctx, bson.M{cst.UnitID: unitId, cst.Status: bson.M{cst.NE: cst.DeletedStatus}})
+	return m.FindAllByFields(ctx, bson.M{cst.UnitID: unitId, cst.Status: bson.M{cst.NE: enum.UserStatusDeleted}})
 }
 
 // CountByUnitID 按单位统计用户数量（排除已删除）
 func (m *mongoMapper) CountByUnitID(ctx context.Context, unitId bson.ObjectID) (int32, error) {
 	filter := bson.M{
 		cst.UnitID: unitId,
-		cst.Status: bson.M{cst.NE: cst.DeletedStatus},
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
 	}
 	cnt, err := m.conn.CountDocuments(ctx, filter)
 	return int32(cnt), err
@@ -102,7 +109,7 @@ func (m *mongoMapper) CountByUnitIDAndPeriod(ctx context.Context, unitId bson.Ob
 
 	filter := bson.M{
 		cst.UnitID: unitId,
-		cst.Status: bson.M{cst.NE: cst.DeletedStatus},
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
 	}
 	if len(timeFilter) > 0 {
 		filter[cst.CreateTime] = timeFilter
@@ -148,7 +155,7 @@ type ClassStatResult struct {
 func (m *mongoMapper) CountByClasses(ctx context.Context, unitId bson.ObjectID, grade, class []int32) ([]*ClassStatResult, error) {
 	match := bson.M{
 		cst.UnitID: unitId,
-		cst.Status: bson.M{cst.NE: cst.DeletedStatus},
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
 	}
 	// 添加筛选条件
 	if len(grade) > 0 {
@@ -170,7 +177,7 @@ func (m *mongoMapper) CountByClasses(ctx context.Context, unitId bson.ObjectID, 
 				"alarmNum": bson.M{ // 风险人数
 					"$sum": bson.M{
 						"$cond": bson.M{
-							"if":   bson.M{cst.NE: []interface{}{"$riskLevel", RiskLevelStoI[cst.Normal]}},
+							"if":   bson.M{cst.NE: []interface{}{"$riskLevel", enum.UserRiskLevelNormal}},
 							"then": 1, // RiskLevel ≠ "normal"则认为是风险用户 计数+1
 							"else": 0,
 						},
@@ -200,8 +207,8 @@ func (m *mongoMapper) Count(ctx context.Context) (int32, error) {
 // CountAlarmUsers 统计高风险用户数量（riskLevel == high），可选按单位过滤
 func (m *mongoMapper) CountAlarmUsers(ctx context.Context, unitId *bson.ObjectID) (int32, error) {
 	filter := bson.M{
-		"riskLevel": RiskLevelStoI[cst.High],
-		cst.Status:  bson.M{cst.NE: cst.DeletedStatus},
+		cst.RiskLevel: enum.UserRiskLevelHigh,
+		cst.Status:    bson.M{cst.NE: enum.UserStatusDeleted},
 	}
 	if unitId != nil {
 		filter[cst.UnitID] = *unitId
@@ -222,8 +229,8 @@ func (m *mongoMapper) CountAlarmUsersByPeriod(ctx context.Context, unitId *bson.
 	}
 
 	filter := bson.M{
-		cst.RiskLevel: RiskLevelStoI[cst.High],
-		cst.Status:    bson.M{cst.NE: cst.DeletedStatus},
+		cst.RiskLevel: enum.UserRiskLevelHigh,
+		cst.Status:    bson.M{cst.NE: enum.UserStatusDeleted},
 	}
 	if unitId != nil {
 		filter[cst.UnitID] = *unitId
@@ -246,7 +253,7 @@ type RiskStat struct {
 // RiskDistributionStats 统计风险等级分布（按性别拆分），unitId 为空表示全平台
 func (m *mongoMapper) RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID) ([]*RiskStat, error) {
 	match := bson.M{
-		cst.Status: bson.M{cst.NE: cst.DeletedStatus},
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
 	}
 	if unitId != nil {
 		match[cst.UnitID] = *unitId
@@ -271,12 +278,12 @@ func (m *mongoMapper) RiskDistributionStats(ctx context.Context, unitId *bson.Ob
 	return results, nil
 }
 
-type ClassTeachers map[int32]map[int32]*User
+type ClassTeachers map[int]map[int]*User
 
 func (m *mongoMapper) FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID) (ClassTeachers, error) {
 	filter := bson.M{
 		cst.UnitID: unitId,
-		cst.Role:   RoleStoI[cst.ClassTeacher],
+		cst.Role:   enum.UserRoleClassTeacher,
 	}
 
 	clsTeacherUsers, err := m.FindAllByFields(ctx, filter)
@@ -285,7 +292,7 @@ func (m *mongoMapper) FindUnitClassTeachers(ctx context.Context, unitId bson.Obj
 		return nil, err
 	}
 
-	clsTeachers := make(map[int32]map[int32]*User)
+	clsTeachers := make(map[int]map[int]*User)
 	for _, u := range clsTeacherUsers {
 		clsTeachers[u.Grade][u.Class] = u
 	}

@@ -15,7 +15,7 @@ type Conversation struct {
 	EndTime    time.Time     `json:"endTime,omitempty" bson:"end_time,omitempty"`
 	CreateTime time.Time     `json:"createTime,omitempty" bson:"create_time,omitempty"`
 	UpdateTime time.Time     `json:"updateTime,omitempty" bson:"update_time,omitempty"`
-	Status     int           `json:"status,omitempty" bson:"status,omitempty"` // 0 正常，-1 删除
+	Status     int           `json:"status,omitempty" bson:"status,omitempty"` // 1-2: Active | Deleted
 }
 
 // DurationMinutes 返回对话时长（分钟）

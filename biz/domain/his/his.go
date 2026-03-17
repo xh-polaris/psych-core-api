@@ -22,12 +22,12 @@ const cachePrefix = "psych:msg:"
 // HistoryManager 历史记录管理, 所有的历史记录都按照从旧到新排序
 type HistoryManager struct {
 	cache      cache.Cmdable
-	msgMapper  message.MongoMapper
+	msgMapper  message.IMongoMapper
 	convMapper conversation.IMongoMapper
 }
 
 // New 创建一个新的历史记录管理器
-func New(cache cache.Cmdable, msgMapper message.MongoMapper, convMapper conversation.IMongoMapper) {
+func New(cache cache.Cmdable, msgMapper message.IMongoMapper, convMapper conversation.IMongoMapper) {
 	Mgr = &HistoryManager{
 		cache:      cache,
 		msgMapper:  msgMapper,

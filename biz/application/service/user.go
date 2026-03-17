@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
-	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"time"
+
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
+	"github.com/xh-polaris/psych-core-api/types/enum"
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
@@ -13,8 +15,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util/convert"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util/encrypt"
-	"github.com/xh-polaris/psych-core-api/biz/infra/util/enum"
-	"github.com/xh-polaris/psych-core-api/biz/infra/util/reg"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
@@ -26,7 +26,6 @@ import (
 var _ IUserService = (*UserService)(nil)
 
 type IUserService interface {
-	UserSignUp(ctx context.Context, req *core_api.UserSignUpReq) (*core_api.UserSignUpResp, error)
 	UserSignIn(ctx context.Context, req *core_api.UserSignInReq) (*core_api.UserSignInResp, error)
 	UserGetInfo(ctx context.Context, req *core_api.UserGetInfoReq) (*core_api.UserGetInfoResp, error)
 	UserUpdateInfo(ctx context.Context, req *core_api.UserUpdateInfoReq) (*basic.Response, error)
@@ -43,131 +42,15 @@ var UserServiceSet = wire.NewSet(
 	wire.Bind(new(IUserService), new(*UserService)),
 )
 
-// UserSignUp 用户不能直接注册 即使注册也需要绑定unitId
-func (u *UserService) UserSignUp(ctx context.Context, req *core_api.UserSignUpReq) (*core_api.UserSignUpResp, error) {
-	// 默认用户通过注册接口，使用手机号注册
-	// 参数校验
-	if req.User == nil {
-		return nil, errorx.New(errno.ErrMissingEntity, errorx.KV("entity", "用户"))
-	}
-	if req.User.Code == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "电话号码"))
-	}
-	if req.User.Password == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "密码"))
-	}
-	if req.User.Name == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "姓名"))
-	}
-
-	// 手机号格式校验
-	if !reg.CheckMobile(req.User.Code) {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "电话号码"))
-	}
-
-	// 检查手机号是否已注册
-	if exists, err := u.UserMapper.ExistsByCode(ctx, req.User.Code); err != nil {
-		logs.Errorf("check phone exists error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	} else if exists {
-		return nil, errorx.New(errno.ErrPhoneAlreadyExist)
-	}
-
-	// 不加密直接明文存密码
-	//hashedPwd, err := encrypt.BcryptEncrypt(req.User.Password)
-	//if err != nil {
-	//	logs.Errorf("bcrypt encrypt error: %s", errorx.ErrorWithoutStack(err))
-	//	return nil, err
-	//}
-
-	// 转换枚举值
-	gender, ok := enum.ParseGender(req.User.Gender)
-	if !ok {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "性别"))
-	}
-
-	// 转换unitID
-	var unitId bson.ObjectID
-	var err error
-	if req.User.UnitId != "" {
-		unitId, err = bson.ObjectIDFromHex(req.User.UnitId)
-		if err != nil {
-			logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
-			return nil, err
-		}
-	}
-
-	// 构造用户
-	userDAO := &user.User{
-		ID:         bson.NewObjectID(),
-		CodeType:   enum.CodeTypePhone,
-		Code:       req.User.Code,
-		Password:   req.User.Password,
-		Name:       req.User.Name,
-		Birth:      time.Unix(req.User.Birth, 0),
-		Gender:     gender,
-		Status:     enum.Active,
-		Class:      req.User.Class,
-		Grade:      req.User.Grade,
-		EnrollYear: req.User.EnrollYear,
-		UnitID:     unitId,
-		UpdateTime: time.Now(),
-		CreateTime: time.Now(),
-	}
-
-	// 插入用户
-	if err = u.UserMapper.Insert(ctx, userDAO); err != nil {
-		logs.Errorf("insert user error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-
-	// 获得枚举值
-	genderStr, ok := enum.GetGender(userDAO.Gender)
-	if !ok {
-		return nil, errorx.New(errno.ErrInternalError)
-	}
-	statusStr, ok := enum.GetStatus(userDAO.Status)
-	if !ok {
-		return nil, errorx.New(errno.ErrInternalError)
-	}
-	codeTypeStr, ok := enum.GetCodeType(userDAO.CodeType)
-	if !ok {
-		return nil, errorx.New(errno.ErrInternalError)
-	}
-
-	// 构造响应
-	return &core_api.UserSignUpResp{
-		User: &core_api.User{
-			Id:         userDAO.ID.Hex(),
-			CodeType:   codeTypeStr,
-			Code:       userDAO.Code,
-			Name:       userDAO.Name,
-			Gender:     genderStr,
-			Birth:      userDAO.Birth.Unix(),
-			Class:      userDAO.Class,
-			Grade:      userDAO.Grade,
-			EnrollYear: userDAO.EnrollYear,
-			Status:     statusStr,
-			CreateTime: userDAO.CreateTime.Unix(),
-			UpdateTime: userDAO.UpdateTime.Unix(),
-		},
-		Code: 0,
-		Msg:  "success",
-	}, nil
-}
-
 func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInReq) (*core_api.UserSignInResp, error) {
 	// 参数校验
 	if req.AuthId == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "账号"))
 	}
-	if req.UnitId == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
-	}
 	switch req.AuthType {
-	case cst.AuthTypeCode:
+	case enum.AuthTypeCode:
 		return nil, errorx.New(errno.ErrUnImplement) // TODO: 验证码登录
-	case cst.AuthTypePassword: //
+	case enum.AuthTypePassword: //
 		if req.VerifyCode == "" {
 			return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "密码"))
 		}
@@ -175,45 +58,59 @@ func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInRe
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "登录方式"))
 	}
 
-	unitId, err := bson.ObjectIDFromHex(req.UnitId)
-	if err != nil {
-		logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
+	// 超级管理员不需要单位ID
+	var err error
+	unitId := ""
+	var userDAO *user.User
+	switch req.UnitId {
+	case "":
+		userDAO, err = u.UserMapper.FindOneByCodeAndRole(ctx, req.AuthId, enum.UserRoleSuperAdmin)
+		if err != nil {
+			logs.Errorf("find user by code %s error: %s", req.AuthId, errorx.ErrorWithoutStack(err))
+			return nil, errorx.New(errno.ErrWrongAccountOrPassword)
+		}
+		if userDAO == nil {
+			return nil, errorx.New(errno.ErrWrongAccountOrPassword)
+		}
+	default:
+		uid, err := bson.ObjectIDFromHex(req.UnitId)
+		if err != nil {
+			logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
+			return nil, err
+		}
+		// 获得用户
+		userDAO, err = u.UserMapper.FindOneByCodeAndUnitID(ctx, req.AuthId, uid)
+		if err != nil {
+			logs.Errorf("find user by code %s and unit id %s error: %s", req.AuthId, uid, errorx.ErrorWithoutStack(err))
+			return nil, err
+		}
+		if userDAO == nil {
+			return nil, errorx.New(errno.ErrUserNotFound)
+		}
+		unitId = userDAO.UnitID.Hex()
 	}
-	logs.Infof("user sign in with unit id: %s", unitId)
 
-	// 获得用户
-	userDAO, err := u.UserMapper.FindOneByCodeAndUnitID(ctx, req.AuthId, unitId)
-	if err != nil {
-		logs.Errorf("find user by code %s and unit id %s error: %s", req.AuthId, unitId, errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-	if userDAO == nil {
+	// 密码验证
+	if isValid := encrypt.BcryptCheck(req.VerifyCode, userDAO.Password); !isValid {
 		return nil, errorx.New(errno.ErrWrongAccountOrPassword)
 	}
-
-	// 明文密码验证
-	if req.VerifyCode != userDAO.Password {
-		return nil, errorx.New(errno.ErrWrongAccountOrPassword)
-	}
-	codeType, _ := enum.GetCodeType(userDAO.CodeType)
 
 	// 签发jwt
 	token, err := util.GenerateJwt(map[string]any{
-		cst.JsonUnitID: req.UnitId,
+		cst.JsonUnitID: unitId,
 		cst.JsonUserID: userDAO.ID.Hex(),
-		cst.JsonCode:   userDAO.Code, // 手机号或学号 后续可能需要区分
-		cst.JsonAdmin:  userDAO.Role,
+		cst.JsonCode:   userDAO.Code, // 手机号或学号
+		cst.JsonRole:   userDAO.Role,
 	})
 	if err != nil {
 		logs.Errorf("generate token for UserSignIn error: %s", errorx.ErrorWithoutStack(err))
 	}
 
 	return &core_api.UserSignInResp{
-		UnitId:    userDAO.UnitID.Hex(),
+		UnitId:    userDAO.UnitID.Hex(), // 超级管理员单位ID为""
 		UserId:    userDAO.ID.Hex(),
 		CodeValue: userDAO.Code,
-		CodeType:  codeType,
+		CodeType:  int32(userDAO.CodeType),
 		Token:     token,
 		Code:      0,
 		Msg:       "success",
@@ -240,38 +137,25 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 		return nil, err
 	}
 
-	// 获得枚举值
-	genderStr, ok := enum.GetGender(userDAO.Gender)
-	if !ok {
-		return nil, errorx.New(errno.ErrInternalError)
-	}
-	statusStr, ok := enum.GetStatus(userDAO.Status)
-	if !ok {
-		return nil, errorx.New(errno.ErrInternalError)
-	}
-	codeTypeStr, ok := enum.GetCodeType(userDAO.CodeType)
-	if !ok {
-		return nil, errorx.New(errno.ErrInternalError)
-	}
-
 	optionsAny, err := convert.Any2Anypb(userDAO.Options)
 	if err != nil {
 		return nil, err
 	}
 
 	return &core_api.UserGetInfoResp{
-		User: &core_api.User{
+		User: &core_api.UserVO{
 			Id:         userDAO.ID.Hex(),
-			CodeType:   codeTypeStr,
+			CodeType:   int32(userDAO.CodeType),
 			Code:       userDAO.Code,
 			UnitId:     userDAO.UnitID.Hex(),
 			Name:       userDAO.Name,
-			Gender:     genderStr,
+			Gender:     int32(userDAO.Gender),
 			Birth:      userDAO.Birth.Unix(),
-			Status:     statusStr,
-			EnrollYear: userDAO.EnrollYear,
-			Class:      userDAO.Class,
-			Grade:      userDAO.Grade,
+			Status:     int32(userDAO.Status),
+			EnrollYear: int32(userDAO.EnrollYear),
+			Class:      int32(userDAO.Class),
+			Grade:      int32(userDAO.Grade),
+			Role:       int32(userDAO.Role),
 			Options:    optionsAny,
 			CreateTime: userDAO.CreateTime.Unix(),
 			UpdateTime: userDAO.UpdateTime.Unix(),
@@ -301,24 +185,20 @@ func (u *UserService) UserUpdateInfo(ctx context.Context, req *core_api.UserUpda
 	if req.User.Name != "" {
 		update[cst.Name] = req.User.Name
 	}
-	if req.User.Gender != "" {
-		gender, ok := enum.ParseGender(req.User.Gender)
-		if !ok {
-			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "性别"))
-		}
-		update[cst.Gender] = gender
+	if req.User.Gender != 0 {
+		update[cst.Gender] = int(req.User.Gender)
 	}
 	if req.User.Birth != 0 {
-		update[cst.Birth] = req.User.Birth
+		update[cst.Birth] = time.Unix(req.User.Birth, 0)
 	}
 	if req.User.EnrollYear != 0 {
-		update[cst.EnrollYear] = req.User.EnrollYear
+		update[cst.EnrollYear] = int(req.User.EnrollYear)
 	}
 	if req.User.Class != 0 {
-		update[cst.Class] = req.User.Class
+		update[cst.Class] = int(req.User.Class)
 	}
 	if req.User.Grade != 0 {
-		update[cst.Grade] = req.User.Grade
+		update[cst.Grade] = int(req.User.Grade)
 	}
 	if req.User.Options != nil {
 		optionsAnypb, err := convert.Anypb2Any(req.User.Options)
@@ -355,10 +235,10 @@ func (u *UserService) UserUpdatePassword(ctx context.Context, req *core_api.User
 	//if req.AuthType == "" {
 	//	return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "验证方式"))
 	//}
-	if req.VerifyCode == "" && req.AuthType == cst.AuthTypePassword {
+	if req.VerifyCode == "" && req.AuthType == enum.AuthTypePassword {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "旧密码"))
 	}
-	if req.VerifyCode == "" && req.AuthType == cst.AuthTypeCode {
+	if req.VerifyCode == "" && req.AuthType == enum.AuthTypeCode {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "验证码"))
 	}
 	if req.NewPassword == "" {
@@ -375,10 +255,10 @@ func (u *UserService) UserUpdatePassword(ctx context.Context, req *core_api.User
 	userDAO := &user.User{}
 	switch req.AuthType {
 	// 验证码
-	case cst.AuthTypeCode:
+	case enum.AuthTypeCode:
 		return nil, errorx.New(errno.ErrUnImplement) // TODO: 验证码登录
 	// 密码
-	case cst.AuthTypePassword:
+	case enum.AuthTypePassword:
 		// 获取密码
 		userDAO, err = u.UserMapper.FindOneById(ctx, userId)
 		if err != nil {

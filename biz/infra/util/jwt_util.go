@@ -46,7 +46,7 @@ func ExtraUserMeta(ctx context.Context) (m *usr.Meta, err error) {
 	var c *app.RequestContext
 	var claims jwt.MapClaims
 	if c, err = httpx.ExtractContext(ctx); err != nil {
-		return nil, err
+		return nil, errorx.New(errno.ErrUnAuth)
 	}
 	if claims, err = ParseJwt(string(c.GetHeader("Authorization"))); err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func ExtraUserMeta(ctx context.Context) (m *usr.Meta, err error) {
 	meta.UserId = claims[cst.JsonUserID].(string)
 	meta.UnitId = claims[cst.JsonUnitID].(string)
 	meta.Code = claims[cst.JsonCode].(string)
-	meta.Admin = int(claims[cst.JsonAdmin].(float64))
+	meta.Role = int(claims[cst.JsonRole].(float64))
 
 	return &meta, nil
 }
