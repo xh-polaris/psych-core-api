@@ -153,7 +153,7 @@ func (c *ConfigService) ConfigGetByUnitID(ctx context.Context, req *core_api.Con
 
 	util.DPrint("configDAO: %+v\n", configDAO.Chat)
 	return &core_api.ConfigGetByUnitIdResp{
-		Config: maskConfig(configDAO),
+		Config: dtoConfig(configDAO),
 		Code:   0,
 		Msg:    "success",
 	}, nil
@@ -303,7 +303,7 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 }
 
 // 将数据库Config对象字段转化为DTO对象
-func maskConfig(configDAO *config.Config) *core_api.ConfigVO {
+func dtoConfig(configDAO *config.Config) *core_api.ConfigVO {
 	return &core_api.ConfigVO{
 		UnitId:          configDAO.UnitID.Hex(),
 		Type:            int32(configDAO.Type),
@@ -337,9 +337,8 @@ func maskConfig(configDAO *config.Config) *core_api.ConfigVO {
 	}
 }
 
-// 隐藏Config的一些敏感字段
-func publicConfig(configDAO *config.Config) *core_api.ConfigVO {
-	conf := maskConfig(configDAO)
+// MaskConfig 隐藏Config的一些敏感字段
+func MaskConfig(conf *core_api.ConfigVO) *core_api.ConfigVO {
 	conf.Chat.AppId = "" // AppID 模型平台标识符
 	conf.Tts.AppId = ""
 	conf.Report.AppId = ""

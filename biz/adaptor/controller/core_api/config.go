@@ -5,6 +5,7 @@ package core_api
 import (
 	"context"
 	"github.com/xh-polaris/psych-core-api/biz/adaptor/middleware"
+	"github.com/xh-polaris/psych-core-api/biz/application/service"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
@@ -60,5 +61,9 @@ func ConfigGetByUnitID(ctx context.Context, c *app.RequestContext) {
 
 	p := provider.Get()
 	resp, err := p.ConfigService.ConfigGetByUnitID(ctx, &req)
+	if resp != nil {
+		resp.Config = service.MaskConfig(resp.Config)
+	}
+
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
