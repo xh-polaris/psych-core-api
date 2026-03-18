@@ -47,8 +47,8 @@ func (e *Engine) already(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Er
 	// 提取字段
 	alreadyAuth.Info = auth.Info
 	e.info = alreadyAuth.Info
-	e.info[cst.JsonUserID] = claims[cst.JsonUnitID].(string)
-	e.info[cst.JsonCode] = claims[cst.JsonUserID].(string)
+	e.info[cst.JsonUnitID] = claims[cst.JsonUnitID].(string)
+	e.info[cst.JsonUserID] = claims[cst.JsonUserID].(string)
 	e.info[cst.JsonCode] = claims[cst.JsonCode].(string)
 	return alreadyAuth, nil
 }

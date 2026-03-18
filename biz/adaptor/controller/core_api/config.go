@@ -4,6 +4,7 @@ package core_api
 
 import (
 	"context"
+	"github.com/xh-polaris/psych-core-api/biz/adaptor/middleware"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
@@ -23,6 +24,7 @@ func ConfigCreate(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.ConfigService.ConfigCreate(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
@@ -39,6 +41,7 @@ func ConfigUpdateInfo(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.ConfigService.ConfigUpdateInfo(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
@@ -55,6 +58,7 @@ func ConfigGetByUnitID(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.ConfigService.ConfigGetByUnitID(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)

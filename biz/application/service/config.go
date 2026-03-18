@@ -54,9 +54,11 @@ func (c *ConfigService) ConfigCreate(ctx context.Context, req *core_api.ConfigCr
 	// 构造并插入数据库
 	now := time.Now()
 	confDAO := &config.Config{
-		ID:     bson.NewObjectID(),
-		Type:   int(req.Config.Type),
-		UnitID: unitOID,
+		ID:            bson.NewObjectID(),
+		Type:          int(req.Config.Type),
+		UnitID:        unitOID,
+		ModelView:     req.Config.ModelView,
+		BackgroundImg: req.Config.BackgroundImage,
 		Chat: &config.Chat{
 			Name:        req.Config.Chat.Name,
 			Description: req.Config.Chat.Description,
@@ -157,26 +159,18 @@ func (c *ConfigService) ConfigGetByUnitID(ctx context.Context, req *core_api.Con
 		logs.Errorf("find config error: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}
-	// 根据权限返回不同DTO
-	switch req.GetAdmin() {
-	case true:
-		util.DPrint("configDAO: %+v\n", configDAO.Chat)
-		return &core_api.ConfigGetByUnitIdResp{
-			Config: adminConfig(configDAO),
-			Code:   0,
-			Msg:    "success",
-		}, nil
-	case false:
-		return &core_api.ConfigGetByUnitIdResp{
-			Config: publicConfig(configDAO), // 隐藏appID字段
-			Code:   0,
-			Msg:    "success",
-		}, nil
-	}
-	return nil, errorx.New(errno.ErrInternalError)
+
+	util.DPrint("configDAO: %+v\n", configDAO.Chat)
+	return &core_api.ConfigGetByUnitIdResp{
+		Config: adminConfig(configDAO),
+		Code:   0,
+		Msg:    "success",
+	}, nil
+
 }
 
-func validateCreateConfigReq(req *core_api.ConfigCreateOrUpdateReq) error { // Deprecated
+// Deprecated
+func validateCreateConfigReq(req *core_api.ConfigCreateOrUpdateReq) error {
 	if req.Config == nil {
 		return errorx.New(errno.ErrMissingParams, errorx.KV("field", "配置内容"))
 	}
@@ -244,8 +238,18 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 	now := time.Now().Unix()
 	conf := req.GetConfig()
 
-	setUpdate[cst.Type] = conf.Type
-	setUpdate[cst.Status] = conf.Status
+	if conf.Type == enum.ConfigTypeEnd2End || conf.Type == enum.ConfigTypeChain {
+		setUpdate[cst.Type] = conf.Type
+	}
+	if conf.Status == enum.ConfigStatusActive || conf.Status == enum.ConfigStatusDeleted {
+		setUpdate[cst.Status] = conf.Status
+	}
+	if conf.ModelView != "" {
+		setUpdate[cst.ModelView] = conf.ModelView
+	}
+	if conf.BackgroundImage != "" {
+		setUpdate[cst.BackgroundImage] = conf.BackgroundImage
+	}
 
 	// chat配置
 	if chat := conf.GetChat(); chat != nil {
@@ -261,7 +265,7 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 		if chat.GetAppId() != "" {
 			setUpdate["chat.appid"] = chat.GetAppId()
 		}
-		setUpdate["chat.updatetime"] = now
+		setUpdate["chat.update_time"] = now
 	}
 
 	// tts配置
@@ -281,7 +285,7 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 		if tts.GetSpeaker() != "" {
 			setUpdate["tts.speaker"] = tts.GetSpeaker()
 		}
-		setUpdate["tts.updatetime"] = now
+		setUpdate["tts.update_time"] = now
 	}
 
 	// report配置
@@ -298,11 +302,11 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 		if report.GetAppId() != "" {
 			setUpdate["report.appid"] = report.GetAppId()
 		}
-		setUpdate["report.updatetime"] = now
+		setUpdate["report.update_time"] = now
 	}
 
 	// 文档级更新时间
-	setUpdate["updatetime"] = now
+	setUpdate["update_time"] = now
 
 	return setUpdate
 }
@@ -310,9 +314,10 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 // 将数据库Config对象字段转化为DTO对象
 func adminConfig(configDAO *config.Config) *core_api.ConfigVO {
 	return &core_api.ConfigVO{
-		UnitId: configDAO.UnitID.Hex(),
-		Type:   int32(configDAO.Type),
-
+		UnitId:          configDAO.UnitID.Hex(),
+		Type:            int32(configDAO.Type),
+		ModelView:       configDAO.ModelView,
+		BackgroundImage: configDAO.BackgroundImg,
 		Chat: &core_api.ChatApp{
 			Name:        configDAO.Chat.Name,
 			Description: configDAO.Chat.Description,
