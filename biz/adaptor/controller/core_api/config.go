@@ -58,7 +58,6 @@ func ConfigGetByUnitID(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.ConfigService.ConfigGetByUnitID(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)

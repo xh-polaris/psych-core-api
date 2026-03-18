@@ -144,15 +144,6 @@ func (c *ConfigService) ConfigGetByUnitID(ctx context.Context, req *core_api.Con
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "单位ID"))
 	}
 
-	// 鉴权
-	usrMeta, err := util.ExtraUserMeta(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if !usrMeta.HasUnitAdminAuth(req.UnitId) {
-		return nil, errorx.New(errno.ErrInsufficientAuth)
-	}
-
 	// 获得配置对象
 	configDAO, err := c.ConfigMapper.FindOneByUnitID(ctx, unitOid)
 	if err != nil {
@@ -162,7 +153,7 @@ func (c *ConfigService) ConfigGetByUnitID(ctx context.Context, req *core_api.Con
 
 	util.DPrint("configDAO: %+v\n", configDAO.Chat)
 	return &core_api.ConfigGetByUnitIdResp{
-		Config: adminConfig(configDAO),
+		Config: maskConfig(configDAO),
 		Code:   0,
 		Msg:    "success",
 	}, nil
@@ -312,7 +303,7 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 }
 
 // 将数据库Config对象字段转化为DTO对象
-func adminConfig(configDAO *config.Config) *core_api.ConfigVO {
+func maskConfig(configDAO *config.Config) *core_api.ConfigVO {
 	return &core_api.ConfigVO{
 		UnitId:          configDAO.UnitID.Hex(),
 		Type:            int32(configDAO.Type),
@@ -348,7 +339,7 @@ func adminConfig(configDAO *config.Config) *core_api.ConfigVO {
 
 // 隐藏Config的一些敏感字段
 func publicConfig(configDAO *config.Config) *core_api.ConfigVO {
-	conf := adminConfig(configDAO)
+	conf := maskConfig(configDAO)
 	conf.Chat.AppId = "" // AppID 模型平台标识符
 	conf.Tts.AppId = ""
 	conf.Report.AppId = ""
