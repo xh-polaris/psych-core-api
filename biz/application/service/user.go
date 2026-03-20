@@ -76,15 +76,12 @@ func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInRe
 		uid, err := bson.ObjectIDFromHex(req.UnitId)
 		if err != nil {
 			logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
-			return nil, err
+			return nil, errorx.New(errno.ErrUserNotFound)
 		}
 		// 获得用户
 		userDAO, err = u.UserMapper.FindOneByCodeAndUnitID(ctx, req.AuthId, uid)
 		if err != nil {
 			logs.Errorf("find user by code %s and unit id %s error: %s", req.AuthId, uid, errorx.ErrorWithoutStack(err))
-			return nil, err
-		}
-		if userDAO == nil {
 			return nil, errorx.New(errno.ErrUserNotFound)
 		}
 		unitId = userDAO.UnitID.Hex()

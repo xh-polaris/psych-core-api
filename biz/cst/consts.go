@@ -60,6 +60,10 @@ const (
 	// 报表内容相关字段 应严格和psych-post字段统一
 	Keywords = "keywords"
 	Digest   = "digest"
+
+	// 单位配置相关
+	BackgroundImage = "background_image"
+	ModelView       = "model_view"
 )
 
 // 原profile 前端字段相关

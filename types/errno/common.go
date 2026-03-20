@@ -72,7 +72,7 @@ func init() {
 	)
 	code.Register(
 		ErrUserNotFound,
-		"用户未注册",
+		"查找用户失败，请检查是否已经注册",
 		code.WithAffectStability(false),
 	)
 	code.Register(
