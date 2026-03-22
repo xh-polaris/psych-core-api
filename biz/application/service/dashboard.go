@@ -434,43 +434,31 @@ func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_
 		})
 	}
 
-	// 对话时长分布（分钟分桶）：[0,5),[5,10),[10,30),[30,60),[60,+)
-	conversationDurations := make([]*core_api.ConversationDuration, 0, 5)
+	// 对话时长分布（分钟分桶）：1: 0-5 min 2: 6-10 min 3: 11-20 min 4: 21-30 min 5: 31-60 min 6: 61-120 min 7: 120+ min
+	conversationDurations := make([]*core_api.ConversationDuration, 0, 7)
 	buckets := []struct {
-		min int
-		max int // max<0 代表无上限
+		min float64
+		max float64
 	}{
-		{0, 5},
-		{5, 10},
-		{10, 30},
-		{30, 60},
-		{60, -1},
+		{0, 5},    // 1: 0-5 min
+		{6, 10},   // 2: 6-10 min
+		{11, 20},  // 3: 11-20 min
+		{21, 30},  // 4: 21-30 min
+		{31, 60},  // 5: 31-60 min
+		{61, 120}, // 6: 61-120 min
+		{121, -1}, // 7: 120+ min
 	}
 
-	for _, b := range buckets {
-		// 这里简单用 AverageDuration + CountByUnit 近似，不做复杂聚合：
-		// 实际更精确的做法是 conversation 表做 $bucket/$group，这里按需求“从简”实现。
-		var cnt int32
-		var err error
-		if unitOID != nil {
-			cnt, err = s.ConversationMapper.CountByUnit(ctx, unitOID)
-		} else {
-			cnt, err = s.ConversationMapper.CountByUnit(ctx, nil)
-		}
+	for i, b := range buckets {
+		cnt, err := s.ConversationMapper.CountByDurationBucket(ctx, unitOID, b.min, b.max)
 		if err != nil {
 			logs.Errorf("count conversations for duration bucket error: %s", errorx.ErrorWithoutStack(err))
 			return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 		}
 
-		// 这里只返回分钟值（桶中心），数量用 cnt 占位，前端可以先用总数/平均值来画一个简单分布。
-		minutes := b.min
-		if b.max > 0 {
-			minutes = (b.min + b.max) / 2
-		}
-
 		conversationDurations = append(conversationDurations, &core_api.ConversationDuration{
-			Minutes: int32(minutes),
-			Count:   cnt,
+			Key:   int32(i + 1),
+			Count: cnt,
 		})
 	}
 

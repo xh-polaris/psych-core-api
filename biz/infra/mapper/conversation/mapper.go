@@ -43,6 +43,8 @@ type IMongoMapper interface {
 	CountActiveUsers(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 	// 批量统计
 	BatchConvStats(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*ConvStats, error)
+	// 按时长分桶统计对话数量
+	CountByDurationBucket(ctx context.Context, unitId *bson.ObjectID, minMinutes, maxMinutes float64) (int32, error)
 }
 
 type mongoMapper struct {
@@ -383,4 +385,66 @@ func (m *mongoMapper) FindManyByUnitId(ctx context.Context, unitId *bson.ObjectI
 		return nil, err
 	}
 	return c, nil
+}
+
+// CountByDurationBucket 按时长分桶统计对话数量（支持四舍五入到整数分钟）
+// minMinutes, maxMinutes: 时长范围（分钟），maxMinutes < 0 表示无上限
+func (m *mongoMapper) CountByDurationBucket(ctx context.Context, unitId *bson.ObjectID, minMinutes, maxMinutes float64) (int32, error) {
+	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
+
+	// 构建时长过滤条件：durationMinutes = (endTime - startTime) / 60000
+	// 使用 $round 四舍五入到整数分钟
+	durationExpr := bson.M{
+		"$divide": []interface{}{
+			bson.M{"$subtract": []interface{}{"$endTime", "$startTime"}},
+			60000, // milliseconds to minutes
+		},
+	}
+
+	durationFilter := bson.M{}
+	if maxMinutes < 0 {
+		// 无上限：只检查下限
+		durationFilter["$gte"] = minMinutes
+	} else {
+		// 有上限：检查范围（四舍五入后的值）
+		durationFilter["$gte"] = minMinutes
+		durationFilter["$lte"] = maxMinutes
+	}
+
+	pipeline := []bson.M{{"$match": matchStage}}
+
+	if unitId != nil {
+		pipeline = append(pipeline,
+			bson.M{"$lookup": bson.M{
+				"from":         userCollection,
+				"localField":   cst.UserID,
+				"foreignField": cst.ID,
+				"as":           "userDoc",
+			}},
+			bson.M{"$match": bson.M{"userDoc.unit_id": *unitId}},
+		)
+	}
+
+	// 添加计算字段：四舍五入后的时长
+	pipeline = append(pipeline,
+		bson.M{"$addFields": bson.M{
+			"roundedDuration": bson.M{"$round": []interface{}{durationExpr, 0}},
+		}},
+		// 过滤时长范围
+		bson.M{"$match": durationFilter},
+		// 计数
+		bson.M{"$count": "count"},
+	)
+
+	var result []struct {
+		Count int32 `bson:"count"`
+	}
+	if err := m.conn.Aggregate(ctx, &result, pipeline); err != nil {
+		logs.Errorf("[conversation mapper] count by duration bucket err: %s", errorx.ErrorWithoutStack(err))
+		return 0, err
+	}
+	if len(result) == 0 {
+		return 0, nil
+	}
+	return result[0].Count, nil
 }

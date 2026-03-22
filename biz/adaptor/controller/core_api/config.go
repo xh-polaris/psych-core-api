@@ -4,6 +4,7 @@ package core_api
 
 import (
 	"context"
+
 	"github.com/xh-polaris/psych-core-api/biz/adaptor/middleware"
 	"github.com/xh-polaris/psych-core-api/biz/application/service"
 
