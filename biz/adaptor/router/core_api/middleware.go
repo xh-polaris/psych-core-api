@@ -195,3 +195,13 @@ func _listconversationsMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _configgetmodelandbgimageMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _configupdatemodelandbgimageMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

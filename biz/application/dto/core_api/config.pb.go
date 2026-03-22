@@ -522,6 +522,187 @@ func (x *ConfigGetByUnitIdResp) GetMsg() string {
 	return ""
 }
 
+type ConfigUpdateModelAndBgImageReq struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	UnitId          string `protobuf:"bytes,1,opt,name=unitId,proto3" form:"unitId" json:"unitId" query:"unitId"`
+	ModelView       string `protobuf:"bytes,2,opt,name=modelView,proto3" form:"modelView" json:"modelView" query:"modelView"`
+	BackgroundImage string `protobuf:"bytes,3,opt,name=backgroundImage,proto3" form:"backgroundImage" json:"backgroundImage" query:"backgroundImage"`
+}
+
+func (x *ConfigUpdateModelAndBgImageReq) Reset() {
+	*x = ConfigUpdateModelAndBgImageReq{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_config_proto_msgTypes[7]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ConfigUpdateModelAndBgImageReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfigUpdateModelAndBgImageReq) ProtoMessage() {}
+
+func (x *ConfigUpdateModelAndBgImageReq) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_config_proto_msgTypes[7]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfigUpdateModelAndBgImageReq.ProtoReflect.Descriptor instead.
+func (*ConfigUpdateModelAndBgImageReq) Descriptor() ([]byte, []int) {
+	return file_core_api_config_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ConfigUpdateModelAndBgImageReq) GetUnitId() string {
+	if x != nil {
+		return x.UnitId
+	}
+	return ""
+}
+
+func (x *ConfigUpdateModelAndBgImageReq) GetModelView() string {
+	if x != nil {
+		return x.ModelView
+	}
+	return ""
+}
+
+func (x *ConfigUpdateModelAndBgImageReq) GetBackgroundImage() string {
+	if x != nil {
+		return x.BackgroundImage
+	}
+	return ""
+}
+
+type ConfigGetModelAndBgImageReq struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	UnitId string `protobuf:"bytes,1,opt,name=unitId,proto3" form:"unitId" json:"unitId" query:"unitId"`
+}
+
+func (x *ConfigGetModelAndBgImageReq) Reset() {
+	*x = ConfigGetModelAndBgImageReq{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_config_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ConfigGetModelAndBgImageReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfigGetModelAndBgImageReq) ProtoMessage() {}
+
+func (x *ConfigGetModelAndBgImageReq) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_config_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfigGetModelAndBgImageReq.ProtoReflect.Descriptor instead.
+func (*ConfigGetModelAndBgImageReq) Descriptor() ([]byte, []int) {
+	return file_core_api_config_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ConfigGetModelAndBgImageReq) GetUnitId() string {
+	if x != nil {
+		return x.UnitId
+	}
+	return ""
+}
+
+type ConfigGetModelAndBgImageResp struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	ModelView       string `protobuf:"bytes,1,opt,name=modelView,proto3" form:"modelView" json:"modelView" query:"modelView"`
+	BackgroundImage string `protobuf:"bytes,2,opt,name=backgroundImage,proto3" form:"backgroundImage" json:"backgroundImage" query:"backgroundImage"`
+	Code            int32  `protobuf:"varint,255,opt,name=code,proto3" form:"code" json:"code" query:"code"`
+	Msg             string `protobuf:"bytes,256,opt,name=msg,proto3" form:"msg" json:"msg" query:"msg"`
+}
+
+func (x *ConfigGetModelAndBgImageResp) Reset() {
+	*x = ConfigGetModelAndBgImageResp{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_config_proto_msgTypes[9]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ConfigGetModelAndBgImageResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfigGetModelAndBgImageResp) ProtoMessage() {}
+
+func (x *ConfigGetModelAndBgImageResp) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_config_proto_msgTypes[9]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfigGetModelAndBgImageResp.ProtoReflect.Descriptor instead.
+func (*ConfigGetModelAndBgImageResp) Descriptor() ([]byte, []int) {
+	return file_core_api_config_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ConfigGetModelAndBgImageResp) GetModelView() string {
+	if x != nil {
+		return x.ModelView
+	}
+	return ""
+}
+
+func (x *ConfigGetModelAndBgImageResp) GetBackgroundImage() string {
+	if x != nil {
+		return x.BackgroundImage
+	}
+	return ""
+}
+
+func (x *ConfigGetModelAndBgImageResp) GetCode() int32 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *ConfigGetModelAndBgImageResp) GetMsg() string {
+	if x != nil {
+		return x.Msg
+	}
+	return ""
+}
+
 var File_core_api_config_proto protoreflect.FileDescriptor
 
 var file_core_api_config_proto_rawDesc = []byte{
@@ -591,12 +772,33 @@ var file_core_api_config_proto_rawDesc = []byte{
 	0x65, 0x5f, 0x61, 0x70, 0x69, 0x2e, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x56, 0x4f, 0x52, 0x06,
 	0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x12, 0x13, 0x0a, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x18, 0xff,
 	0x01, 0x20, 0x01, 0x28, 0x05, 0x52, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x12, 0x11, 0x0a, 0x03, 0x6d,
-	0x73, 0x67, 0x18, 0x80, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6d, 0x73, 0x67, 0x42, 0x43,
-	0x5a, 0x41, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x78, 0x68, 0x2d,
-	0x70, 0x6f, 0x6c, 0x61, 0x72, 0x69, 0x73, 0x2f, 0x70, 0x73, 0x79, 0x63, 0x68, 0x2d, 0x63, 0x6f,
-	0x72, 0x65, 0x2d, 0x61, 0x70, 0x69, 0x2f, 0x62, 0x69, 0x7a, 0x2f, 0x61, 0x70, 0x70, 0x6c, 0x69,
-	0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x64, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x72, 0x65, 0x5f,
-	0x61, 0x70, 0x69, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x73, 0x67, 0x18, 0x80, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6d, 0x73, 0x67, 0x22, 0x80,
+	0x01, 0x0a, 0x1e, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x4d,
+	0x6f, 0x64, 0x65, 0x6c, 0x41, 0x6e, 0x64, 0x42, 0x67, 0x49, 0x6d, 0x61, 0x67, 0x65, 0x52, 0x65,
+	0x71, 0x12, 0x16, 0x0a, 0x06, 0x75, 0x6e, 0x69, 0x74, 0x49, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x06, 0x75, 0x6e, 0x69, 0x74, 0x49, 0x64, 0x12, 0x1c, 0x0a, 0x09, 0x6d, 0x6f, 0x64,
+	0x65, 0x6c, 0x56, 0x69, 0x65, 0x77, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x6d, 0x6f,
+	0x64, 0x65, 0x6c, 0x56, 0x69, 0x65, 0x77, 0x12, 0x28, 0x0a, 0x0f, 0x62, 0x61, 0x63, 0x6b, 0x67,
+	0x72, 0x6f, 0x75, 0x6e, 0x64, 0x49, 0x6d, 0x61, 0x67, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x0f, 0x62, 0x61, 0x63, 0x6b, 0x67, 0x72, 0x6f, 0x75, 0x6e, 0x64, 0x49, 0x6d, 0x61, 0x67,
+	0x65, 0x22, 0x35, 0x0a, 0x1b, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x47, 0x65, 0x74, 0x4d, 0x6f,
+	0x64, 0x65, 0x6c, 0x41, 0x6e, 0x64, 0x42, 0x67, 0x49, 0x6d, 0x61, 0x67, 0x65, 0x52, 0x65, 0x71,
+	0x12, 0x16, 0x0a, 0x06, 0x75, 0x6e, 0x69, 0x74, 0x49, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x06, 0x75, 0x6e, 0x69, 0x74, 0x49, 0x64, 0x22, 0x8e, 0x01, 0x0a, 0x1c, 0x43, 0x6f, 0x6e,
+	0x66, 0x69, 0x67, 0x47, 0x65, 0x74, 0x4d, 0x6f, 0x64, 0x65, 0x6c, 0x41, 0x6e, 0x64, 0x42, 0x67,
+	0x49, 0x6d, 0x61, 0x67, 0x65, 0x52, 0x65, 0x73, 0x70, 0x12, 0x1c, 0x0a, 0x09, 0x6d, 0x6f, 0x64,
+	0x65, 0x6c, 0x56, 0x69, 0x65, 0x77, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x09, 0x6d, 0x6f,
+	0x64, 0x65, 0x6c, 0x56, 0x69, 0x65, 0x77, 0x12, 0x28, 0x0a, 0x0f, 0x62, 0x61, 0x63, 0x6b, 0x67,
+	0x72, 0x6f, 0x75, 0x6e, 0x64, 0x49, 0x6d, 0x61, 0x67, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x0f, 0x62, 0x61, 0x63, 0x6b, 0x67, 0x72, 0x6f, 0x75, 0x6e, 0x64, 0x49, 0x6d, 0x61, 0x67,
+	0x65, 0x12, 0x13, 0x0a, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x18, 0xff, 0x01, 0x20, 0x01, 0x28, 0x05,
+	0x52, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x12, 0x11, 0x0a, 0x03, 0x6d, 0x73, 0x67, 0x18, 0x80, 0x02,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6d, 0x73, 0x67, 0x42, 0x43, 0x5a, 0x41, 0x67, 0x69, 0x74,
+	0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x78, 0x68, 0x2d, 0x70, 0x6f, 0x6c, 0x61, 0x72,
+	0x69, 0x73, 0x2f, 0x70, 0x73, 0x79, 0x63, 0x68, 0x2d, 0x63, 0x6f, 0x72, 0x65, 0x2d, 0x61, 0x70,
+	0x69, 0x2f, 0x62, 0x69, 0x7a, 0x2f, 0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f,
+	0x6e, 0x2f, 0x64, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x62, 0x06,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -611,15 +813,18 @@ func file_core_api_config_proto_rawDescGZIP() []byte {
 	return file_core_api_config_proto_rawDescData
 }
 
-var file_core_api_config_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_core_api_config_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_core_api_config_proto_goTypes = []interface{}{
-	(*ChatApp)(nil),                 // 0: core_api.ChatApp
-	(*TTSApp)(nil),                  // 1: core_api.TTSApp
-	(*ReportApp)(nil),               // 2: core_api.ReportApp
-	(*ConfigVO)(nil),                // 3: core_api.ConfigVO
-	(*ConfigCreateOrUpdateReq)(nil), // 4: core_api.ConfigCreateOrUpdateReq
-	(*ConfigGetByUnitIdReq)(nil),    // 5: core_api.ConfigGetByUnitIdReq
-	(*ConfigGetByUnitIdResp)(nil),   // 6: core_api.ConfigGetByUnitIdResp
+	(*ChatApp)(nil),                        // 0: core_api.ChatApp
+	(*TTSApp)(nil),                         // 1: core_api.TTSApp
+	(*ReportApp)(nil),                      // 2: core_api.ReportApp
+	(*ConfigVO)(nil),                       // 3: core_api.ConfigVO
+	(*ConfigCreateOrUpdateReq)(nil),        // 4: core_api.ConfigCreateOrUpdateReq
+	(*ConfigGetByUnitIdReq)(nil),           // 5: core_api.ConfigGetByUnitIdReq
+	(*ConfigGetByUnitIdResp)(nil),          // 6: core_api.ConfigGetByUnitIdResp
+	(*ConfigUpdateModelAndBgImageReq)(nil), // 7: core_api.ConfigUpdateModelAndBgImageReq
+	(*ConfigGetModelAndBgImageReq)(nil),    // 8: core_api.ConfigGetModelAndBgImageReq
+	(*ConfigGetModelAndBgImageResp)(nil),   // 9: core_api.ConfigGetModelAndBgImageResp
 }
 var file_core_api_config_proto_depIdxs = []int32{
 	0, // 0: core_api.ConfigVO.chat:type_name -> core_api.ChatApp
@@ -723,6 +928,42 @@ func file_core_api_config_proto_init() {
 				return nil
 			}
 		}
+		file_core_api_config_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ConfigUpdateModelAndBgImageReq); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_core_api_config_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ConfigGetModelAndBgImageReq); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_core_api_config_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ConfigGetModelAndBgImageResp); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -730,7 +971,7 @@ func file_core_api_config_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_core_api_config_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
