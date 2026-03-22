@@ -520,6 +520,7 @@ func (s *DashboardService) DashboardListUnits(ctx context.Context, req *core_api
 		updateTs := u.UpdateTime.Unix()
 
 		respUnits = append(respUnits, &core_api.DashboardUnit{
+			Id:                         u.ID.Hex(),
 			Name:                       u.Name,
 			UserCount:                  userCount,
 			RiskUserCount:              riskCount,
@@ -885,6 +886,7 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 	for i, dbUser := range targetUsers {
 		riskUsers[i] = &core_api.RiskUser{
 			User: &core_api.UserVO{
+				Id:    dbUser.ID.Hex(),
 				Code:  dbUser.Code,
 				Name:  dbUser.Name,
 				Grade: int32(dbUser.Grade),
