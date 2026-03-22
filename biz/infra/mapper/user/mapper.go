@@ -32,6 +32,7 @@ type IMongoMapper interface {
 	ExistsByCode(ctx context.Context, phone string) (bool, error)
 	ExistsByCodeAndUnitID(ctx context.Context, code string, unitId bson.ObjectID) (bool, error)
 	FindAllByUnitID(ctx context.Context, unitId bson.ObjectID) ([]*User, error)
+	FindManyByUnitIDWithFilter(ctx context.Context, unitId bson.ObjectID, grade, class *int32) ([]*User, error)
 	BatchFindByIDs(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*User, error)
 	CountByClasses(ctx context.Context, unitId bson.ObjectID, grade, class []int32) ([]*ClassStatResult, error)
 	Count(ctx context.Context) (int32, error)
@@ -85,6 +86,27 @@ func (m *mongoMapper) ExistsByCodeAndUnitID(ctx context.Context, code string, un
 // FindAllByUnitID 根据UnitID查询所有用户
 func (m *mongoMapper) FindAllByUnitID(ctx context.Context, unitId bson.ObjectID) ([]*User, error) {
 	return m.FindAllByFields(ctx, bson.M{cst.UnitID: unitId, cst.Status: bson.M{cst.NE: enum.UserStatusDeleted}})
+}
+
+// FindManyByUnitIDWithFilter 根据 UnitID 及班级条件查询用户
+func (m *mongoMapper) FindManyByUnitIDWithFilter(ctx context.Context, unitId bson.ObjectID, grade, class *int32) ([]*User, error) {
+	filter := bson.M{
+		cst.UnitID: unitId,
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+	}
+	if grade != nil {
+		filter[cst.Grade] = *grade
+	}
+	if class != nil {
+		filter[cst.Class] = *class
+	}
+
+	var users []*User
+	if err := m.conn.Find(ctx, &users, filter); err != nil {
+		logs.Errorf("[user mapper] find by unitID with filter err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+	return users, nil
 }
 
 // CountByUnitID 按单位统计用户数量（排除已删除）

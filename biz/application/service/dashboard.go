@@ -789,7 +789,14 @@ func (s *DashboardService) DashboardListUsers(ctx context.Context, req *core_api
 		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 	// 查找所有用户并按风险高→低排序
-	dbUsers, err := s.UserMapper.FindAllByUnitID(ctx, unitOID)
+	var dbUsers []*user.User
+	if req.Grade != nil || req.Class != nil {
+		// 有班级筛选条件
+		dbUsers, err = s.UserMapper.FindManyByUnitIDWithFilter(ctx, unitOID, req.Grade, req.Class)
+	} else {
+		// 无班级筛选条件
+		dbUsers, err = s.UserMapper.FindAllByUnitID(ctx, unitOID)
+	}
 	if err != nil {
 		return nil, errorx.New(errno.ErrNotFound)
 	}
