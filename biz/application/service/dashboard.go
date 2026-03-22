@@ -750,12 +750,21 @@ func aggregateAndSort(mapperRes []*user.ClassStatResult, clsTeachers user.ClassT
 		// 年级已存在
 		uNum := item.UserNum
 		aNum := item.AlarmNum
+
+		// 检查班主任是否存在，避免空指针 panic
+		var teacherName, teacherPhone string
+		if clsTeachers[int(item.Info.Grade)] != nil &&
+			clsTeachers[int(item.Info.Grade)][int(item.Info.Class)] != nil {
+			teacherName = clsTeachers[int(item.Info.Grade)][int(item.Info.Class)].Name
+			teacherPhone = clsTeachers[int(item.Info.Grade)][int(item.Info.Class)].Code
+		}
+
 		gradeInfo.Classes = append(gradeInfo.Classes, &core_api.ClassInfo{
 			Class:        item.Info.Class,
 			UserNum:      uNum,
 			AlarmNum:     aNum,
-			TeacherName:  clsTeachers[int(item.Info.Grade)][int(item.Info.Class)].Name,
-			TeacherPhone: clsTeachers[int(item.Info.Grade)][int(item.Info.Class)].Code,
+			TeacherName:  teacherName,
+			TeacherPhone: teacherPhone,
 		})
 	}
 
