@@ -32,9 +32,10 @@ var (
 )
 
 var (
-	RModelText  RType = 1 // 模型文本响应
-	RModelAudio RType = 2 // 模型音频响应
-	RUserText   RType = 3 // 用户文本响应
+	RModelText    RType = 1 // 模型文本响应
+	RModelAudio   RType = 2 // 模型音频响应
+	RUserText     RType = 3 // 用户文本响应(ASR结果)
+	RUserTextStop RType = 4 // 用户文本响应(ASR结束)
 )
 
 var (

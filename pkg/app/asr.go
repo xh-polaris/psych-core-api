@@ -32,25 +32,28 @@ type (
 		// 标识结束的音频流是一个全为1的字节
 		Send(ctx context.Context, bytes []byte) error
 		// Receive 接受文字响应 TODO: 暂时只有使用文字的需求, 后续若用到其余部分再迭代
-		Receive(ctx context.Context) (string, bool, error)
+		Receive(ctx context.Context) (text string, last bool, definite bool, err error)
 		// Close  关闭连接, 释放资源
 		Close() error
 	}
 	ASRSetting struct {
-		Provider   string `json:"provider"`
-		Url        string `json:"url"`
-		AppID      string `json:"app_id"`
-		AccessKey  string `json:"access_key"`
-		ResourceId string `json:"resource_id"`
-		Format     string `json:"format"`      // 音频容器 (volc)pcm(pcm_s16le) / wav(pcm_s16le) / ogg
-		Codec      string `json:"codec"`       // 编码方式 (volc)raw / opus，默认为 raw(pcm)
-		Rate       int    `json:"rate"`        // 采样频率 (volc)默认为 16000，目前只支持16000
-		Bits       int    `json:"bits"`        // 比特率  (volc)默认为 16。
-		Channels   int    `json:"channels"`    // 声道个数 (volc)默认为 1
-		ModelName  string `json:"model_name"`  // 模型名称 (volc)目前只有bigmodel
-		EnablePunc bool   `json:"enable_punc"` // 启用标点
-		EnableDdc  bool   `json:"enable_ddc"`  // 启用语义顺滑
-		ResultType string `json:"result_type"` // 返回方式,full为全量, single为增量
+		Provider           string `json:"provider"`
+		Url                string `json:"url"`
+		AppID              string `json:"app_id"`
+		AccessKey          string `json:"access_key"`
+		ResourceId         string `json:"resource_id"`
+		Format             string `json:"format"`                // 音频容器 (volc)pcm(pcm_s16le) / wav(pcm_s16le) / ogg
+		Codec              string `json:"codec"`                 // 编码方式 (volc)raw / opus，默认为 raw(pcm)
+		Rate               int    `json:"rate"`                  // 采样频率 (volc)默认为 16000，目前只支持16000
+		Bits               int    `json:"bits"`                  // 比特率  (volc)默认为 16。
+		Channels           int    `json:"channels"`              // 声道个数 (volc)默认为 1
+		ModelName          string `json:"model_name"`            // 模型名称 (volc)目前只有bigmodel
+		EnablePunc         bool   `json:"enable_punc"`           // 启用标点
+		EnableDdc          bool   `json:"enable_ddc"`            // 启用语义顺滑
+		ResultType         string `json:"result_type"`           // 返回方式,full为全量, single为增量
+		ShowUtterances     bool   `json:"show_utterances"`       // 是否返回所有utterances
+		VADSegmentDuration int    `json:"vad_segment_duration" ` // VAD段长 (volc)默认为 3000ms
+		EndWindowSize      int    `json:"end_window_size"`       // 强制判停时间 (volc)默认为 800ms
 	}
 )
 

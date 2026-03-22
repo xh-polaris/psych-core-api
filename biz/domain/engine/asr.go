@@ -40,11 +40,12 @@ func (e *Engine) execASR(ctx context.Context, cmd *core.Cmd) (err error) {
 // execASRRecv 用于接收语音转文字识别结果(接收端) [task]
 func (e *Engine) execASRRecv(ctx context.Context) {
 	for {
+		var typ = core.RUserText
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			text, last, err := e.asr.Receive(ctx)
+			text, last, definite, err := e.asr.Receive(ctx)
 			// 这里由于ASR的问题, 可能出现正常响应也1006, 所以这里跳过
 			if err != nil && !wsx.IsNormal(err) && !websocket.IsCloseError(err, websocket.CloseAbnormalClosure) { // 出现问题, 需要结束整个链路
 				e.unexpected(err, "asr receive err")
@@ -52,10 +53,13 @@ func (e *Engine) execASRRecv(ctx context.Context) {
 			} else if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
 				return
 			}
-			if err = e.MWrite(core.MResp, &core.Resp{ID: 0, Type: core.RUserText, Content: text}); err != nil { // 写回响应
+			if definite {
+				typ = core.RUserTextStop
+			}
+			if err = e.MWrite(core.MResp, &core.Resp{ID: 0, Type: typ, Content: text}); err != nil { // 写回响应
 				e.unexpected(err, "asr receive write err")
 			}
-			if last { // 正常结束
+			if last || definite { // 正常结束
 				return
 			}
 		}

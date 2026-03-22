@@ -122,14 +122,16 @@ type CorpusMeta struct {
 
 // RequestMeta 请求元数据
 type RequestMeta struct {
-	ModelName       string     `json:"model_name,omitempty"`
-	EnableITN       bool       `json:"enable_itn,omitempty"`
-	EnablePUNC      bool       `json:"enable_punc,omitempty"`
-	EnableDDC       bool       `json:"enable_ddc,omitempty"`
-	ShowUtterances  bool       `json:"show_utterances"`
-	EnableNonstream bool       `json:"enable_nonstream"`
-	ResultType      string     `json:"result_type,omitempty"`
-	Corpus          CorpusMeta `json:"corpus,omitempty"`
+	ModelName          string     `json:"model_name,omitempty"`
+	EnableITN          bool       `json:"enable_itn,omitempty"`
+	EnablePUNC         bool       `json:"enable_punc,omitempty"`
+	EnableDDC          bool       `json:"enable_ddc,omitempty"`
+	ShowUtterances     bool       `json:"show_utterances"`
+	EnableNonstream    bool       `json:"enable_nonstream"`
+	ResultType         string     `json:"result_type,omitempty"`
+	Corpus             CorpusMeta `json:"corpus,omitempty"`
+	EndWindowSize      int        `json:"end_window_size,omitempty"`
+	VADSegmentDuration int        `json:"vad_segment_duration,omitempty"`
 }
 
 // RequestPayload 请求负载
@@ -140,7 +142,7 @@ type RequestPayload struct {
 }
 
 // NewFullClientRequest 客户端请求
-func NewFullClientRequest(uid, format, codec string, rate, bits, channel int, name string, itn, punc, ddc bool, resultType string, utterances, stream bool) *RequestPayload {
+func NewFullClientRequest(uid, format, codec string, rate, bits, channel int, name string, itn, punc, ddc bool, resultType string, utterances, stream bool, vadSegmentDuration, endWindowSize int) *RequestPayload {
 	return &RequestPayload{
 		User: UserMeta{
 			Uid: uid,
@@ -153,13 +155,15 @@ func NewFullClientRequest(uid, format, codec string, rate, bits, channel int, na
 			Channel: channel,
 		},
 		Request: RequestMeta{
-			ModelName:       name,
-			EnableITN:       itn,
-			EnablePUNC:      punc,
-			EnableDDC:       ddc,
-			ShowUtterances:  utterances,
-			EnableNonstream: stream,
-			ResultType:      resultType,
+			ModelName:          name,
+			EnableITN:          itn,
+			EnablePUNC:         punc,
+			EnableDDC:          ddc,
+			ShowUtterances:     utterances,
+			EnableNonstream:    stream,
+			ResultType:         resultType,
+			EndWindowSize:      endWindowSize,
+			VADSegmentDuration: vadSegmentDuration,
 		},
 	}
 }

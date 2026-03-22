@@ -13,7 +13,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/core"
 )
 
-var audioPath = "D:\\Projects\\xhpolaris\\psych\\psych-core-api\\test\\output.pcm"
+var audioPath = "D:\\Projects\\xhpolaris\\psych\\psych-core-api\\test\\slice.pcm"
 var first, last = []byte{app.FirstASR}, []byte{app.LastASR}
 
 func SendCommandMessage(conn *websocket.Conn, meta *core.Meta, reader *bufio.Reader) {

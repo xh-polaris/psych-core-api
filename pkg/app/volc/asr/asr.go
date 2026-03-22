@@ -67,7 +67,8 @@ func (asr *VcASRApp) start() (err error) {
 	setting := asr.setting
 	// 协商配置参数
 	req := NewFullClientRequest(asr.uSession, setting.Format, setting.Codec, setting.Rate, setting.Bits,
-		setting.Channels, setting.ModelName, true, setting.EnablePunc, setting.EnableDdc, setting.ResultType, false, false)
+		setting.Channels, setting.ModelName, true, setting.EnablePunc, setting.EnableDdc, setting.ResultType, setting.ShowUtterances, false,
+		setting.VADSegmentDuration, setting.EndWindowSize)
 	if payload, err = json.Marshal(req); err != nil {
 		return err
 	}
@@ -115,27 +116,30 @@ func (asr *VcASRApp) Send(ctx context.Context, data []byte) (err error) {
 }
 
 // Receive 接受响应
-func (asr *VcASRApp) Receive(_ context.Context) (text string, last bool, err error) {
+func (asr *VcASRApp) Receive(_ context.Context) (text string, last bool, definite bool, err error) {
 	var msg []byte
 	var mt int
 	if mt, msg, err = asr.wsx.Read(); err == nil {
 		switch mt {
 		case websocket.BinaryMessage:
 			resp := ParseResponse(msg)
-			return resp.PayloadMsg.Result.Text, resp.IsLastPackage, nil
+			if len(resp.PayloadMsg.Result.Utterances) > 0 {
+				definite = resp.PayloadMsg.Result.Utterances[0].Definite
+			}
+			return resp.PayloadMsg.Result.Text, resp.IsLastPackage, definite, nil
 		case websocket.TextMessage:
 			return asr.receiveText(msg)
 		default:
-			return "", false, err
+			return "", false, false, err
 		}
 	}
-	return "", false, err
+	return "", false, false, err
 }
 
 // receiveText 接受到文本消息, 暂无实际用途
-func (asr *VcASRApp) receiveText(res []byte) (string, bool, error) {
+func (asr *VcASRApp) receiveText(res []byte) (text string, last bool, definite bool, err error) {
 	logs.Info("[volc asr] receiveText: ", string(res))
-	return "", false, nil
+	return string(res), false, false, nil
 }
 
 // Close 释放资源

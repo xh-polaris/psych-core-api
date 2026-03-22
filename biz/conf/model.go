@@ -36,20 +36,23 @@ type TTSConfig struct {
 }
 
 type ASRConfig struct {
-	Provider   string
-	URL        string
-	AppID      string
-	AccessKey  string
-	ResourceId string
-	Format     string // 音频容器 (volc)pcm(pcm_s16le) / wav(pcm_s16le) / ogg
-	Codec      string // 编码方式 (volc)raw / opus，默认为 raw(pcm)
-	Rate       int    // 采样频率 (volc)默认为 16000，目前只支持16000
-	Bits       int    // 比特率  (volc)默认为 16。
-	Channels   int    // 声道个数 (volc)默认为 1
-	ModelName  string // 模型名称 (volc)目前只有bigmodel
-	EnablePunc bool   // 启用标点
-	EnableDdc  bool   // 启用语义顺滑
-	ResultType string // 返回方式,full为全量, single为增量
+	Provider           string
+	URL                string
+	AppID              string
+	AccessKey          string
+	ResourceId         string
+	Format             string // 音频容器 (volc)pcm(pcm_s16le) / wav(pcm_s16le) / ogg
+	Codec              string // 编码方式 (volc)raw / opus，默认为 raw(pcm)
+	Rate               int    // 采样频率 (volc)默认为 16000，目前只支持16000
+	Bits               int    // 比特率  (volc)默认为 16。
+	Channels           int    // 声道个数 (volc)默认为 1
+	ModelName          string // 模型名称 (volc)目前只有bigmodel
+	EnablePunc         bool   // 启用标点
+	EnableDdc          bool   // 启用语义顺滑
+	ResultType         string // 返回方式,full为全量, single为增量
+	ShowUtterances     bool   // 是否显示分句信息
+	VADSegmentDuration int    // VAD段长 (volc)默认为 3000ms
+	EndWindowSize      int    // 强制判停时间 (volc)默认为 800ms
 }
 
 type ModelConfig struct {
@@ -91,7 +94,7 @@ func (c *Config) ASRConf() (*app.ASRSetting, error) {
 	return &app.ASRSetting{Provider: asr.Provider, Url: asr.URL, AppID: asr.AppID, AccessKey: asr.AccessKey,
 		ResourceId: asr.ResourceId, Format: asr.Format, Codec: asr.Codec, Rate: asr.Rate, Bits: asr.Bits,
 		Channels: asr.Channels, ModelName: asr.ModelName, EnablePunc: asr.EnablePunc, EnableDdc: asr.EnableDdc,
-		ResultType: asr.ResultType}, nil
+		ResultType: asr.ResultType, ShowUtterances: asr.ShowUtterances, VADSegmentDuration: asr.VADSegmentDuration, EndWindowSize: asr.EndWindowSize}, nil
 }
 
 // ReportConf 获取报表配置
