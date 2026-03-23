@@ -45,6 +45,8 @@ type IMongoMapper interface {
 	BatchConvStats(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*ConvStats, error)
 	// 按时长分桶统计对话数量
 	CountByDurationBucket(ctx context.Context, unitId *bson.ObjectID, minMinutes, maxMinutes float64) (int32, error)
+	// 按年级统计对话时长分布
+	ConvDurationByGrade(ctx context.Context, unitId *bson.ObjectID) (map[int32]int32, int32, error)
 }
 
 type mongoMapper struct {
@@ -447,4 +449,64 @@ func (m *mongoMapper) CountByDurationBucket(ctx context.Context, unitId *bson.Ob
 		return 0, nil
 	}
 	return result[0].Count, nil
+}
+
+// ConvDurationByGrade 按年级统计对话时长分布（年级 1-12）
+// 返回 map[grade]durationSeconds 和总时长
+func (m *mongoMapper) ConvDurationByGrade(ctx context.Context, unitId *bson.ObjectID) (map[int32]int32, int32, error) {
+	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
+
+	pipeline := []bson.M{{"$match": matchStage}}
+
+	if unitId != nil {
+		pipeline = append(pipeline,
+			bson.M{"$lookup": bson.M{
+				"from":         userCollection,
+				"localField":   cst.UserID,
+				"foreignField": cst.ID,
+				"as":           "userDoc",
+			}},
+			bson.M{"$match": bson.M{"userDoc.unit_id": *unitId}},
+		)
+	}
+
+	// 关联 user 表获取年级，按年级分组统计时长（秒）
+	pipeline = append(pipeline,
+		bson.M{"$lookup": bson.M{
+			"from":         userCollection,
+			"localField":   cst.UserID,
+			"foreignField": cst.ID,
+			"as":           "userInfo",
+		}},
+		bson.M{"$unwind": bson.M{
+			"path": "$userInfo",
+		}},
+		bson.M{"$group": bson.M{
+			"_id":   "$userInfo.grade",
+			"total": bson.M{"$sum": bson.M{"$subtract": []interface{}{"$endTime", "$startTime"}}},
+		}},
+		bson.M{"$match": bson.M{
+			"_id": bson.M{cst.GTE: 1, cst.LTE: 12},
+		}},
+	)
+
+	var results []struct {
+		Grade int32 `bson:"_id"`
+		Total int32 `bson:"total"`
+	}
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
+		logs.Errorf("[conversation mapper] conv duration by grade err: %s", errorx.ErrorWithoutStack(err))
+		return nil, 0, err
+	}
+
+	ratioMap := make(map[int32]int32, 12)
+	var totalDuration int32
+	for _, r := range results {
+		if r.Grade >= 1 && r.Grade <= 12 {
+			ratioMap[r.Grade] = r.Total
+			totalDuration += r.Total
+		}
+	}
+
+	return ratioMap, totalDuration, nil
 }

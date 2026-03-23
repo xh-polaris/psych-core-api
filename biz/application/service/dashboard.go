@@ -462,10 +462,30 @@ func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_
 		})
 	}
 
+	// 分年级的对话时长比例 定义年级从 1-12
+	gradeDurationMap, totalDuration, err := s.ConversationMapper.ConvDurationByGrade(ctx, unitOID)
+	if err != nil {
+		logs.Errorf("conv duration by grade error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
+	}
+
+	ratioMap := make(map[int32]int32, 12)
+	if totalDuration > 0 {
+		for grade, duration := range gradeDurationMap {
+			ratioMap[grade] = (duration * 100) / totalDuration
+		}
+	}
+
+	convDistribution := &core_api.ConvDistribution{
+		Ratio: ratioMap,
+		Total: totalDuration,
+	}
+
 	return &core_api.DashboardGetDataTrendResp{
 		ActivePoints:          activePoints,
 		ConversationPoints:    conversationPoints,
 		ConversationDurations: conversationDurations,
+		ConvDistribution:      convDistribution,
 		Code:                  0,
 		Msg:                   "success",
 	}, nil
