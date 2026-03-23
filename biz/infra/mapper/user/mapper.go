@@ -316,6 +316,9 @@ func (m *mongoMapper) FindUnitClassTeachers(ctx context.Context, unitId bson.Obj
 
 	clsTeachers := make(map[int]map[int]*User)
 	for _, u := range clsTeacherUsers {
+		if clsTeachers[u.Grade] == nil {
+			clsTeachers[u.Grade] = make(map[int]*User)
+		}
 		clsTeachers[u.Grade][u.Class] = u
 	}
 
