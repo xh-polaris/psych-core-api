@@ -43,6 +43,8 @@ type IMongoMapper interface {
 	CountAlarmUsersByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 	RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID) ([]*RiskStat, error)
 	FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID) (ClassTeachers, error)
+	// 检查某班级是否已有班主任
+	ExistsClassTeacher(ctx context.Context, unitId bson.ObjectID, grade, class int) (bool, error)
 }
 
 type mongoMapper struct {
@@ -323,4 +325,22 @@ func (m *mongoMapper) FindUnitClassTeachers(ctx context.Context, unitId bson.Obj
 	}
 
 	return clsTeachers, nil
+}
+
+// ExistsClassTeacher 检查某班级是否已有班主任 (role=3)
+func (m *mongoMapper) ExistsClassTeacher(ctx context.Context, unitId bson.ObjectID, grade, class int) (bool, error) {
+	filter := bson.M{
+		cst.UnitID: unitId,
+		cst.Role:   enum.UserRoleClassTeacher,
+		cst.Grade:  grade,
+		cst.Class:  class,
+	}
+
+	count, err := m.conn.CountDocuments(ctx, filter)
+	if err != nil {
+		logs.Errorf("[user mapper] exists class teacher err: %s", errorx.ErrorWithoutStack(err))
+		return false, err
+	}
+
+	return count > 0, nil
 }
