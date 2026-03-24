@@ -355,15 +355,16 @@ func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_
 	}
 
 	now := time.Now()
-	// 计算本周一 00:00 和下周一 00:00（用于按周内 7 天切分）
-	// Go 的 Weekday: Sunday=0, Monday=1 ... Saturday=6
-	weekday := int(now.Weekday())
-	if weekday == 0 {
-		weekday = 7
+	// 统计过去7天（含今天），避免“本周”窗口落到未来日期
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	startDay := todayStart.AddDate(0, 0, -6)
+	toWeek := func(t time.Time) int32 {
+		wd := int32(t.Weekday()) // Sunday=0
+		if wd == 0 {
+			return 7
+		}
+		return wd
 	}
-	startOfWeek := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).
-		AddDate(0, 0, -(weekday - 1)) // 回退到周一
-	_ = startOfWeek.AddDate(0, 0, 7) // endOfWeek 目前未直接使用，预留扩展
 
 	var unitOID *bson.ObjectID
 	if req.UnitId != nil && req.GetUnitId() != "" {
@@ -386,7 +387,7 @@ func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_
 	// 活跃趋势（按天）
 	activePoints := make([]*core_api.TrendPoint, 0, 7)
 	for i := 0; i < 7; i++ {
-		dayStart := startOfWeek.AddDate(0, 0, i)
+		dayStart := startDay.AddDate(0, 0, i)
 		dayEnd := dayStart.AddDate(0, 0, 1)
 		var (
 			cnt int32
@@ -404,7 +405,7 @@ func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_
 		// week 字段：1=Mon ... 7=Sun
 		activePoints = append(activePoints, &core_api.TrendPoint{
 			Count: cnt,
-			Week:  int32(i + 1),
+			Week:  toWeek(dayStart),
 			Hour:  0,
 		})
 	}
@@ -412,7 +413,7 @@ func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_
 	// 对话频率趋势（按天）
 	conversationPoints := make([]*core_api.TrendPoint, 0, 7)
 	for i := 0; i < 7; i++ {
-		dayStart := startOfWeek.AddDate(0, 0, i)
+		dayStart := startDay.AddDate(0, 0, i)
 		dayEnd := dayStart.AddDate(0, 0, 1)
 		var (
 			cnt int32
@@ -429,7 +430,7 @@ func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_
 		}
 		conversationPoints = append(conversationPoints, &core_api.TrendPoint{
 			Count: cnt,
-			Week:  int32(i + 1),
+			Week:  toWeek(dayStart),
 			Hour:  0,
 		})
 	}
@@ -1269,6 +1270,7 @@ func (s *DashboardService) getOneUnitConvs(ctx context.Context, req *core_api.Da
 				Code:   usr.Code,
 				Gender: int32(usr.Gender),
 			},
+			ConvId:    conv.ID.Hex(),
 			Title:     conv.Title,
 			Time:      conv.EndTime.Unix(),
 			NeedAlarm: needsAlarm[conv.ID],
