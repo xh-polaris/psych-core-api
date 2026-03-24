@@ -177,12 +177,12 @@ func (m *mongoMapper) averageDurationWithFilter(ctx context.Context, unitId *bso
 		)
 	}
 
-	// $addFields: durationMinutes = (endTime - startTime) / 60000
+	// $addFields: durationMinutes = (end_time - start_time) / 60000
 	pipeline = append(pipeline,
 		bson.M{"$addFields": bson.M{
 			"durationMinutes": bson.M{
 				"$divide": []interface{}{
-					bson.M{"$subtract": []interface{}{"$endTime", "$startTime"}},
+					bson.M{"$subtract": []interface{}{"$end_time", "$start_time"}},
 					60000, // milliseconds to minutes
 				},
 			},
@@ -220,7 +220,7 @@ func (m *mongoMapper) CountActiveUsers(ctx context.Context, unitId *bson.ObjectI
 		timeFilter["$lt"] = end
 	}
 	if len(timeFilter) > 0 {
-		matchStage["endTime"] = timeFilter
+		matchStage["end_time"] = timeFilter
 	}
 
 	pipeline := []bson.M{{"$match": matchStage}}
@@ -381,9 +381,54 @@ func (m *mongoMapper) FindManyByUserId(ctx context.Context, userId bson.ObjectID
 }
 
 func (m *mongoMapper) FindManyByUnitId(ctx context.Context, unitId *bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error) {
-	c, err := m.FindManyWithOption(ctx, bson.M{cst.UnitID: unitId}, opt)
-	if err != nil {
-		logs.Error("[conversation mapper] paged find many by unit err: %s", errorx.ErrorWithoutStack(err))
+	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
+
+	if unitId == nil {
+		c, err := m.FindManyWithOption(ctx, matchStage, opt)
+		if err != nil {
+			logs.Errorf("[conversation mapper] paged find many by unit err: %s", errorx.ErrorWithoutStack(err))
+			return nil, err
+		}
+		return c, nil
+	}
+
+	pipeline := []bson.M{
+		{"$match": matchStage},
+		{"$lookup": bson.M{
+			"from":         userCollection,
+			"localField":   cst.UserID,
+			"foreignField": cst.ID,
+			"as":           "userDoc",
+		}},
+		{"$match": bson.M{"userDoc.unit_id": *unitId}},
+	}
+
+	if opt != nil {
+		findOpt := &options.FindOptions{}
+		for _, setter := range opt.List() {
+			if setter == nil {
+				continue
+			}
+			if err := setter(findOpt); err != nil {
+				logs.Errorf("[conversation mapper] parse find options err: %s", errorx.ErrorWithoutStack(err))
+				return nil, err
+			}
+		}
+
+		if findOpt.Sort != nil {
+			pipeline = append(pipeline, bson.M{"$sort": findOpt.Sort})
+		}
+		if findOpt.Skip != nil && *findOpt.Skip > 0 {
+			pipeline = append(pipeline, bson.M{"$skip": *findOpt.Skip})
+		}
+		if findOpt.Limit != nil && *findOpt.Limit > 0 {
+			pipeline = append(pipeline, bson.M{"$limit": *findOpt.Limit})
+		}
+	}
+
+	var c []*Conversation
+	if err := m.conn.Aggregate(ctx, &c, pipeline); err != nil {
+		logs.Errorf("[conversation mapper] paged find many by unit err: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}
 	return c, nil
@@ -394,11 +439,11 @@ func (m *mongoMapper) FindManyByUnitId(ctx context.Context, unitId *bson.ObjectI
 func (m *mongoMapper) CountByDurationBucket(ctx context.Context, unitId *bson.ObjectID, minMinutes, maxMinutes float64) (int32, error) {
 	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
 
-	// 构建时长过滤条件：durationMinutes = (endTime - startTime) / 60000
+	// 构建时长过滤条件：durationMinutes = (end_time - start_time) / 60000
 	// 使用 $round 四舍五入到整数分钟
 	durationExpr := bson.M{
 		"$divide": []interface{}{
-			bson.M{"$subtract": []interface{}{"$endTime", "$startTime"}},
+			bson.M{"$subtract": []interface{}{"$end_time", "$start_time"}},
 			60000, // milliseconds to minutes
 		},
 	}
@@ -433,7 +478,9 @@ func (m *mongoMapper) CountByDurationBucket(ctx context.Context, unitId *bson.Ob
 			"roundedDuration": bson.M{"$round": []interface{}{durationExpr, 0}},
 		}},
 		// 过滤时长范围
-		bson.M{"$match": durationFilter},
+		bson.M{"$match": bson.M{
+			"roundedDuration": durationFilter,
+		}},
 		// 计数
 		bson.M{"$count": "count"},
 	)
@@ -470,7 +517,7 @@ func (m *mongoMapper) ConvDurationByGrade(ctx context.Context, unitId *bson.Obje
 		)
 	}
 
-	// 关联 user 表获取年级，按年级分组统计时长（秒）
+	// 关联 user 表获取年级，按年级分组统计时长
 	pipeline = append(pipeline,
 		bson.M{"$lookup": bson.M{
 			"from":         userCollection,
@@ -478,15 +525,19 @@ func (m *mongoMapper) ConvDurationByGrade(ctx context.Context, unitId *bson.Obje
 			"foreignField": cst.ID,
 			"as":           "userInfo",
 		}},
-		bson.M{"$unwind": bson.M{
-			"path": "$userInfo",
+		bson.M{"$match": bson.M{
+			"userInfo.0": bson.M{"$exists": true}, // 确保 lookup 找到了 user
 		}},
-		bson.M{"$group": bson.M{
-			"_id":   "$userInfo.grade",
-			"total": bson.M{"$sum": bson.M{"$subtract": []interface{}{"$endTime", "$startTime"}}},
+		bson.M{"$unwind": "$userInfo"},
+		bson.M{"$addFields": bson.M{
+			"grade": "$userInfo.grade", // 提取 grade 到顶层
 		}},
 		bson.M{"$match": bson.M{
-			"_id": bson.M{cst.GTE: 1, cst.LTE: 12},
+			"grade": bson.M{cst.GTE: 1, cst.LTE: 12}, // 过滤年级范围
+		}},
+		bson.M{"$group": bson.M{
+			"_id":   "$grade",
+			"total": bson.M{"$sum": bson.M{"$subtract": []interface{}{"$end_time", "$start_time"}}},
 		}},
 	)
 

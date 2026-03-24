@@ -87,7 +87,7 @@ func (m *mongoMapper) ExistsByCodeAndUnitID(ctx context.Context, code string, un
 
 // FindAllByUnitID 根据UnitID查询所有用户
 func (m *mongoMapper) FindAllByUnitID(ctx context.Context, unitId bson.ObjectID) ([]*User, error) {
-	return m.FindAllByFields(ctx, bson.M{cst.UnitID: unitId, cst.Status: bson.M{cst.NE: enum.UserStatusDeleted}})
+	return m.FindAllByFields(ctx, bson.M{cst.UnitID: unitId, cst.Status: bson.M{cst.NE: enum.UserStatusDeleted}, cst.Role: enum.UserRoleStudent})
 }
 
 // FindManyByUnitIDWithFilter 根据 UnitID 及班级条件查询用户
@@ -95,6 +95,7 @@ func (m *mongoMapper) FindManyByUnitIDWithFilter(ctx context.Context, unitId bso
 	filter := bson.M{
 		cst.UnitID: unitId,
 		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+		cst.Role:   enum.UserRoleStudent,
 	}
 	if grade != nil {
 		filter[cst.Grade] = *grade
@@ -180,6 +181,7 @@ func (m *mongoMapper) CountByClasses(ctx context.Context, unitId bson.ObjectID, 
 	match := bson.M{
 		cst.UnitID: unitId,
 		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+		cst.Role:   enum.UserRoleStudent,
 	}
 	// 添加筛选条件
 	if len(grade) > 0 {
