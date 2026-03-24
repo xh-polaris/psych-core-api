@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"os"
 	"strconv"
 	"sync"
 	"testing"
@@ -24,6 +25,13 @@ func TestVolcTTSApp(t *testing.T) {
 		t.Fatalf("[tts app] dial err: %v", err)
 	}
 
+	// 准备保存 PCM 的文件
+	f, err := os.Create("output.pcm")
+	if err != nil {
+		t.Fatalf("[tts app] create file err: %v", err)
+	}
+	defer f.Close()
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 
@@ -39,6 +47,13 @@ func TestVolcTTSApp(t *testing.T) {
 				if err != nil {
 					t.Errorf("[tts app] receive err: %v", err)
 					return
+				}
+
+				if len(frame) > 0 {
+					if _, err := f.Write(frame); err != nil {
+						t.Errorf("[tts app] write file err: %v", err)
+						return
+					}
 				}
 
 				fmt.Printf("[tts app] receive frame len: %d\n", len(frame))

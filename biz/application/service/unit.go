@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
@@ -229,6 +230,8 @@ func (u *UnitService) UnitCreateAndLinkUser(ctx context.Context, req *core_api.U
 	success := 0
 	skip := 0
 
+	// 记录批量创建中已处理的班主任班级，避免同批数据中重复
+	creatingClassTeachers := make(map[string]bool) // key: "grade-class"
 	// 插入用户
 	for _, userReq := range req.Users {
 		// 参数校验
@@ -244,12 +247,35 @@ func (u *UnitService) UnitCreateAndLinkUser(ctx context.Context, req *core_api.U
 		if userReq.Password == "" {
 			return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "密码"))
 		}
+		if userReq.Role == 0 {
+			return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "角色"))
+		}
 
 		// 检查是否已存在相同的code
 		if existingCodes[userReq.Code] {
 			// 如果在这个unit中已经存在该code，则跳过
 			skip++
 			continue
+		}
+
+		// 检查班主任唯一性：一个班级只能有一个班主任
+		if userReq.Role == enum.UserRoleClassTeacher {
+			classKey := fmt.Sprintf("%d-%d", userReq.Grade, userReq.Class)
+			// 检查同批数据中是否已有该班级的班主任
+			if creatingClassTeachers[classKey] {
+				return nil, errorx.New(errno.ErrUnitCreateClassTeacher)
+			}
+			// 检查数据库中是否已有该班级的班主任
+			exists, err := u.UserMapper.ExistsClassTeacher(ctx, unitId, int(userReq.Grade), int(userReq.Class))
+			if err != nil {
+				logs.Errorf("check class teacher exists error: %s", errorx.ErrorWithoutStack(err))
+				return nil, err
+			}
+			if exists {
+				return nil, errorx.New(errno.ErrUnitCreateClassTeacher)
+			}
+			// 标记该班级班主任已在创建中
+			creatingClassTeachers[classKey] = true
 		}
 
 		if isCodeTypePhone {

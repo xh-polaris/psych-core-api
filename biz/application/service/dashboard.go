@@ -434,50 +434,58 @@ func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_
 		})
 	}
 
-	// 对话时长分布（分钟分桶）：[0,5),[5,10),[10,30),[30,60),[60,+)
-	conversationDurations := make([]*core_api.ConversationDuration, 0, 5)
+	// 对话时长分布（分钟分桶）：1: 0-5 min 2: 6-10 min 3: 11-20 min 4: 21-30 min 5: 31-60 min 6: 61-120 min 7: 120+ min
+	conversationDurations := make([]*core_api.ConversationDuration, 0, 7)
 	buckets := []struct {
-		min int
-		max int // max<0 代表无上限
+		min float64
+		max float64
 	}{
-		{0, 5},
-		{5, 10},
-		{10, 30},
-		{30, 60},
-		{60, -1},
+		{0, 5},    // 1: 0-5 min
+		{6, 10},   // 2: 6-10 min
+		{11, 20},  // 3: 11-20 min
+		{21, 30},  // 4: 21-30 min
+		{31, 60},  // 5: 31-60 min
+		{61, 120}, // 6: 61-120 min
+		{121, -1}, // 7: 120+ min
 	}
 
-	for _, b := range buckets {
-		// 这里简单用 AverageDuration + CountByUnit 近似，不做复杂聚合：
-		// 实际更精确的做法是 conversation 表做 $bucket/$group，这里按需求“从简”实现。
-		var cnt int32
-		var err error
-		if unitOID != nil {
-			cnt, err = s.ConversationMapper.CountByUnit(ctx, unitOID)
-		} else {
-			cnt, err = s.ConversationMapper.CountByUnit(ctx, nil)
-		}
+	for i, b := range buckets {
+		cnt, err := s.ConversationMapper.CountByDurationBucket(ctx, unitOID, b.min, b.max)
 		if err != nil {
 			logs.Errorf("count conversations for duration bucket error: %s", errorx.ErrorWithoutStack(err))
 			return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 		}
 
-		// 这里只返回分钟值（桶中心），数量用 cnt 占位，前端可以先用总数/平均值来画一个简单分布。
-		minutes := b.min
-		if b.max > 0 {
-			minutes = (b.min + b.max) / 2
-		}
-
 		conversationDurations = append(conversationDurations, &core_api.ConversationDuration{
-			Minutes: int32(minutes),
-			Count:   cnt,
+			Key:   int32(i + 1),
+			Count: cnt,
 		})
+	}
+
+	// 分年级的对话时长比例 定义年级从 1-12
+	gradeDurationMap, totalDuration, err := s.ConversationMapper.ConvDurationByGrade(ctx, unitOID)
+	if err != nil {
+		logs.Errorf("conv duration by grade error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
+	}
+
+	ratioMap := make(map[int32]int32, 12)
+	if totalDuration > 0 {
+		for grade, duration := range gradeDurationMap {
+			ratioMap[grade] = (duration * 100) / totalDuration
+		}
+	}
+
+	convDistribution := &core_api.ConvDistribution{
+		Ratio: ratioMap,
+		Total: totalDuration,
 	}
 
 	return &core_api.DashboardGetDataTrendResp{
 		ActivePoints:          activePoints,
 		ConversationPoints:    conversationPoints,
 		ConversationDurations: conversationDurations,
+		ConvDistribution:      convDistribution,
 		Code:                  0,
 		Msg:                   "success",
 	}, nil
@@ -532,6 +540,7 @@ func (s *DashboardService) DashboardListUnits(ctx context.Context, req *core_api
 		updateTs := u.UpdateTime.Unix()
 
 		respUnits = append(respUnits, &core_api.DashboardUnit{
+			Id:                         u.ID.Hex(),
 			Name:                       u.Name,
 			UserCount:                  userCount,
 			RiskUserCount:              riskCount,
@@ -762,12 +771,21 @@ func aggregateAndSort(mapperRes []*user.ClassStatResult, clsTeachers user.ClassT
 		// 年级已存在
 		uNum := item.UserNum
 		aNum := item.AlarmNum
+
+		// 检查班主任是否存在，避免空指针 panic
+		var teacherName, teacherPhone string
+		if clsTeachers[int(item.Info.Grade)] != nil &&
+			clsTeachers[int(item.Info.Grade)][int(item.Info.Class)] != nil {
+			teacherName = clsTeachers[int(item.Info.Grade)][int(item.Info.Class)].Name
+			teacherPhone = clsTeachers[int(item.Info.Grade)][int(item.Info.Class)].Code
+		}
+
 		gradeInfo.Classes = append(gradeInfo.Classes, &core_api.ClassInfo{
 			Class:        item.Info.Class,
 			UserNum:      uNum,
 			AlarmNum:     aNum,
-			TeacherName:  clsTeachers[int(item.Info.Grade)][int(item.Info.Class)].Name,
-			TeacherPhone: clsTeachers[int(item.Info.Grade)][int(item.Info.Class)].Code,
+			TeacherName:  teacherName,
+			TeacherPhone: teacherPhone,
 		})
 	}
 
@@ -801,7 +819,14 @@ func (s *DashboardService) DashboardListUsers(ctx context.Context, req *core_api
 		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 	// 查找所有用户并按风险高→低排序
-	dbUsers, err := s.UserMapper.FindAllByUnitID(ctx, unitOID)
+	var dbUsers []*user.User
+	if req.Grade != nil || req.Class != nil {
+		// 有班级筛选条件
+		dbUsers, err = s.UserMapper.FindManyByUnitIDWithFilter(ctx, unitOID, req.Grade, req.Class)
+	} else {
+		// 无班级筛选条件
+		dbUsers, err = s.UserMapper.FindAllByUnitID(ctx, unitOID)
+	}
 	if err != nil {
 		return nil, errorx.New(errno.ErrNotFound)
 	}
@@ -881,6 +906,7 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 	for i, dbUser := range targetUsers {
 		riskUsers[i] = &core_api.RiskUser{
 			User: &core_api.UserVO{
+				Id:    dbUser.ID.Hex(),
 				Code:  dbUser.Code,
 				Name:  dbUser.Name,
 				Grade: int32(dbUser.Grade),

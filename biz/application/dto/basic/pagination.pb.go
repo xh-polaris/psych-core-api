@@ -7,7 +7,6 @@
 package basic
 
 import (
-	_ "github.com/xh-polaris/psych-core-api/biz/application/dto/http"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
