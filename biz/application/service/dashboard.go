@@ -1091,9 +1091,10 @@ func (s *DashboardService) getUserConvDetails(ctx context.Context, userOID bson.
 
 	for convId, convTime := range tm {
 		convDetail := &core_api.ConvDetail{
-			Time:     convTime,
-			Digest:   "",
-			Keywords: &core_api.Keywords{},
+			ConversationId: convId.Hex(),
+			Time:           convTime,
+			Digest:         "",
+			Keywords:       &core_api.Keywords{},
 		}
 		if dgst, ok := digests[convId]; ok {
 			convDetail.Digest = dgst
@@ -1167,6 +1168,7 @@ func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api
 	}
 
 	return &core_api.DashboardGetReportResp{
+		ReportId:  rpt.ID.Hex(),
 		Title:     rpt.Title,
 		Keywords:  rpt.Keywords,
 		Digest:    rpt.Digest,
