@@ -16,9 +16,9 @@ var heartbeatTimeout = time.Second * 30
 // 应用层模拟的心跳消息
 func (e *Engine) mockHeartbeat(ping *core.Ping) (err error) {
 	if ping.Data != "" {
-		logs.Info("[engine] mock heartbeat: %s", ping.Data)
+		logs.Infof("[engine] mock heartbeat: %s", ping.Data)
 	}
-	util.DPrint("[engine] [heartbeat] receive ping")
+	util.DPrint("[engine] [heartbeat] receive ping\n")
 	if err = e.wsx.Pong(nil); err != nil {
 		logs.CondError(!wsx.IsNormal(err), "[engine] %s error %s", core.APong, err)
 		return errorx.WrapByCode(err, errno.PongErr)

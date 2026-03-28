@@ -48,6 +48,7 @@ type Engine struct {
 	tts       app.TTSApp                 // tts 管理语言转文字
 	llm       model.ToolCallingChatModel // llm 管理大模型
 	llmCancel context.CancelFunc         // 用于中断大模型输出
+	llmWg     sync.WaitGroup             // llmWg 中断时等待各子线程退出
 
 	// ws 与前端的websocket链接
 	wsx             *wsx.HZWSClient // wsx 是与前端的连接
