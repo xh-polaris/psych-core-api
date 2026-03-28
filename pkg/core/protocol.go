@@ -29,6 +29,7 @@ var (
 	CUserAudio    CType = 2 // 用户音频输入, 直接作为输入, 也会返回识别结果给前端
 	CUserAudioASR CType = 3 // 用户音频输入, 用于识别
 	CModelText    CType = 4 // 模型文字输入, 用于转语音
+	CInterrupt    CType = 5 // 中断模型运行
 )
 
 var (
@@ -36,6 +37,7 @@ var (
 	RModelAudio   RType = 2 // 模型音频响应
 	RUserText     RType = 3 // 用户文本响应(ASR结果)
 	RUserTextStop RType = 4 // 用户文本响应(ASR结束)
+	RInterrupt    RType = 5 // 中断模型运行
 )
 
 var (

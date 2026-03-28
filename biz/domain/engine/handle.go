@@ -67,6 +67,8 @@ func (e *Engine) execCmd(ctx context.Context, cmd *core.Cmd) (err error) {
 	case core.CUserText: // 常规文本
 		return e.execLLM(ctx, cmd)
 	case core.CUserAudio: // 暂不支持
+	case core.CInterrupt:
+		e.execInterrupt(ctx, cmd)
 	default:
 		return errorx.New(errno.InvalidCmdContent)
 	}

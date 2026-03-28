@@ -13,6 +13,7 @@ import (
 
 // execTTS 用于文字转语音(发送端) [task]
 func (e *Engine) execTTS(ctx context.Context, id uint, stream *schema.StreamReader[*schema.Message]) {
+	defer e.llmWg.Done()
 	defer stream.Close()
 	if err := e.tts.Dial(ctx); err != nil {
 		e.unexpected(err, "tts dial err")
@@ -55,6 +56,7 @@ func (e *Engine) execTTS(ctx context.Context, id uint, stream *schema.StreamRead
 
 // execTTSRecv 文字转语音识别结果(接收端) [task]
 func (e *Engine) execTTSRecv(ctx context.Context, id uint) {
+	defer e.llmWg.Done()
 	for {
 		select {
 		case <-ctx.Done():

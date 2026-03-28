@@ -62,11 +62,13 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	go e.execLLMResponse(subctx, cmd.ID, ret, astMsg)
 	// 启用tts发送
 	go e.execTTS(subctx, cmd.ID, tts)
+	e.llmWg.Add(3) // 模型, tts发送, tts响应三个子线程
 	return err
 }
 
 // execLLMResponse 负责将大模型响应返回给前端 [task]
 func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.StreamReader[*schema.Message], astMsg *message.Message) {
+	defer e.llmWg.Done()
 	defer stream.Close()
 	var collect strings.Builder
 	defer func(collect *strings.Builder, astMsg *message.Message) { // 存储模型消息
@@ -123,4 +125,16 @@ func (e *Engine) llmUsage(usage *schema.ResponseMeta) {
 	e.usage.LLMUsage.PromptTokenDetails.CachedTokens += usage.Usage.PromptTokenDetails.CachedTokens
 	e.usage.LLMUsage.CompletionTokens += usage.Usage.CompletionTokens
 	e.usage.LLMUsage.TotalTokens += usage.Usage.TotalTokens
+}
+
+// execInterrupt 中断模型运行
+func (e *Engine) execInterrupt(ctx context.Context, cmd *core.Cmd) {
+	if e.llmCancel != nil {
+		e.llmCancel()
+		e.llmWg.Wait()
+		e.llmCancel = nil
+		if err := e.MWrite(core.MResp, &core.Resp{ID: cmd.ID, Type: core.RInterrupt, Content: "interrupt"}); err != nil {
+			e.unexpected(err, "llm interrupt write err")
+		}
+	}
 }
