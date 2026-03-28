@@ -32,6 +32,7 @@ type IMongoMapper interface {
 	ExistsByCode(ctx context.Context, phone string) (bool, error)
 	ExistsByCodeAndUnitID(ctx context.Context, code string, unitId bson.ObjectID) (bool, error)
 	FindAllByUnitID(ctx context.Context, unitId bson.ObjectID) ([]*User, error)
+	FindManyByUnitIDWithFilter(ctx context.Context, unitId bson.ObjectID, grade, class *int32) ([]*User, error)
 	BatchFindByIDs(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*User, error)
 	CountByClasses(ctx context.Context, unitId bson.ObjectID, grade, class []int32) ([]*ClassStatResult, error)
 	Count(ctx context.Context) (int32, error)
@@ -42,6 +43,8 @@ type IMongoMapper interface {
 	CountAlarmUsersByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 	RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID) ([]*RiskStat, error)
 	FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID) (ClassTeachers, error)
+	// 检查某班级是否已有班主任
+	ExistsClassTeacher(ctx context.Context, unitId bson.ObjectID, grade, class int) (bool, error)
 }
 
 type mongoMapper struct {
@@ -84,7 +87,29 @@ func (m *mongoMapper) ExistsByCodeAndUnitID(ctx context.Context, code string, un
 
 // FindAllByUnitID 根据UnitID查询所有用户
 func (m *mongoMapper) FindAllByUnitID(ctx context.Context, unitId bson.ObjectID) ([]*User, error) {
-	return m.FindAllByFields(ctx, bson.M{cst.UnitID: unitId, cst.Status: bson.M{cst.NE: enum.UserStatusDeleted}})
+	return m.FindAllByFields(ctx, bson.M{cst.UnitID: unitId, cst.Status: bson.M{cst.NE: enum.UserStatusDeleted}, cst.Role: enum.UserRoleStudent})
+}
+
+// FindManyByUnitIDWithFilter 根据 UnitID 及班级条件查询用户
+func (m *mongoMapper) FindManyByUnitIDWithFilter(ctx context.Context, unitId bson.ObjectID, grade, class *int32) ([]*User, error) {
+	filter := bson.M{
+		cst.UnitID: unitId,
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+		cst.Role:   enum.UserRoleStudent,
+	}
+	if grade != nil {
+		filter[cst.Grade] = *grade
+	}
+	if class != nil {
+		filter[cst.Class] = *class
+	}
+
+	var users []*User
+	if err := m.conn.Find(ctx, &users, filter); err != nil {
+		logs.Errorf("[user mapper] find by unitID with filter err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+	return users, nil
 }
 
 // CountByUnitID 按单位统计用户数量（排除已删除）
@@ -156,6 +181,7 @@ func (m *mongoMapper) CountByClasses(ctx context.Context, unitId bson.ObjectID, 
 	match := bson.M{
 		cst.UnitID: unitId,
 		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+		cst.Role:   enum.UserRoleStudent,
 	}
 	// 添加筛选条件
 	if len(grade) > 0 {
@@ -294,8 +320,29 @@ func (m *mongoMapper) FindUnitClassTeachers(ctx context.Context, unitId bson.Obj
 
 	clsTeachers := make(map[int]map[int]*User)
 	for _, u := range clsTeacherUsers {
+		if clsTeachers[u.Grade] == nil {
+			clsTeachers[u.Grade] = make(map[int]*User)
+		}
 		clsTeachers[u.Grade][u.Class] = u
 	}
 
 	return clsTeachers, nil
+}
+
+// ExistsClassTeacher 检查某班级是否已有班主任 (role=3)
+func (m *mongoMapper) ExistsClassTeacher(ctx context.Context, unitId bson.ObjectID, grade, class int) (bool, error) {
+	filter := bson.M{
+		cst.UnitID: unitId,
+		cst.Role:   enum.UserRoleClassTeacher,
+		cst.Grade:  grade,
+		cst.Class:  class,
+	}
+
+	count, err := m.conn.CountDocuments(ctx, filter)
+	if err != nil {
+		logs.Errorf("[user mapper] exists class teacher err: %s", errorx.ErrorWithoutStack(err))
+		return false, err
+	}
+
+	return count > 0, nil
 }

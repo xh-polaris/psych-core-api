@@ -197,6 +197,10 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 					Name:  dbUser.Name,
 					Grade: int32(dbUser.Grade),
 					Class: int32(dbUser.Class),
+					Remark: &core_api.Remark{
+						Content: dbUser.Remark.Content,
+						Time:    dbUser.Remark.CreateTime.Unix(),
+					},
 				},
 			}
 		}

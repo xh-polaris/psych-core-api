@@ -24,6 +24,8 @@ type IConfigService interface {
 	ConfigCreate(ctx context.Context, req *core_api.ConfigCreateOrUpdateReq) (resp *basic.Response, err error)
 	ConfigUpdateInfo(ctx context.Context, req *core_api.ConfigCreateOrUpdateReq) (resp *basic.Response, err error)
 	ConfigGetByUnitID(ctx context.Context, req *core_api.ConfigGetByUnitIdReq) (resp *core_api.ConfigGetByUnitIdResp, err error)
+	ConfigUpdateModelAndBgImage(ctx context.Context, req *core_api.ConfigUpdateModelAndBgImageReq) (resp *basic.Response, err error)
+	ConfigGetModelAndBgImage(ctx context.Context, req *core_api.ConfigGetModelAndBgImageReq) (resp *core_api.ConfigGetModelAndBgImageResp, err error)
 }
 
 type ConfigService struct {
@@ -160,7 +162,33 @@ func (c *ConfigService) ConfigGetByUnitID(ctx context.Context, req *core_api.Con
 
 }
 
-// Deprecated
+func (c *ConfigService) ConfigUpdateModelAndBgImage(ctx context.Context, req *core_api.ConfigUpdateModelAndBgImageReq) (resp *basic.Response, err error) {
+	newReq := &core_api.ConfigCreateOrUpdateReq{
+		Config: &core_api.ConfigVO{
+			UnitId:          req.UnitId,
+			ModelView:       req.ModelView,
+			BackgroundImage: req.BackgroundImage,
+		},
+	}
+	return c.ConfigUpdateInfo(ctx, newReq)
+}
+
+func (c *ConfigService) ConfigGetModelAndBgImage(ctx context.Context, req *core_api.ConfigGetModelAndBgImageReq) (resp *core_api.ConfigGetModelAndBgImageResp, err error) {
+	newReq := &core_api.ConfigGetByUnitIdReq{
+		UnitId: req.UnitId,
+	}
+	newResp, err := c.ConfigGetByUnitID(ctx, newReq)
+	if err != nil {
+		return nil, err
+	}
+
+	return &core_api.ConfigGetModelAndBgImageResp{
+		ModelView:       newResp.Config.ModelView,
+		BackgroundImage: newResp.Config.BackgroundImage,
+	}, nil
+}
+
+// DEPRECATED
 func validateCreateConfigReq(req *core_api.ConfigCreateOrUpdateReq) error {
 	if req.Config == nil {
 		return errorx.New(errno.ErrMissingParams, errorx.KV("field", "配置内容"))
