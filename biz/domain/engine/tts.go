@@ -69,7 +69,9 @@ func (e *Engine) execTTSRecv(ctx context.Context, id uint) {
 				e.unexpected(err, "tts resp err")
 				return
 			}
+			util.DPrint("[tts] receive audio with length %d\n", len(audio))
 			if last {
+				util.DPrint("[tts] last audio\n")
 				return
 			}
 		}
