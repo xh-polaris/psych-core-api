@@ -6,10 +6,12 @@ const (
 	AlarmStatusPending   = 2
 )
 
-// AlarmEmotion
+// AlarmEmotion 应按照严重程度升序
 const (
-	AlarmEmotionDanger   = 1
-	AlarmEmotionDepress  = 2
-	AlarmEmotionNegative = 3
-	AlarmEmotionNormal   = 4
+	UnknownEmotion = iota
+	AlarmEmotionDanger
+	AlarmEmotionDepress
+	AlarmEmotionAnxiety
+	AlarmEmotionNegative
+	AlarmEmotionNormal
 )
