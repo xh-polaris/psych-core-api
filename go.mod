@@ -95,7 +95,7 @@ require (
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
-	github.com/xh-polaris/psych-idl v0.0.0-20260323081537-d18a46c31eb1 // indirect
+	github.com/xh-polaris/psych-idl v0.0.0-20260327062036-08176ab7f5e1 // indirect
 	github.com/yargevad/filepathx v1.0.0 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect

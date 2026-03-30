@@ -46,6 +46,7 @@ type IDashboardService interface {
 	// 用户管理
 	DashboardListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (*core_api.DashboardListClassesResp, error)
 	DashboardListUsers(ctx context.Context, req *core_api.DashboardListUsersReq) (*core_api.DashboardListUsersResp, error)
+	DashboardCreateRemark(ctx context.Context, req *core_api.DashboardCreateRemarkReq) (*core_api.DashboardCreateRemarkResp, error)
 
 	// 对话记录
 	DashboardUserConvRecords(ctx context.Context, req *core_api.DashboardUserConvRecordsReq) (*core_api.DashboardUserConvRecordsResp, error)
@@ -905,13 +906,18 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 	// 构建响应列表
 	riskUsers := make([]*core_api.RiskUser, end-start+1)
 	for i, dbUser := range targetUsers {
+		remark := &core_api.Remark{
+			Time:    dbUser.Remark.CreateTime.Unix(),
+			Content: dbUser.Remark.Content,
+		}
 		riskUsers[i] = &core_api.RiskUser{
 			User: &core_api.UserVO{
-				Id:    dbUser.ID.Hex(),
-				Code:  dbUser.Code,
-				Name:  dbUser.Name,
-				Grade: int32(dbUser.Grade),
-				Class: int32(dbUser.Class),
+				Id:     dbUser.ID.Hex(),
+				Code:   dbUser.Code,
+				Name:   dbUser.Name,
+				Grade:  int32(dbUser.Grade),
+				Class:  int32(dbUser.Class),
+				Remark: remark,
 			},
 			Level:    int32(dbUser.RiskLevel),
 			Keywords: make([]string, 0),
@@ -926,6 +932,50 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 	}
 
 	return riskUsers, nil
+}
+
+func (s *DashboardService) DashboardCreateRemark(ctx context.Context, req *core_api.DashboardCreateRemarkReq) (*core_api.DashboardCreateRemarkResp, error) {
+	// 提取用户Meta
+	userMeta, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// 验证用户权限 - 必须是该单位管理员
+	if !userMeta.HasUnitAdminAuth(req.GetUnitId()) {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
+	}
+
+	// 验证用户是否属于这个单位
+	userOID, err := bson.ObjectIDFromHex(req.UserId)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UserID"), errorx.KV("value", "用户ID"))
+	}
+	u, err := s.UserMapper.FindOneById(ctx, userOID)
+	if err != nil {
+		logs.Errorf("find user by id error: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+	if u.UnitID.Hex() != req.GetUnitId() {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
+	}
+
+	// 更新用户 remark
+	update := bson.M{
+		cst.Remark: &user.Remark{
+			Content:    req.GetRemark(),
+			CreateTime: time.Now(),
+		},
+	}
+	if err = s.UserMapper.UpdateFields(ctx, userOID, update); err != nil {
+		logs.Errorf("update user error: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	return &core_api.DashboardCreateRemarkResp{
+		Code: 0,
+		Msg:  "success",
+	}, nil
 }
 
 func (s *DashboardService) DashboardUserConvRecords(ctx context.Context, req *core_api.DashboardUserConvRecordsReq) (*core_api.DashboardUserConvRecordsResp, error) {

@@ -118,7 +118,7 @@ var file_core_api_proto_rawDesc = []byte{
 	0x6f, 0x64, 0x65, 0x6c, 0x41, 0x6e, 0x64, 0x42, 0x67, 0x49, 0x6d, 0x61, 0x67, 0x65, 0x52, 0x65,
 	0x73, 0x70, 0x22, 0x22, 0xca, 0xc1, 0x18, 0x1e, 0x2f, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x2f,
 	0x67, 0x65, 0x74, 0x5f, 0x6d, 0x6f, 0x64, 0x65, 0x6c, 0x5f, 0x61, 0x6e, 0x64, 0x5f, 0x62, 0x67,
-	0x5f, 0x69, 0x6d, 0x61, 0x67, 0x65, 0x32, 0x95, 0x0c, 0x0a, 0x09, 0x44, 0x61, 0x73, 0x68, 0x62,
+	0x5f, 0x69, 0x6d, 0x61, 0x67, 0x65, 0x32, 0x95, 0x0d, 0x0a, 0x09, 0x44, 0x61, 0x73, 0x68, 0x62,
 	0x6f, 0x61, 0x72, 0x64, 0x12, 0x82, 0x01, 0x0a, 0x18, 0x44, 0x61, 0x73, 0x68, 0x62, 0x6f, 0x61,
 	0x72, 0x64, 0x47, 0x65, 0x74, 0x44, 0x61, 0x74, 0x61, 0x4f, 0x76, 0x65, 0x72, 0x76, 0x69, 0x65,
 	0x77, 0x12, 0x25, 0x2e, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x2e, 0x44, 0x61, 0x73,
@@ -215,7 +215,15 @@ var file_core_api_proto_rawDesc = []byte{
 	0x71, 0x1a, 0x20, 0x2e, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x2e, 0x44, 0x61, 0x73,
 	0x68, 0x62, 0x6f, 0x61, 0x72, 0x64, 0x47, 0x65, 0x74, 0x52, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x52,
 	0x65, 0x73, 0x70, 0x22, 0x19, 0xd2, 0xc1, 0x18, 0x15, 0x2f, 0x64, 0x61, 0x73, 0x68, 0x62, 0x6f,
-	0x61, 0x72, 0x64, 0x2f, 0x67, 0x65, 0x74, 0x5f, 0x72, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x32, 0xd6,
+	0x61, 0x72, 0x64, 0x2f, 0x67, 0x65, 0x74, 0x5f, 0x72, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x12, 0x7e,
+	0x0a, 0x15, 0x44, 0x61, 0x73, 0x68, 0x62, 0x6f, 0x61, 0x72, 0x64, 0x43, 0x72, 0x65, 0x61, 0x74,
+	0x65, 0x52, 0x65, 0x6d, 0x61, 0x72, 0x6b, 0x12, 0x22, 0x2e, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61,
+	0x70, 0x69, 0x2e, 0x44, 0x61, 0x73, 0x68, 0x62, 0x6f, 0x61, 0x72, 0x64, 0x43, 0x72, 0x65, 0x61,
+	0x74, 0x65, 0x52, 0x65, 0x6d, 0x61, 0x72, 0x6b, 0x52, 0x65, 0x71, 0x1a, 0x23, 0x2e, 0x63, 0x6f,
+	0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x2e, 0x44, 0x61, 0x73, 0x68, 0x62, 0x6f, 0x61, 0x72, 0x64,
+	0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x52, 0x65, 0x6d, 0x61, 0x72, 0x6b, 0x52, 0x65, 0x73, 0x70,
+	0x22, 0x1c, 0xd2, 0xc1, 0x18, 0x18, 0x2f, 0x64, 0x61, 0x73, 0x68, 0x62, 0x6f, 0x61, 0x72, 0x64,
+	0x2f, 0x63, 0x72, 0x65, 0x61, 0x74, 0x65, 0x5f, 0x72, 0x65, 0x6d, 0x61, 0x72, 0x6b, 0x32, 0xd6,
 	0x02, 0x0a, 0x0c, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x12,
 	0x71, 0x0a, 0x12, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73,
 	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x1f, 0x2e, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69,
@@ -270,31 +278,33 @@ var file_core_api_proto_goTypes = []interface{}{
 	(*DashboardUserConvRecordsReq)(nil),    // 21: core_api.DashboardUserConvRecordsReq
 	(*DashboardUnitConvRecordsReq)(nil),    // 22: core_api.DashboardUnitConvRecordsReq
 	(*DashboardGetReportReq)(nil),          // 23: core_api.DashboardGetReportReq
-	(*CreateConversationReq)(nil),          // 24: core_api.CreateConversationReq
-	(*ListConversationsReq)(nil),           // 25: core_api.ListConversationsReq
-	(*GetConversationReq)(nil),             // 26: core_api.GetConversationReq
-	(*UserSignInResp)(nil),                 // 27: core_api.UserSignInResp
-	(*UserGetInfoResp)(nil),                // 28: core_api.UserGetInfoResp
-	(*basic.Response)(nil),                 // 29: basic.Response
-	(*UnitGetInfoResp)(nil),                // 30: core_api.UnitGetInfoResp
-	(*UnitCreateAndLinkUserResp)(nil),      // 31: core_api.UnitCreateAndLinkUserResp
-	(*ConfigGetByUnitIdResp)(nil),          // 32: core_api.ConfigGetByUnitIdResp
-	(*ConfigGetModelAndBgImageResp)(nil),   // 33: core_api.ConfigGetModelAndBgImageResp
-	(*DashboardGetDataOverviewResp)(nil),   // 34: core_api.DashboardGetDataOverviewResp
-	(*DashboardGetDataTrendResp)(nil),      // 35: core_api.DashboardGetDataTrendResp
-	(*DashboardListUnitsResp)(nil),         // 36: core_api.DashboardListUnitsResp
-	(*DashboardGetPsychTrendResp)(nil),     // 37: core_api.DashboardGetPsychTrendResp
-	(*DashboardGetAlarmOverviewResp)(nil),  // 38: core_api.DashboardGetAlarmOverviewResp
-	(*DashboardListAlarmRecordsResp)(nil),  // 39: core_api.DashboardListAlarmRecordsResp
-	(*DashboardUpdateAlarmResp)(nil),       // 40: core_api.DashboardUpdateAlarmResp
-	(*DashboardListClassesResp)(nil),       // 41: core_api.DashboardListClassesResp
-	(*DashboardListUsersResp)(nil),         // 42: core_api.DashboardListUsersResp
-	(*DashboardUserConvRecordsResp)(nil),   // 43: core_api.DashboardUserConvRecordsResp
-	(*DashboardUnitConvRecordsResp)(nil),   // 44: core_api.DashboardUnitConvRecordsResp
-	(*DashboardGetReportResp)(nil),         // 45: core_api.DashboardGetReportResp
-	(*CreateConversationResp)(nil),         // 46: core_api.CreateConversationResp
-	(*ListConversationsResp)(nil),          // 47: core_api.ListConversationsResp
-	(*GetConversationResp)(nil),            // 48: core_api.GetConversationResp
+	(*DashboardCreateRemarkReq)(nil),       // 24: core_api.DashboardCreateRemarkReq
+	(*CreateConversationReq)(nil),          // 25: core_api.CreateConversationReq
+	(*ListConversationsReq)(nil),           // 26: core_api.ListConversationsReq
+	(*GetConversationReq)(nil),             // 27: core_api.GetConversationReq
+	(*UserSignInResp)(nil),                 // 28: core_api.UserSignInResp
+	(*UserGetInfoResp)(nil),                // 29: core_api.UserGetInfoResp
+	(*basic.Response)(nil),                 // 30: basic.Response
+	(*UnitGetInfoResp)(nil),                // 31: core_api.UnitGetInfoResp
+	(*UnitCreateAndLinkUserResp)(nil),      // 32: core_api.UnitCreateAndLinkUserResp
+	(*ConfigGetByUnitIdResp)(nil),          // 33: core_api.ConfigGetByUnitIdResp
+	(*ConfigGetModelAndBgImageResp)(nil),   // 34: core_api.ConfigGetModelAndBgImageResp
+	(*DashboardGetDataOverviewResp)(nil),   // 35: core_api.DashboardGetDataOverviewResp
+	(*DashboardGetDataTrendResp)(nil),      // 36: core_api.DashboardGetDataTrendResp
+	(*DashboardListUnitsResp)(nil),         // 37: core_api.DashboardListUnitsResp
+	(*DashboardGetPsychTrendResp)(nil),     // 38: core_api.DashboardGetPsychTrendResp
+	(*DashboardGetAlarmOverviewResp)(nil),  // 39: core_api.DashboardGetAlarmOverviewResp
+	(*DashboardListAlarmRecordsResp)(nil),  // 40: core_api.DashboardListAlarmRecordsResp
+	(*DashboardUpdateAlarmResp)(nil),       // 41: core_api.DashboardUpdateAlarmResp
+	(*DashboardListClassesResp)(nil),       // 42: core_api.DashboardListClassesResp
+	(*DashboardListUsersResp)(nil),         // 43: core_api.DashboardListUsersResp
+	(*DashboardUserConvRecordsResp)(nil),   // 44: core_api.DashboardUserConvRecordsResp
+	(*DashboardUnitConvRecordsResp)(nil),   // 45: core_api.DashboardUnitConvRecordsResp
+	(*DashboardGetReportResp)(nil),         // 46: core_api.DashboardGetReportResp
+	(*DashboardCreateRemarkResp)(nil),      // 47: core_api.DashboardCreateRemarkResp
+	(*CreateConversationResp)(nil),         // 48: core_api.CreateConversationResp
+	(*ListConversationsResp)(nil),          // 49: core_api.ListConversationsResp
+	(*GetConversationResp)(nil),            // 50: core_api.GetConversationResp
 }
 var file_core_api_proto_depIdxs = []int32{
 	0,  // 0: core_api.User.UserSignIn:input_type -> core_api.UserSignInReq
@@ -322,39 +332,41 @@ var file_core_api_proto_depIdxs = []int32{
 	21, // 22: core_api.Dashboard.DashboardUserConvRecords:input_type -> core_api.DashboardUserConvRecordsReq
 	22, // 23: core_api.Dashboard.DashboardUnitConvRecords:input_type -> core_api.DashboardUnitConvRecordsReq
 	23, // 24: core_api.Dashboard.DashboardGetReport:input_type -> core_api.DashboardGetReportReq
-	24, // 25: core_api.Conversation.CreateConversation:input_type -> core_api.CreateConversationReq
-	25, // 26: core_api.Conversation.ListConversations:input_type -> core_api.ListConversationsReq
-	26, // 27: core_api.Conversation.GetConversation:input_type -> core_api.GetConversationReq
-	27, // 28: core_api.User.UserSignIn:output_type -> core_api.UserSignInResp
-	28, // 29: core_api.User.UserGetInfo:output_type -> core_api.UserGetInfoResp
-	29, // 30: core_api.User.UserUpdateInfo:output_type -> basic.Response
-	29, // 31: core_api.User.UserUpdatePassword:output_type -> basic.Response
-	30, // 32: core_api.Unit.UnitGetInfo:output_type -> core_api.UnitGetInfoResp
-	29, // 33: core_api.Unit.UnitUpdateInfo:output_type -> basic.Response
-	29, // 34: core_api.Unit.UnitLinkUser:output_type -> basic.Response
-	31, // 35: core_api.Unit.UnitCreateAndLinkUser:output_type -> core_api.UnitCreateAndLinkUserResp
-	29, // 36: core_api.Config.ConfigCreate:output_type -> basic.Response
-	29, // 37: core_api.Config.ConfigUpdateInfo:output_type -> basic.Response
-	32, // 38: core_api.Config.ConfigGetByUnitID:output_type -> core_api.ConfigGetByUnitIdResp
-	29, // 39: core_api.Config.ConfigUpdateModelAndBgImage:output_type -> basic.Response
-	33, // 40: core_api.Config.ConfigGetModelAndBgImage:output_type -> core_api.ConfigGetModelAndBgImageResp
-	34, // 41: core_api.Dashboard.DashboardGetDataOverview:output_type -> core_api.DashboardGetDataOverviewResp
-	35, // 42: core_api.Dashboard.DashboardGetDataTrend:output_type -> core_api.DashboardGetDataTrendResp
-	36, // 43: core_api.Dashboard.DashboardListUnits:output_type -> core_api.DashboardListUnitsResp
-	37, // 44: core_api.Dashboard.DashboardGetPsychTrend:output_type -> core_api.DashboardGetPsychTrendResp
-	38, // 45: core_api.Dashboard.DashboardGetAlarmOverview:output_type -> core_api.DashboardGetAlarmOverviewResp
-	39, // 46: core_api.Dashboard.DashboardListAlarmRecords:output_type -> core_api.DashboardListAlarmRecordsResp
-	40, // 47: core_api.Dashboard.DashboardUpdateAlarm:output_type -> core_api.DashboardUpdateAlarmResp
-	41, // 48: core_api.Dashboard.DashboardListClasses:output_type -> core_api.DashboardListClassesResp
-	42, // 49: core_api.Dashboard.DashboardListUsers:output_type -> core_api.DashboardListUsersResp
-	43, // 50: core_api.Dashboard.DashboardUserConvRecords:output_type -> core_api.DashboardUserConvRecordsResp
-	44, // 51: core_api.Dashboard.DashboardUnitConvRecords:output_type -> core_api.DashboardUnitConvRecordsResp
-	45, // 52: core_api.Dashboard.DashboardGetReport:output_type -> core_api.DashboardGetReportResp
-	46, // 53: core_api.Conversation.CreateConversation:output_type -> core_api.CreateConversationResp
-	47, // 54: core_api.Conversation.ListConversations:output_type -> core_api.ListConversationsResp
-	48, // 55: core_api.Conversation.GetConversation:output_type -> core_api.GetConversationResp
-	28, // [28:56] is the sub-list for method output_type
-	0,  // [0:28] is the sub-list for method input_type
+	24, // 25: core_api.Dashboard.DashboardCreateRemark:input_type -> core_api.DashboardCreateRemarkReq
+	25, // 26: core_api.Conversation.CreateConversation:input_type -> core_api.CreateConversationReq
+	26, // 27: core_api.Conversation.ListConversations:input_type -> core_api.ListConversationsReq
+	27, // 28: core_api.Conversation.GetConversation:input_type -> core_api.GetConversationReq
+	28, // 29: core_api.User.UserSignIn:output_type -> core_api.UserSignInResp
+	29, // 30: core_api.User.UserGetInfo:output_type -> core_api.UserGetInfoResp
+	30, // 31: core_api.User.UserUpdateInfo:output_type -> basic.Response
+	30, // 32: core_api.User.UserUpdatePassword:output_type -> basic.Response
+	31, // 33: core_api.Unit.UnitGetInfo:output_type -> core_api.UnitGetInfoResp
+	30, // 34: core_api.Unit.UnitUpdateInfo:output_type -> basic.Response
+	30, // 35: core_api.Unit.UnitLinkUser:output_type -> basic.Response
+	32, // 36: core_api.Unit.UnitCreateAndLinkUser:output_type -> core_api.UnitCreateAndLinkUserResp
+	30, // 37: core_api.Config.ConfigCreate:output_type -> basic.Response
+	30, // 38: core_api.Config.ConfigUpdateInfo:output_type -> basic.Response
+	33, // 39: core_api.Config.ConfigGetByUnitID:output_type -> core_api.ConfigGetByUnitIdResp
+	30, // 40: core_api.Config.ConfigUpdateModelAndBgImage:output_type -> basic.Response
+	34, // 41: core_api.Config.ConfigGetModelAndBgImage:output_type -> core_api.ConfigGetModelAndBgImageResp
+	35, // 42: core_api.Dashboard.DashboardGetDataOverview:output_type -> core_api.DashboardGetDataOverviewResp
+	36, // 43: core_api.Dashboard.DashboardGetDataTrend:output_type -> core_api.DashboardGetDataTrendResp
+	37, // 44: core_api.Dashboard.DashboardListUnits:output_type -> core_api.DashboardListUnitsResp
+	38, // 45: core_api.Dashboard.DashboardGetPsychTrend:output_type -> core_api.DashboardGetPsychTrendResp
+	39, // 46: core_api.Dashboard.DashboardGetAlarmOverview:output_type -> core_api.DashboardGetAlarmOverviewResp
+	40, // 47: core_api.Dashboard.DashboardListAlarmRecords:output_type -> core_api.DashboardListAlarmRecordsResp
+	41, // 48: core_api.Dashboard.DashboardUpdateAlarm:output_type -> core_api.DashboardUpdateAlarmResp
+	42, // 49: core_api.Dashboard.DashboardListClasses:output_type -> core_api.DashboardListClassesResp
+	43, // 50: core_api.Dashboard.DashboardListUsers:output_type -> core_api.DashboardListUsersResp
+	44, // 51: core_api.Dashboard.DashboardUserConvRecords:output_type -> core_api.DashboardUserConvRecordsResp
+	45, // 52: core_api.Dashboard.DashboardUnitConvRecords:output_type -> core_api.DashboardUnitConvRecordsResp
+	46, // 53: core_api.Dashboard.DashboardGetReport:output_type -> core_api.DashboardGetReportResp
+	47, // 54: core_api.Dashboard.DashboardCreateRemark:output_type -> core_api.DashboardCreateRemarkResp
+	48, // 55: core_api.Conversation.CreateConversation:output_type -> core_api.CreateConversationResp
+	49, // 56: core_api.Conversation.ListConversations:output_type -> core_api.ListConversationsResp
+	50, // 57: core_api.Conversation.GetConversation:output_type -> core_api.GetConversationResp
+	29, // [29:58] is the sub-list for method output_type
+	0,  // [0:29] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name
 	0,  // [0:0] is the sub-list for extension extendee
 	0,  // [0:0] is the sub-list for field type_name
