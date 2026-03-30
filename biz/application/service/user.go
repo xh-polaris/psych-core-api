@@ -169,7 +169,7 @@ func (u *UserService) UserUpdateInfo(ctx context.Context, req *core_api.UserUpda
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "用户ID"))
 	}
 
-	// 不允许修改手机号、密码、验证方式、单位ID、状态
+	// 不允许修改手机号、密码、验证方式、单位ID、状态、Remark
 	// 密码、验证方式需要通过其他接口修改
 	userId, err := bson.ObjectIDFromHex(req.User.Id)
 	if err != nil {
@@ -203,9 +203,6 @@ func (u *UserService) UserUpdateInfo(ctx context.Context, req *core_api.UserUpda
 			return nil, err
 		}
 		update[cst.Options] = optionsAnypb
-	}
-	if req.User.Remark != nil {
-		update[cst.Remark] = req.User.Remark
 	}
 	update[cst.UpdateTime] = time.Now().Unix()
 

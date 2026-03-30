@@ -205,3 +205,8 @@ func _configupdatemodelandbgimageMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _dashboardcreateremarkMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

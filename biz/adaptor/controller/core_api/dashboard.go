@@ -216,3 +216,20 @@ func DashboardGetReport(ctx context.Context, c *app.RequestContext) {
 	resp, err := p.DashboardService.DashboardGetReport(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
+
+// DashboardCreateRemark .
+// @router /dashboard/create_remark [POST]
+func DashboardCreateRemark(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.DashboardCreateRemarkReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	middleware.StoreToken(ctx, c, &req)
+	p := provider.Get()
+	resp, err := p.DashboardService.DashboardCreateRemark(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
