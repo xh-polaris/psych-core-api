@@ -13,6 +13,7 @@ import (
 
 // execTTS 用于文字转语音(发送端) [task]
 func (e *Engine) execTTS(ctx context.Context, id uint, stream *schema.StreamReader[*schema.Message]) {
+	var sendLast bool
 	defer e.llmWg.Done()
 	defer stream.Close()
 	if err := e.tts.Dial(ctx); err != nil {
@@ -28,6 +29,11 @@ func (e *Engine) execTTS(ctx context.Context, id uint, stream *schema.StreamRead
 	for {
 		select {
 		case <-ctx.Done():
+			if !sendLast {
+				if err := e.tts.Send(ctx, app.LastTTS); err != nil {
+					e.unexpected(err, "tts send err")
+				}
+			}
 			return
 		default:
 			var err error
@@ -40,13 +46,17 @@ func (e *Engine) execTTS(ctx context.Context, id uint, stream *schema.StreamRead
 				stop = true
 			}
 			if stop { // 尾包
+				sendLast = true // 进入到stop, 退出时不需要再发last
 				if err = e.tts.Send(ctx, app.LastTTS); err != nil {
-					e.unexpected(err, "tts send err")
+					e.unexpected(err, "tts send last err")
 				}
 				util.DPrint("[tts] send LastTTS\n")
 				return
 			}
 			if err = e.tts.Send(ctx, msg.Content); err != nil {
+				// 正常发送失败, 不需要再发last
+				sendLast = true
+				e.unexpected(err, "tts send err")
 				return
 			}
 			util.DPrint("[tts] send %s\n", msg.Content)
