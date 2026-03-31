@@ -6,9 +6,16 @@ import (
 )
 
 func PagedFindOpt(pg *basic.PaginationOptions) *options.FindOptionsBuilder {
-	p := pg.GetPage() - 1
-	l := pg.GetLimit()
-	return options.Find().SetSkip(p * l).SetLimit(l)
+	page := pg.GetPage()
+	if page < 1 {
+		page = 1
+	}
+	limit := pg.GetLimit()
+	if limit < 1 {
+		limit = 10
+	}
+
+	return options.Find().SetSkip((page - 1) * limit).SetLimit(limit)
 }
 
 func PagedIndex(total int32, pg *basic.PaginationOptions) (int, int) {
@@ -21,6 +28,9 @@ func PagedIndex(total int32, pg *basic.PaginationOptions) (int, int) {
 	}
 
 	startIdx := (page - 1) * size
+	if startIdx < 0 {
+		startIdx = 0
+	}
 	endIdx := startIdx + size
 	if startIdx >= int(total) {
 		startIdx = 0
@@ -37,10 +47,19 @@ func PaginationRes(total int32, pg *basic.PaginationOptions) *basic.Pagination {
 		return &basic.Pagination{Total: 0, HasNext: false}
 	}
 
+	page := pg.GetPage()
+	if page < 1 {
+		page = 1
+	}
+	limit := pg.GetLimit()
+	if limit < 1 {
+		limit = 10
+	}
+
 	return &basic.Pagination{
 		Total:   int64(total),
-		Page:    pg.GetPage(),
-		Limit:   pg.GetLimit(),
-		HasNext: pg.GetPage()*pg.GetLimit() < int64(total),
+		Page:    page,
+		Limit:   limit,
+		HasNext: page*limit < int64(total),
 	}
 }

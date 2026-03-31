@@ -1277,8 +1277,7 @@ func (s *DashboardService) getOneUnitConvs(ctx context.Context, req *core_api.Da
 	}
 
 	// 至少有1条对话
-	fopt := util.PagedFindOpt(req.PaginationOptions).SetSort(bson.D{{cst.EndTime, -1}})
-	convs, err := s.ConversationMapper.FindManyByUnitId(ctx, &unitOID, fopt)
+	convs, err := s.ConversationMapper.FindManyByUnitId(ctx, &unitOID, util.PagedFindOpt(req.PaginationOptions).SetSort(bson.D{{cst.EndTime, -1}}))
 	if err != nil || len(convs) == 0 {
 		logs.Errorf("get conversation error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "对话"))
