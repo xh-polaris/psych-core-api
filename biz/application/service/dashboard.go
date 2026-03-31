@@ -1009,7 +1009,7 @@ func (s *DashboardService) DashboardUserConvRecords(ctx context.Context, req *co
 	}
 
 	// 批量处理对话详情
-	convDetail, pagination, err := s.getUserConvDetails(ctx, userOID, req.PaginationOptions)
+	convDetail, pagination, err := s.listUserConvDetails(ctx, userOID, req.PaginationOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -1054,8 +1054,8 @@ func (s *DashboardService) getUserConvTrend(ctx context.Context, userOID bson.Ob
 	}, nil
 }
 
-// getUserConvDetails 获取用户对话详情（摘要&词云）
-func (s *DashboardService) getUserConvDetails(ctx context.Context, userOID bson.ObjectID, paginationOpts *basic.PaginationOptions) ([]*core_api.ConvDetail, *basic.Pagination, error) {
+// listUserConvDetails 用户对话详情列表（摘要&词云）
+func (s *DashboardService) listUserConvDetails(ctx context.Context, userOID bson.ObjectID, paginationOpts *basic.PaginationOptions) ([]*core_api.ConvDetail, *basic.Pagination, error) {
 	// 获取对话记录
 	convs, pagination, err := s.getPagedUserConvs(ctx, userOID, paginationOpts)
 	if err != nil {
@@ -1218,15 +1218,16 @@ func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api
 	}
 
 	return &core_api.DashboardGetReportResp{
-		ReportId:  rpt.ID.Hex(),
-		Title:     rpt.Title,
-		Keywords:  rpt.Keywords,
-		Digest:    rpt.Digest,
-		Emotion:   int32(rpt.Emotion),
-		Body:      rpt.Body,
-		NeedAlarm: rpt.NeedAlarm,
-		Code:      0,
-		Msg:       "success",
+		ReportId:    rpt.ID.Hex(),
+		Title:       rpt.Title,
+		Keywords:    rpt.Keywords,
+		Digest:      rpt.Digest,
+		Emotion:     int32(rpt.Emotion),
+		Body:        rpt.Body,
+		Suggestions: rpt.Suggestions,
+		NeedAlarm:   rpt.NeedAlarm,
+		Code:        0,
+		Msg:         "success",
 	}, nil
 }
 
@@ -1277,8 +1278,7 @@ func (s *DashboardService) getOneUnitConvs(ctx context.Context, req *core_api.Da
 	}
 
 	// 至少有1条对话
-	fopt := util.PagedFindOpt(req.PaginationOptions).SetSort(bson.D{{cst.EndTime, -1}})
-	convs, err := s.ConversationMapper.FindManyByUnitId(ctx, &unitOID, fopt)
+	convs, err := s.ConversationMapper.FindManyByUnitId(ctx, &unitOID, util.PagedFindOpt(req.PaginationOptions).SetSort(bson.D{{cst.EndTime, -1}}))
 	if err != nil || len(convs) == 0 {
 		logs.Errorf("get conversation error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "对话"))

@@ -25,10 +25,11 @@ type Report struct {
 	Info           map[string]interface{} `bson:"info" json:"info,omitempty"`                                // 额外信息
 
 	// 报表结果
-	Title     string   `bson:"title" json:"title"`                    // 报表标题
-	Keywords  []string `bson:"keywords" json:"keywords,omitempty"`    // 关键词
-	Digest    string   `bson:"digest" json:"digest,omitempty"`        // 对话摘要
-	Emotion   int      `bson:"emotion" json:"emotion,omitempty"`      // 用户情绪状态 1-4: Danger | Depress | Negative | Normal
-	Body      string   `bson:"body" json:"body,omitempty"`            // 正文
-	NeedAlarm bool     `bson:"need_alarm" json:"needAlarm,omitempty"` // 是否需要创建预警
+	Title       string   `bson:"title" json:"title"`                       // 报表标题
+	Keywords    []string `bson:"keywords" json:"keywords,omitempty"`       // 关键词
+	Digest      string   `bson:"digest" json:"digest,omitempty"`           // 对话摘要
+	Emotion     int      `bson:"emotion" json:"emotion,omitempty"`         // 用户情绪状态 1-4: Danger | Depress | Negative | Normal
+	Body        string   `bson:"body" json:"body,omitempty"`               // 正文
+	Suggestions string   `bson:"suggestions" json:"suggestions,omitempty"` // 建议与反馈
+	NeedAlarm   bool     `bson:"need_alarm" json:"needAlarm,omitempty"`    // 是否需要创建预警
 }

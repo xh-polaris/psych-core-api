@@ -383,52 +383,38 @@ func (m *mongoMapper) FindManyByUserId(ctx context.Context, userId bson.ObjectID
 func (m *mongoMapper) FindManyByUnitId(ctx context.Context, unitId *bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error) {
 	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
 
-	if unitId == nil {
-		c, err := m.FindManyWithOption(ctx, matchStage, opt)
-		if err != nil {
-			logs.Errorf("[conversation mapper] paged find many by unit err: %s", errorx.ErrorWithoutStack(err))
+	if unitId != nil {
+		// 1. 先从用户表找到该单位的所有用户ID
+		var users []struct {
+			ID bson.ObjectID `bson:"_id"`
+		}
+		userFilter := bson.M{
+			"unit_id":  *unitId,
+			cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+		}
+		// 使用聚合或Find只取ID
+		if err := m.conn.Aggregate(ctx, &users, []bson.M{{"$match": userFilter}, {"$project": bson.M{cst.ID: 1}}}); err != nil {
+			logs.Errorf("[conversation mapper] find users by unit err: %s", errorx.ErrorWithoutStack(err))
 			return nil, err
 		}
-		return c, nil
+
+		if len(users) == 0 {
+			return nil, nil
+		}
+
+		userIds := make([]bson.ObjectID, 0, len(users))
+		for _, u := range users {
+			userIds = append(userIds, u.ID)
+		}
+
+		// 2. 直接根据 UserID 过滤
+		matchStage[cst.UserID] = bson.M{cst.In: userIds}
 	}
 
-	pipeline := []bson.M{
-		{"$match": matchStage},
-		{"$lookup": bson.M{
-			"from":         userCollection,
-			"localField":   cst.UserID,
-			"foreignField": cst.ID,
-			"as":           "userDoc",
-		}},
-		{"$match": bson.M{"userDoc.unit_id": *unitId}},
-	}
-
-	if opt != nil {
-		findOpt := &options.FindOptions{}
-		for _, setter := range opt.List() {
-			if setter == nil {
-				continue
-			}
-			if err := setter(findOpt); err != nil {
-				logs.Errorf("[conversation mapper] parse find options err: %s", errorx.ErrorWithoutStack(err))
-				return nil, err
-			}
-		}
-
-		if findOpt.Sort != nil {
-			pipeline = append(pipeline, bson.M{"$sort": findOpt.Sort})
-		}
-		if findOpt.Skip != nil && *findOpt.Skip > 0 {
-			pipeline = append(pipeline, bson.M{"$skip": *findOpt.Skip})
-		}
-		if findOpt.Limit != nil && *findOpt.Limit > 0 {
-			pipeline = append(pipeline, bson.M{"$limit": *findOpt.Limit})
-		}
-	}
-
-	var c []*Conversation
-	if err := m.conn.Aggregate(ctx, &c, pipeline); err != nil {
-		logs.Errorf("[conversation mapper] paged find many by unit err: %s", errorx.ErrorWithoutStack(err))
+	// 3. 使用标准 FindManyWithOption，它已经完美处理了 opt 中的排序和分页
+	c, err := m.FindManyWithOption(ctx, matchStage, opt)
+	if err != nil {
+		logs.Errorf("[conversation mapper] find many by unit err: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}
 	return c, nil
