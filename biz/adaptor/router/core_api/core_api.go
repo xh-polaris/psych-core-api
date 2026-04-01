@@ -50,6 +50,7 @@ func Register(r *server.Hertz) {
 	{
 		_unit := root.Group("/unit", _unitMw()...)
 		_unit.POST("/create_and_link_user", append(_unitcreateandlinkuserMw(), core_api.UnitCreateAndLinkUser)...)
+		_unit.POST("/get_by_uri", append(_unitgetbyuriMw(), core_api.UnitGetByURI)...)
 		_unit.GET("/get_info", append(_unitgetinfoMw(), core_api.UnitGetInfo)...)
 		_unit.POST("/link_user", append(_unitlinkuserMw(), core_api.UnitLinkUser)...)
 		_unit.POST("/update_info", append(_unitupdateinfoMw(), core_api.UnitUpdateInfo)...)

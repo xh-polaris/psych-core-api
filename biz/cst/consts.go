@@ -39,6 +39,7 @@ const (
 	Password       = "password"
 	RiskLevel      = "risk_level"
 	Remark         = "remark"
+	URI            = "uri"
 
 	Status = "status"
 	Type   = "type"

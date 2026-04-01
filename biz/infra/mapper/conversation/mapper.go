@@ -384,27 +384,34 @@ func (m *mongoMapper) FindManyByUnitId(ctx context.Context, unitId *bson.ObjectI
 	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
 
 	if unitId != nil {
-		// 1. 先从用户表找到该单位的所有用户ID
-		var users []struct {
-			ID bson.ObjectID `bson:"_id"`
+		// 在 conversation 集合上通过 $lookup 关联 user，并根据 user.unit_id 过滤出相关的 conversation.user_id
+		var userIdDocs []struct {
+			UserID bson.ObjectID `bson:"user_id"`
 		}
-		userFilter := bson.M{
-			"unit_id":  *unitId,
-			cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+
+		pipeline := []bson.M{
+			{"$lookup": bson.M{
+				"from":         userCollection,
+				"localField":   cst.UserID,
+				"foreignField": cst.ID,
+				"as":           "userDoc",
+			}},
+			{"$match": bson.M{"userDoc.unit_id": *unitId}},
+			{"$project": bson.M{"user_id": 1}},
 		}
-		// 使用聚合或Find只取ID
-		if err := m.conn.Aggregate(ctx, &users, []bson.M{{"$match": userFilter}, {"$project": bson.M{cst.ID: 1}}}); err != nil {
-			logs.Errorf("[conversation mapper] find users by unit err: %s", errorx.ErrorWithoutStack(err))
+
+		if err := m.conn.Aggregate(ctx, &userIdDocs, pipeline); err != nil {
+			logs.Errorf("[conversation mapper] find userIds by unit err: %s", errorx.ErrorWithoutStack(err))
 			return nil, err
 		}
 
-		if len(users) == 0 {
+		if len(userIdDocs) == 0 {
 			return nil, nil
 		}
 
-		userIds := make([]bson.ObjectID, 0, len(users))
-		for _, u := range users {
-			userIds = append(userIds, u.ID)
+		userIds := make([]bson.ObjectID, 0, len(userIdDocs))
+		for _, d := range userIdDocs {
+			userIds = append(userIds, d.UserID)
 		}
 
 		// 2. 直接根据 UserID 过滤

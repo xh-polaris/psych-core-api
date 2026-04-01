@@ -28,6 +28,7 @@ type IMongoMapper interface {
 	Count(ctx context.Context) (int32, error)
 	CountByPeriod(ctx context.Context, start, end time.Time) (int32, error)
 	FindAll(ctx context.Context) ([]*Unit, error)
+	FindOneByURI(ctx context.Context, uri string) (*Unit, error)
 }
 
 type mongoMapper struct {
@@ -61,4 +62,9 @@ func (m *mongoMapper) FindAll(ctx context.Context) ([]*Unit, error) {
 		return nil, err
 	}
 	return units, nil
+}
+
+// FindOneByURI 根据uri查询unitID
+func (m *mongoMapper) FindOneByURI(ctx context.Context, uri string) (*Unit, error) {
+	return m.FindOneByFields(ctx, bson.M{cst.Status: bson.M{cst.NE: enum.UnitStatusDeleted}, cst.URI: uri})
 }
