@@ -30,11 +30,26 @@ type IUnitService interface {
 	UnitUpdateInfo(ctx context.Context, req *core_api.UnitUpdateInfoReq) (*basic.Response, error)
 	UnitLinkUser(ctx context.Context, req *core_api.UnitLinkUserReq) (*basic.Response, error)
 	UnitCreateAndLinkUser(ctx context.Context, req *core_api.UnitCreateAndLinkUserReq) (*core_api.UnitCreateAndLinkUserResp, error)
+	UnitFindByURI(ctx context.Context, req *core_api.UnitGetByURIReq) (*core_api.UnitGetByURIResp, error)
 }
 
 type UnitService struct {
 	UnitMapper unit.IMongoMapper
 	UserMapper user.IMongoMapper
+}
+
+func (u *UnitService) UnitFindByURI(ctx context.Context, req *core_api.UnitGetByURIReq) (*core_api.UnitGetByURIResp, error) {
+	un, err := u.UnitMapper.FindOneByURI(ctx, req.Uri)
+	if err != nil {
+		logs.Errorf("UnitFindByURI failed:%s, got URI:%s", errorx.ErrorWithoutStack(err), req.Uri)
+		return nil, errorx.New(errno.ErrUnitFindByURI)
+	}
+
+	return &core_api.UnitGetByURIResp{
+		Unit: &core_api.UnitVO{Id: un.ID.Hex()},
+		Code: 0,
+		Msg:  "",
+	}, nil
 }
 
 var UnitServiceSet = wire.NewSet(

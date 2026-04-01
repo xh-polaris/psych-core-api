@@ -210,3 +210,8 @@ func _dashboardcreateremarkMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _unitgetbyuriMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

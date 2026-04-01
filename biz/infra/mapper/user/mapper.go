@@ -24,7 +24,7 @@ const (
 
 type IMongoMapper interface {
 	FindOneByCode(ctx context.Context, phone string) (*User, error)
-	FindOneByCodeAndUnitID(ctx context.Context, phone string, unitId bson.ObjectID) (*User, error)
+	FindOneByCodeAndUnitID(ctx context.Context, code string, unitId bson.ObjectID) (*User, error)
 	FindOneByCodeAndRole(ctx context.Context, code string, role int) (*User, error)
 	FindOneById(ctx context.Context, id bson.ObjectID) (*User, error)
 	Insert(ctx context.Context, user *User) error
@@ -151,7 +151,7 @@ func (m *mongoMapper) BatchFindByIDs(ctx context.Context, userIds []bson.ObjectI
 		return make(map[bson.ObjectID]*User), nil
 	}
 
-	filter := bson.M{cst.ID: bson.M{"$in": userIds}}
+	filter := bson.M{cst.ID: bson.M{"$in": userIds}, cst.Role: enum.UserRoleStudent}
 	var users []*User
 	if err := m.conn.Find(ctx, &users, filter); err != nil {
 		logs.Errorf("[user mapper] aggregate user err:%s", errorx.ErrorWithoutStack(err))
