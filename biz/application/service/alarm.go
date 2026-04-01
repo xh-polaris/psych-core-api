@@ -193,6 +193,7 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 				Keywords: al.Keywords,
 				Status:   int32(al.Status),
 				User: &core_api.UserVO{
+					Id:    dbUser.ID.Hex(),
 					Code:  dbUser.Code,
 					Name:  dbUser.Name,
 					Grade: int32(dbUser.Grade),
