@@ -76,7 +76,7 @@ func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInRe
 		uid, err := bson.ObjectIDFromHex(req.UnitId)
 		if err != nil {
 			logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
-			return nil, errorx.New(errno.ErrUserNotFound)
+			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("unitId", "单位id"))
 		}
 		// 获得用户
 		userDAO, err = u.UserMapper.FindOneByCodeAndUnitID(ctx, req.AuthId, uid)
