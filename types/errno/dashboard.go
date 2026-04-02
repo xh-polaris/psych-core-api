@@ -51,7 +51,7 @@ func init() {
 	)
 	code.Register(
 		ErrDashboardGetConvReports,
-		"获取对话报表失败",
+		"报表不存在或生成中",
 		code.WithAffectStability(false),
 	)
 	code.Register(
