@@ -7,6 +7,7 @@ const (
 	ErrFindReport       = 6000
 	ErrReportInvalid    = 6001
 	ErrGetReportKeyWord = 6002
+	ErrReportNotReady   = 6003
 )
 
 func init() {
@@ -23,6 +24,11 @@ func init() {
 	code.Register(
 		ErrGetReportKeyWord,
 		"获取报表关键词出错",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrReportNotReady,
+		"报表处理中，请稍后",
 		code.WithAffectStability(false),
 	)
 }

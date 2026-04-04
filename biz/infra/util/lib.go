@@ -84,3 +84,12 @@ func CalculateChange(current, lastWeek float64) float64 {
 	}
 	return ((current - lastWeek) / lastWeek) * 100
 }
+
+// KeywordsMap2Slice 转换得到关键词列表
+func KeywordsMap2Slice[V any](m map[string]V) []string {
+	s := make([]string, 0, len(m))
+	for k, _ := range m {
+		s = append(s, k)
+	}
+	return s
+}

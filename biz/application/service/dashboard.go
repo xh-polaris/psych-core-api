@@ -1085,7 +1085,7 @@ func (s *DashboardService) listUserConvDetails(ctx context.Context, userOID bson
 			tmMu.Unlock()
 
 			// 获取摘要
-			rpt, err := s.ReportMapper.FindByConversation(ctx, c.ID)
+			rpt, err := s.ReportMapper.FindByConversationPreferSuccess(ctx, c.ID)
 			if err != nil {
 				// 报表不存在，可能还未完成创建
 				if errors.Is(err, mongo.ErrNoDocuments) {
@@ -1211,24 +1211,33 @@ func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api
 		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
-	rpt, err := s.ReportMapper.FindByConversation(ctx, convOID)
+	rpt, err := s.ReportMapper.FindByConversationPreferSuccess(ctx, convOID)
 	if err != nil {
 		logs.Errorf("get report error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardGetReport)
 	}
 
-	return &core_api.DashboardGetReportResp{
-		ReportId:    rpt.ID.Hex(),
-		Title:       rpt.Title,
-		Keywords:    rpt.Keywords,
-		Digest:      rpt.Digest,
-		Emotion:     int32(rpt.Emotion),
-		Body:        rpt.Body,
-		Suggestions: rpt.Suggestions,
-		NeedAlarm:   rpt.NeedAlarm,
-		Code:        0,
-		Msg:         "success",
-	}, nil
+	resp := &core_api.DashboardGetReportResp{
+		ReportId:       rpt.ID.Hex(),
+		Title:          rpt.Title,
+		Topics:         rpt.Topics,
+		Digest:         rpt.Digest,
+		Emotion:        int32(rpt.Emotion),
+		Body:           rpt.Body,
+		Suggestions:    rpt.Suggestions,
+		NeedAlarm:      rpt.NeedAlarm,
+		KeywordPercent: rpt.Keywords,
+		ReportStatus:   int32(rpt.Status),
+		Code:           0,
+		Msg:            "success",
+	}
+
+	if rpt.Status != enum.ReportStatusSuccess {
+		resp.Code = errno.ErrReportNotReady
+		resp.Msg = "报表处理中，请稍后"
+	}
+
+	return resp, nil
 }
 
 func (s *DashboardService) DashboardUnitConvRecords(ctx context.Context, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error) {
