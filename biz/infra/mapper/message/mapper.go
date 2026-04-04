@@ -26,8 +26,8 @@ const (
 )
 
 type IMongoMapper interface {
+	mapper.IMongoMapper[Message]
 	RetrieveMessage(ctx context.Context, conversation string, size int) ([]*Message, error)
-	Insert(ctx context.Context, msg *Message) error
 	BatchMessageStats(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*MsgStats, error)
 }
 

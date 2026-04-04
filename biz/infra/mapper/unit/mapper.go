@@ -2,7 +2,6 @@ package unit
 
 import (
 	"context"
-	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
@@ -21,14 +20,11 @@ const (
 )
 
 type IMongoMapper interface {
-	FindOneByPhone(ctx context.Context, phone string) (*Unit, error)
-	FindOneById(ctx context.Context, id bson.ObjectID) (*Unit, error)
-	Insert(ctx context.Context, unit *Unit) error
-	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
+	mapper.IMongoMapper[Unit]
 	Count(ctx context.Context) (int32, error)
-	CountByPeriod(ctx context.Context, start, end time.Time) (int32, error)
 	FindAll(ctx context.Context) ([]*Unit, error)
 	FindOneByURI(ctx context.Context, uri string) (*Unit, error)
+	FindOneByPhone(ctx context.Context, phone string) (*Unit, error)
 }
 
 type mongoMapper struct {

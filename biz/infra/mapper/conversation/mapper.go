@@ -24,14 +24,10 @@ const (
 )
 
 type IMongoMapper interface {
-	Insert(ctx context.Context, conv *Conversation) error
-	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
-
+	mapper.IMongoMapper[Conversation]
 	Exists(ctx context.Context, conversationId bson.ObjectID) (bool, error)
 	CountByUnit(ctx context.Context, unitId *bson.ObjectID) (int32, error)
 	CountByUser(ctx context.Context, userId bson.ObjectID) (int32, error)
-	// 查找
-	FindOneById(ctx context.Context, id bson.ObjectID) (*Conversation, error)
 	FindManyByUserId(ctx context.Context, userId bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error) // 分页查找
 	FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error)                                           // 查找全部
 	FindManyByUnitId(ctx context.Context, unitId *bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
@@ -85,18 +81,14 @@ func (m *mongoMapper) CountByUser(ctx context.Context, userId bson.ObjectID) (in
 	return int32(cnt), err
 }
 
-// CountUnitByPeriod 按时间范围统计对话数量
+// CountUnitConvByPeriod 按时间范围统计对话数量
 func (m *mongoMapper) CountUnitConvByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error) {
 	return m.countWithUnitFilter(ctx, unitId, &start, &end)
 }
 
-func (m *mongoMapper) CountUserConvByPeriod(ctx context.Context, userId *bson.ObjectID, start, end time.Time) (int32, error) {
-	return 0, nil
-}
-
 func (m *mongoMapper) countWithUnitFilter(ctx context.Context, unitId *bson.ObjectID, start, end *time.Time) (int32, error) {
 	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
-	if start != nil && !start.IsZero() || end != nil && !end.IsZero() {
+	if (start != nil && !start.IsZero()) || (end != nil && !end.IsZero()) {
 		ct := bson.M{}
 		if start != nil && !start.IsZero() {
 			ct[cst.GT] = *start
@@ -150,7 +142,7 @@ func (m *mongoMapper) AverageDurationByPeriod(ctx context.Context, unitId *bson.
 
 func (m *mongoMapper) averageDurationWithFilter(ctx context.Context, unitId *bson.ObjectID, start, end *time.Time) (float64, error) {
 	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
-	if start != nil && !start.IsZero() || end != nil && !end.IsZero() {
+	if (start != nil && !start.IsZero()) || (end != nil && !end.IsZero()) {
 		ct := bson.M{}
 		if start != nil && !start.IsZero() {
 			ct[cst.GT] = *start

@@ -21,8 +21,7 @@ const (
 )
 
 type IMongoMapper interface {
-	Insert(ctx context.Context, rep *Report) error
-	FindOneById(ctx context.Context, id bson.ObjectID) (*Report, error)
+	mapper.IMongoMapper[Report]
 	ExistByUser(ctx context.Context, userId bson.ObjectID) (bool, error)
 	FindUserLatest(ctx context.Context, userId bson.ObjectID) (*Report, error)
 	FindAllByUser(ctx context.Context, userId bson.ObjectID) ([]*Report, error)

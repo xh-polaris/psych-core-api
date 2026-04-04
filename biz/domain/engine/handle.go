@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/core"
@@ -9,10 +10,19 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/pkg/wsx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+)
+
+var (
+	engineTracer = otel.Tracer("engine")
 )
 
 // handle 处理消息, 当messageCh关闭时退出
 func (e *Engine) handle(data []byte) (err error) {
+	ctx, span := engineTracer.Start(e.ctx, "Engine.Handle")
+	defer span.End()
+
 	var (
 		payload any
 		msg     *core.Message
@@ -51,7 +61,7 @@ func (e *Engine) handle(data []byte) (err error) {
 	}
 	switch msg.Type {
 	case core.MCmd:
-		return e.execCmd(e.ctx, payload.(*core.Cmd))
+		return e.execCmd(ctx, payload.(*core.Cmd))
 	case core.MPing: // Ping消息
 		return e.mockHeartbeat(payload.(*core.Ping))
 	default: // 不支持的消息
@@ -61,6 +71,10 @@ func (e *Engine) handle(data []byte) (err error) {
 
 // 执行命令
 func (e *Engine) execCmd(ctx context.Context, cmd *core.Cmd) (err error) {
+	ctx, span := engineTracer.Start(ctx, "Engine.ExecCmd")
+	defer span.End()
+	span.SetAttributes(attribute.String("engine.command", fmt.Sprintf("%d", cmd.Command)))
+
 	switch cmd.Command {
 	case core.CUserAudioASR: // 音频识别
 		return e.execASR(ctx, cmd)

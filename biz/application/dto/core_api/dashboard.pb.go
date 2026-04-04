@@ -2478,9 +2478,8 @@ type DashboardGetReportResp struct {
 	// 详细分析内容
 	Body string `protobuf:"bytes,5,opt,name=body,proto3" form:"body" json:"body" query:"body"`
 	// 是否需要告警
-	NeedAlarm bool   `protobuf:"varint,6,opt,name=need_alarm,json=needAlarm,proto3" form:"need_alarm" json:"needAlarm" query:"need_alarm"`
-	ReportId  string `protobuf:"bytes,7,opt,name=reportId,proto3" form:"reportId" json:"reportId" query:"reportId"`
-	// 建议与反馈
+	NeedAlarm   bool     `protobuf:"varint,6,opt,name=need_alarm,json=needAlarm,proto3" form:"need_alarm" json:"needAlarm" query:"need_alarm"`
+	ReportId    string   `protobuf:"bytes,7,opt,name=reportId,proto3" form:"reportId" json:"reportId" query:"reportId"`
 	Suggestions []string `protobuf:"bytes,8,rep,name=suggestions,proto3" form:"suggestions" json:"suggestions" query:"suggestions"`
 	Code        int32    `protobuf:"varint,255,opt,name=code,proto3" form:"code" json:"code" query:"code"`
 	Msg         string   `protobuf:"bytes,256,opt,name=msg,proto3" form:"msg" json:"msg" query:"msg"`
@@ -3486,6 +3485,7 @@ var file_core_api_dashboard_proto_depIdxs = []int32{
 	33, // [33:33] is the sub-list for extension extendee
 	0,  // [0:33] is the sub-list for field type_name
 }
+
 
 func file_core_api_dashboard_proto_init() {
 	if File_core_api_dashboard_proto != nil {

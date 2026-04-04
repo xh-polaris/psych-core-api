@@ -9,6 +9,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
+	"github.com/xh-polaris/psych-core-api/pkg/httpx"
 	"github.com/xh-polaris/psych-core-api/provider"
 )
 
@@ -21,6 +22,12 @@ type AppDependency struct {
 }
 
 func InitApplication() {
+	// 初始化带追踪的 Mongo Client 注入到 mon 管理中
+	config := provider.Get().Config
+	if _, err := httpx.NewTracedClient(config.Mongo.URL); err != nil {
+		panic(err)
+	}
+
 	app := &AppDependency{}
 	InitInfra(app)
 	InitDomain(app)

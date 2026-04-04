@@ -218,10 +218,17 @@ func (ll *defaultLogger) logfCtx(ctx context.Context, lv Level, format *string, 
 		return
 	}
 	msg := lv.toString()
+
+	// 尝试提取 ID
+	traceID := ctx.Value("trace-id")
 	logID := ctx.Value("log-id")
-	if logID != nil {
+
+	if traceID != nil && traceID != "" {
+		msg += fmt.Sprintf("[trace-id: %v] ", traceID)
+	} else if logID != nil && logID != "" {
 		msg += fmt.Sprintf("[log-id: %v] ", logID)
 	}
+
 	if format != nil {
 		msg += fmt.Sprintf(*format, v...)
 	} else {

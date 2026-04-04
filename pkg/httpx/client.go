@@ -76,7 +76,7 @@ func (c *HttpClient) ReqWithHeader(method, url string, headers http.Header, body
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		_resp, _ := io.ReadAll(response.Body)
 		errMsg := fmt.Sprintf("unexpected status code: %d, response body: %s", response.StatusCode, _resp)
-		return response.Header, nil, fmt.Errorf(errMsg)
+		return response.Header, nil, fmt.Errorf("%s", errMsg)
 	}
 	// 读取响应体
 	var _resp []byte
@@ -131,7 +131,7 @@ func (c *HttpClient) StreamWithHeader(method, url string, headers http.Header, b
 		defer func() { _ = reader.Close() }()
 		_resp, _ := reader.ReadAll()
 		errMsg := fmt.Sprintf("unexpected status code: %d, response body: %s", resp.StatusCode, _resp)
-		return resp.Header, nil, fmt.Errorf(errMsg)
+		return resp.Header, nil, fmt.Errorf("%s", errMsg)
 	}
 	return resp.Header, reader, nil
 }
