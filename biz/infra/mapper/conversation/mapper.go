@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
 	"github.com/xh-polaris/psych-core-api/types/enum"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
@@ -23,16 +24,10 @@ const (
 )
 
 type IMongoMapper interface {
-	FindOneByFields(ctx context.Context, filter bson.M) (*Conversation, error)
-	FindManyWithOption(ctx context.Context, filter bson.M, opts options.Lister[options.FindOptions]) ([]*Conversation, error)
-	Insert(ctx context.Context, conv *Conversation) error
-	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
-
+	mapper.IMongoMapper[Conversation]
 	Exists(ctx context.Context, conversationId bson.ObjectID) (bool, error)
 	CountByUnit(ctx context.Context, unitId *bson.ObjectID) (int32, error)
 	CountByUser(ctx context.Context, userId bson.ObjectID) (int32, error)
-	// 查找
-	FindOneById(ctx context.Context, id bson.ObjectID) (*Conversation, error)
 	FindManyByUserId(ctx context.Context, userId bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error) // 分页查找
 	FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error)                                           // 查找全部
 	FindManyByUnitId(ctx context.Context, unitId *bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
@@ -52,46 +47,12 @@ type IMongoMapper interface {
 
 type mongoMapper struct {
 	conn *monc.Model
+	mapper.IMongoMapper[Conversation]
 }
 
 func NewConversationMongoMapper(config *conf.Config) IMongoMapper {
 	conn := monc.MustNewModel(config.Mongo.URL, config.Mongo.DB, collectionName, config.CacheConf)
-	return &mongoMapper{conn: conn}
-}
-
-// FindOneByFields 根据字段查询对话
-func (m *mongoMapper) FindOneByFields(ctx context.Context, filter bson.M) (*Conversation, error) {
-	result := new(Conversation)
-	if err := m.conn.FindOneNoCache(ctx, result, filter); err != nil {
-		return nil, err
-	}
-	return result, nil
-}
-
-// FindOneById 根据ID查询对话
-func (m *mongoMapper) FindOneById(ctx context.Context, id bson.ObjectID) (*Conversation, error) {
-	return m.FindOneByFields(ctx, bson.M{cst.ID: id})
-}
-
-// FindManyWithOption 带选项查询多个对话
-func (m *mongoMapper) FindManyWithOption(ctx context.Context, filter bson.M, opts options.Lister[options.FindOptions]) ([]*Conversation, error) {
-	var result []*Conversation
-	if err := m.conn.Find(ctx, &result, filter, opts); err != nil {
-		return nil, err
-	}
-	return result, nil
-}
-
-// Insert 插入对话
-func (m *mongoMapper) Insert(ctx context.Context, data *Conversation) error {
-	_, err := m.conn.InsertOneNoCache(ctx, data)
-	return err
-}
-
-// UpdateFields 更新字段
-func (m *mongoMapper) UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error {
-	_, err := m.conn.UpdateOneNoCache(ctx, bson.M{cst.ID: id}, bson.M{"$set": update})
-	return err
+	return &mongoMapper{conn: conn, IMongoMapper: mapper.NewMongoMapper[Conversation](conn)}
 }
 
 func (m *mongoMapper) Exists(ctx context.Context, conversationId bson.ObjectID) (bool, error) {
@@ -120,18 +81,14 @@ func (m *mongoMapper) CountByUser(ctx context.Context, userId bson.ObjectID) (in
 	return int32(cnt), err
 }
 
-// CountUnitByPeriod 按时间范围统计对话数量
+// CountUnitConvByPeriod 按时间范围统计对话数量
 func (m *mongoMapper) CountUnitConvByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error) {
 	return m.countWithUnitFilter(ctx, unitId, &start, &end)
 }
 
-func (m *mongoMapper) CountUserConvByPeriod(ctx context.Context, userId *bson.ObjectID, start, end time.Time) (int32, error) {
-	return 0, nil
-}
-
 func (m *mongoMapper) countWithUnitFilter(ctx context.Context, unitId *bson.ObjectID, start, end *time.Time) (int32, error) {
 	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
-	if start != nil && !start.IsZero() || end != nil && !end.IsZero() {
+	if (start != nil && !start.IsZero()) || (end != nil && !end.IsZero()) {
 		ct := bson.M{}
 		if start != nil && !start.IsZero() {
 			ct[cst.GT] = *start
@@ -185,7 +142,7 @@ func (m *mongoMapper) AverageDurationByPeriod(ctx context.Context, unitId *bson.
 
 func (m *mongoMapper) averageDurationWithFilter(ctx context.Context, unitId *bson.ObjectID, start, end *time.Time) (float64, error) {
 	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
-	if start != nil && !start.IsZero() || end != nil && !end.IsZero() {
+	if (start != nil && !start.IsZero()) || (end != nil && !end.IsZero()) {
 		ct := bson.M{}
 		if start != nil && !start.IsZero() {
 			ct[cst.GT] = *start

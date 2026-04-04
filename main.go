@@ -11,6 +11,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
+	"github.com/hertz-contrib/cors"
 	prometheus "github.com/hertz-contrib/monitor-prometheus"
 	"github.com/hertz-contrib/obs-opentelemetry/tracing"
 	"github.com/xh-polaris/gopkg/hertz/middleware"
@@ -50,8 +51,14 @@ func main() {
 
 	h.NoHijackConnPool = true
 
+	// CORS 配置
+	corsConf := cors.DefaultConfig()
+	corsConf.AllowAllOrigins = true
+	corsConf.AllowHeaders = []string{"*"}
+	corsHandler := cors.New(corsConf)
+
 	// 增加全局中间件链
-	h.Use(tracing.ServerMiddleware(cfg), middleware.EnvironmentMiddleware, recovery.Recovery(), func(ctx context.Context, c *app.RequestContext) {
+	h.Use(corsHandler, tracing.ServerMiddleware(cfg), middleware.EnvironmentMiddleware, recovery.Recovery(), func(ctx context.Context, c *app.RequestContext) {
 		ctx = httpx.InjectContext(ctx, c)
 		c.Next(ctx)
 	})

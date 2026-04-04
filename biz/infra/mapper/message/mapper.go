@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
 	"github.com/xh-polaris/psych-core-api/types/enum"
 
 	"github.com/xh-polaris/psych-core-api/biz/conf"
@@ -25,24 +26,19 @@ const (
 )
 
 type IMongoMapper interface {
+	mapper.IMongoMapper[Message]
 	RetrieveMessage(ctx context.Context, conversation string, size int) ([]*Message, error)
-	Insert(ctx context.Context, msg *Message) error
 	BatchMessageStats(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*MsgStats, error)
 }
 
 type mongoMapper struct {
 	conn *monc.Model
+	mapper.IMongoMapper[Message]
 }
 
 func NewMessageMongoMapper(config *conf.Config) IMongoMapper {
 	conn := monc.MustNewModel(config.Mongo.URL, config.Mongo.DB, collection, config.CacheConf)
-	return &mongoMapper{conn: conn}
-}
-
-// Insert 插入消息
-func (m *mongoMapper) Insert(ctx context.Context, data *Message) error {
-	_, err := m.conn.InsertOneNoCache(ctx, data)
-	return err
+	return &mongoMapper{conn: conn, IMongoMapper: mapper.NewMongoMapper[Message](conn)}
 }
 
 func (m *mongoMapper) RetrieveMessage(ctx context.Context, conversation string, size int) (msgs []*Message, err error) {
