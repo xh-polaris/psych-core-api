@@ -215,3 +215,23 @@ func _unitgetbyuriMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _adminMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _adminsigninMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _studentMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _studentsigninMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

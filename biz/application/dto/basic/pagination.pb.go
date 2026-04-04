@@ -243,6 +243,7 @@ var file_basic_pagination_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for field type_name
 }
 
+
 func file_basic_pagination_proto_init() {
 	if File_basic_pagination_proto != nil {
 		return

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
 	"github.com/xh-polaris/psych-core-api/types/enum"
 
 	"time"
@@ -29,8 +28,9 @@ const (
 )
 
 type IMongoMapper interface {
-	Insert(ctx context.Context, alarm *Alarm) error
+	FindOneByFields(ctx context.Context, filter bson.M) (*Alarm, error)
 	FindOneById(ctx context.Context, id bson.ObjectID) (*Alarm, error)
+	Insert(ctx context.Context, alarm *Alarm) error
 	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
 	RetrieveByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time, opt *options.FindOptionsBuilder) ([]*Alarm, error)
 	CountByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (int32, error)
@@ -42,18 +42,38 @@ type IMongoMapper interface {
 
 type mongoMapper struct {
 	conn *monc.Model
-	mapper.IMongoMapper[Alarm]
 }
 
 func NewAlarmMongoMapper(config *conf.Config) IMongoMapper {
 	conn := monc.MustNewModel(config.Mongo.URL, config.Mongo.DB, collection, config.CacheConf)
-	return &mongoMapper{conn: conn, IMongoMapper: mapper.NewMongoMapper[Alarm](conn)}
+	return &mongoMapper{conn: conn}
 }
 
-//func (m *mongoMapper) Insert(ctx context.Context, alarm *Alarm) error {
-//	_, err := m.conn.InsertOneNoCache(ctx, alarm)
-//	return err
-//}
+// FindOneByFields 根据字段查询预警
+func (m *mongoMapper) FindOneByFields(ctx context.Context, filter bson.M) (*Alarm, error) {
+	result := new(Alarm)
+	if err := m.conn.FindOneNoCache(ctx, result, filter); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// FindOneById 根据ID查询预警
+func (m *mongoMapper) FindOneById(ctx context.Context, id bson.ObjectID) (*Alarm, error) {
+	return m.FindOneByFields(ctx, bson.M{cst.ID: id})
+}
+
+// Insert 插入预警
+func (m *mongoMapper) Insert(ctx context.Context, data *Alarm) error {
+	_, err := m.conn.InsertOneNoCache(ctx, data)
+	return err
+}
+
+// UpdateFields 更新字段
+func (m *mongoMapper) UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error {
+	_, err := m.conn.UpdateOneNoCache(ctx, bson.M{cst.ID: id}, bson.M{"$set": update})
+	return err
+}
 
 // RetrieveByTime 返回某Unit下一段时间内的所有预警信息 如时间范围传入零值time.Time{} 则查询所有
 func (m *mongoMapper) RetrieveByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time, opt *options.FindOptionsBuilder) (alarms []*Alarm, err error) {
@@ -134,7 +154,7 @@ func (m *mongoMapper) AggregateStats(ctx context.Context, unitID bson.ObjectID, 
 	now := time.Now()
 	lastweek := time.Now().AddDate(0, 0, -7)
 
-	// 使用 $facet 一次查询获取当前周和上周的数据
+	// 使用 $facet 一次查询获取当前周 and 上周的数据
 	pipeline := mongo.Pipeline{
 		{{Key: "$match", Value: bson.M{
 			cst.UnitID: unitID,

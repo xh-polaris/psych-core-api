@@ -5,7 +5,6 @@ import (
 
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
-	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -21,6 +20,9 @@ const (
 )
 
 type IMongoMapper interface {
+	FindOneByFields(ctx context.Context, filter bson.M) (*Report, error)
+	FindAllByFields(ctx context.Context, filter bson.M) ([]*Report, error)
+	ExistsByFields(ctx context.Context, filter bson.M) (bool, error)
 	Insert(ctx context.Context, rep *Report) error
 	FindOneById(ctx context.Context, id bson.ObjectID) (*Report, error)
 	ExistByUser(ctx context.Context, userId bson.ObjectID) (bool, error)
@@ -37,12 +39,46 @@ type IMongoMapper interface {
 
 type mongoMapper struct {
 	conn *monc.Model
-	mapper.IMongoMapper[Report]
 }
 
 func NewReportMongoMapper(config *conf.Config) IMongoMapper {
 	conn := monc.MustNewModel(config.Mongo.URL, config.Mongo.DB, collection, config.CacheConf)
-	return &mongoMapper{conn: conn, IMongoMapper: mapper.NewMongoMapper[Report](conn)}
+	return &mongoMapper{conn: conn}
+}
+
+// FindOneByFields 根据字段查询报表
+func (m *mongoMapper) FindOneByFields(ctx context.Context, filter bson.M) (*Report, error) {
+	result := new(Report)
+	if err := m.conn.FindOneNoCache(ctx, result, filter); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// FindOneById 根据ID查询报表
+func (m *mongoMapper) FindOneById(ctx context.Context, id bson.ObjectID) (*Report, error) {
+	return m.FindOneByFields(ctx, bson.M{cst.ID: id})
+}
+
+// FindAllByFields 根据字段查询所有报表
+func (m *mongoMapper) FindAllByFields(ctx context.Context, filter bson.M) ([]*Report, error) {
+	var result []*Report
+	if err := m.conn.Find(ctx, &result, filter); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// ExistsByFields 根据字段查询是否存在报表
+func (m *mongoMapper) ExistsByFields(ctx context.Context, filter bson.M) (bool, error) {
+	count, err := m.conn.CountDocuments(ctx, filter)
+	return count > 0, err
+}
+
+// Insert 插入报表
+func (m *mongoMapper) Insert(ctx context.Context, data *Report) error {
+	_, err := m.conn.InsertOneNoCache(ctx, data)
+	return err
 }
 
 func (m *mongoMapper) ExistByUser(ctx context.Context, userId bson.ObjectID) (bool, error) {

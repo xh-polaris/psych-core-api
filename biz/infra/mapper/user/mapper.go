@@ -6,7 +6,6 @@ import (
 
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
-	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/enum"
@@ -23,74 +22,207 @@ const (
 )
 
 type IMongoMapper interface {
-	FindOneByCode(ctx context.Context, phone string) (*User, error)
-	FindOneByCodeAndUnitID(ctx context.Context, code string, unitId bson.ObjectID) (*User, error)
-	FindOneByCodeAndRole(ctx context.Context, code string, role int) (*User, error)
+	// --- 基础 CRUD ---
+	FindOneByFields(ctx context.Context, filter bson.M) (*User, error)
+	FindAllByFields(ctx context.Context, filter bson.M) ([]*User, error)
 	FindOneById(ctx context.Context, id bson.ObjectID) (*User, error)
 	Insert(ctx context.Context, user *User) error
 	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
-	ExistsByCode(ctx context.Context, phone string) (bool, error)
+	ExistsByFields(ctx context.Context, filter bson.M) (bool, error)
+
+	// --- 语义化查询 (Business-level) ---
+	// FindStudentByCode 查找学生 (强制 Role: Student + Status: Active)
+	FindStudentByCode(ctx context.Context, code string, unitId bson.ObjectID) (*User, error)
+	// FindAdminByCode 查找管理人员 (强制 Role IN [Teacher, ClassTeacher, UnitAdmin, SuperAdmin] + Status: Active)
+	FindAdminByCode(ctx context.Context, code string, unitId *bson.ObjectID) (*User, error)
+
+	// --- 语义化统计 (Business-level) ---
+	// CountStudents 统计单位下的学生总数
+	CountStudents(ctx context.Context, unitId bson.ObjectID) (int32, error)
+	// CountStudentsByPeriod 统计时间段内新增的学生数
+	CountStudentsByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
+	// CountHighRiskStudents 统计高风险学生数
+	CountHighRiskStudents(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
+
+	// --- 其他业务查询 ---
+	FindOneByCodeAndUnitID(ctx context.Context, code string, unitId bson.ObjectID) (*User, error)
+	FindOneByCodeAndRole(ctx context.Context, code string, role int) (*User, error)
 	ExistsByCodeAndUnitID(ctx context.Context, code string, unitId bson.ObjectID) (bool, error)
 	FindAllByUnitID(ctx context.Context, unitId bson.ObjectID) ([]*User, error)
 	FindManyByUnitIDWithFilter(ctx context.Context, unitId bson.ObjectID, grade, class *int32) ([]*User, error)
 	BatchFindByIDs(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*User, error)
 	CountByClasses(ctx context.Context, unitId bson.ObjectID, grade, class []int32) ([]*ClassStatResult, error)
-	Count(ctx context.Context) (int32, error)
-	CountByPeriod(ctx context.Context, start, end time.Time) (int32, error)
-	CountByUnitID(ctx context.Context, unitId bson.ObjectID) (int32, error)
-	CountByUnitIDAndPeriod(ctx context.Context, unitId bson.ObjectID, start, end time.Time) (int32, error)
-	CountAlarmUsers(ctx context.Context, unitId *bson.ObjectID) (int32, error)
-	CountAlarmUsersByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 	RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID) ([]*RiskStat, error)
 	FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID) (ClassTeachers, error)
-	// 检查某班级是否已有班主任
 	ExistsClassTeacher(ctx context.Context, unitId bson.ObjectID, grade, class int) (bool, error)
+
+	// --- 通用/历史保留 (谨慎使用) ---
+	Count(ctx context.Context) (int32, error)
 }
 
 type mongoMapper struct {
-	mapper.IMongoMapper[User]
 	conn *monc.Model
 }
 
 func NewUserMongoMapper(config *conf.Config) IMongoMapper {
 	conn := monc.MustNewModel(config.Mongo.URL, config.Mongo.DB, collectionName, config.CacheConf)
 	return &mongoMapper{
-		IMongoMapper: mapper.NewMongoMapper[User](conn),
-		conn:         conn,
+		conn: conn,
 	}
 }
 
-// FindOneByCode 根据电话号码或学号查询用户
-func (m *mongoMapper) FindOneByCode(ctx context.Context, code string) (*User, error) {
-	return m.FindOneByFields(ctx, bson.M{cst.Code: code})
+// FindOneByFields 根据字段查询用户
+func (m *mongoMapper) FindOneByFields(ctx context.Context, filter bson.M) (*User, error) {
+	result := new(User)
+	if err := m.conn.FindOneNoCache(ctx, result, filter); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
-// FindOneByCodeAndUnitID 根据电话号码和UnitID查询用户
+// FindOneById 根据ID查询用户
+func (m *mongoMapper) FindOneById(ctx context.Context, id bson.ObjectID) (*User, error) {
+	return m.FindOneByFields(ctx, bson.M{cst.ID: id})
+}
+
+// FindAllByFields 根据字段查询所有用户
+func (m *mongoMapper) FindAllByFields(ctx context.Context, filter bson.M) ([]*User, error) {
+	var result []*User
+	if err := m.conn.Find(ctx, &result, filter); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// Insert 插入用户
+func (m *mongoMapper) Insert(ctx context.Context, user *User) error {
+	_, err := m.conn.InsertOneNoCache(ctx, user)
+	return err
+}
+
+// UpdateFields 更新字段
+func (m *mongoMapper) UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error {
+	_, err := m.conn.UpdateOneNoCache(ctx, bson.M{cst.ID: id}, bson.M{"$set": update})
+	return err
+}
+
+// ExistsByFields 根据字段查询是否存在用户
+func (m *mongoMapper) ExistsByFields(ctx context.Context, filter bson.M) (bool, error) {
+	count, err := m.conn.CountDocuments(ctx, filter)
+	return count > 0, err
+}
+
+// FindOneByCodeAndUnitID 根据代码和单位ID查询用户
 func (m *mongoMapper) FindOneByCodeAndUnitID(ctx context.Context, code string, unitId bson.ObjectID) (*User, error) {
 	return m.FindOneByFields(ctx, bson.M{cst.Code: code, cst.UnitID: unitId})
 }
 
-// FindOneByCodeAndRole 根据电话号码和角色查询用户
+// FindOneByCodeAndRole 根据代码和角色查询用户
 func (m *mongoMapper) FindOneByCodeAndRole(ctx context.Context, code string, role int) (*User, error) {
 	return m.FindOneByFields(ctx, bson.M{cst.Code: code, cst.Role: role})
 }
 
-// ExistsByCode 根据电话号码或学号查询用户是否存在
-func (m *mongoMapper) ExistsByCode(ctx context.Context, code string) (bool, error) {
-	return m.ExistsByFields(ctx, bson.M{cst.Code: code})
-}
-
-// ExistsByCodeAndUnitID 根据电话号码和UnitID查询用户是否存在
+// ExistsByCodeAndUnitID 检查代码和单位ID对应的用户是否存在
 func (m *mongoMapper) ExistsByCodeAndUnitID(ctx context.Context, code string, unitId bson.ObjectID) (bool, error) {
 	return m.ExistsByFields(ctx, bson.M{cst.Code: code, cst.UnitID: unitId})
 }
 
-// FindAllByUnitID 根据UnitID查询所有用户
+// FindStudentByCode 查找学生 (强制 Role: Student + Status: Active)
+func (m *mongoMapper) FindStudentByCode(ctx context.Context, code string, unitId bson.ObjectID) (*User, error) {
+	return m.FindOneByFields(ctx, bson.M{
+		cst.Code:   code,
+		cst.UnitID: unitId,
+		cst.Role:   enum.UserRoleStudent,
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+	})
+}
+
+// FindAdminByCode 查找管理人员
+func (m *mongoMapper) FindAdminByCode(ctx context.Context, code string, unitId *bson.ObjectID) (*User, error) {
+	filter := bson.M{
+		cst.Code: code,
+		cst.Role: bson.M{"$in": []int{
+			enum.UserRoleTeacher,
+			enum.UserRoleClassTeacher,
+			enum.UserRoleUnitAdmin,
+			enum.UserRoleSuperAdmin,
+		}},
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+	}
+	if unitId != nil {
+		filter[cst.UnitID] = *unitId
+	}
+	return m.FindOneByFields(ctx, filter)
+}
+
+// CountStudents 统计单位下的学生总数
+func (m *mongoMapper) CountStudents(ctx context.Context, unitId bson.ObjectID) (int32, error) {
+	filter := bson.M{
+		cst.UnitID: unitId,
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+		cst.Role:   enum.UserRoleStudent,
+	}
+	cnt, err := m.conn.CountDocuments(ctx, filter)
+	return int32(cnt), err
+}
+
+// CountStudentsByPeriod 统计时间段内新增的学生数
+func (m *mongoMapper) CountStudentsByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error) {
+	timeFilter := bson.M{}
+	if !start.IsZero() {
+		timeFilter[cst.GT] = start
+	}
+	if !end.IsZero() {
+		timeFilter[cst.LT] = end
+	}
+
+	filter := bson.M{
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+		cst.Role:   enum.UserRoleStudent,
+	}
+	if unitId != nil {
+		filter[cst.UnitID] = *unitId
+	}
+	if len(timeFilter) > 0 {
+		filter[cst.CreateTime] = timeFilter
+	}
+
+	cnt, err := m.conn.CountDocuments(ctx, filter)
+	return int32(cnt), err
+}
+
+// CountHighRiskStudents 统计高风险学生数
+func (m *mongoMapper) CountHighRiskStudents(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error) {
+	timeFilter := bson.M{}
+	if !start.IsZero() {
+		timeFilter["$gte"] = start
+	}
+	if !end.IsZero() {
+		timeFilter["$lte"] = end
+	}
+
+	filter := bson.M{
+		cst.RiskLevel: enum.UserRiskLevelHigh,
+		cst.Status:    bson.M{cst.NE: enum.UserStatusDeleted},
+		cst.Role:      enum.UserRoleStudent,
+	}
+	if unitId != nil {
+		filter[cst.UnitID] = *unitId
+	}
+	if len(timeFilter) > 0 {
+		filter[cst.CreateTime] = timeFilter
+	}
+
+	cnt, err := m.conn.CountDocuments(ctx, filter)
+	return int32(cnt), err
+}
+
+// FindAllByUnitID 根据UnitID查询所有学生
 func (m *mongoMapper) FindAllByUnitID(ctx context.Context, unitId bson.ObjectID) ([]*User, error) {
 	return m.FindAllByFields(ctx, bson.M{cst.UnitID: unitId, cst.Status: bson.M{cst.NE: enum.UserStatusDeleted}, cst.Role: enum.UserRoleStudent})
 }
 
-// FindManyByUnitIDWithFilter 根据 UnitID 及班级条件查询用户
+// FindManyByUnitIDWithFilter 根据 UnitID 及班级条件查询学生
 func (m *mongoMapper) FindManyByUnitIDWithFilter(ctx context.Context, unitId bson.ObjectID, grade, class *int32) ([]*User, error) {
 	filter := bson.M{
 		cst.UnitID: unitId,
@@ -112,39 +244,7 @@ func (m *mongoMapper) FindManyByUnitIDWithFilter(ctx context.Context, unitId bso
 	return users, nil
 }
 
-// CountByUnitID 按单位统计用户数量（排除已删除）
-func (m *mongoMapper) CountByUnitID(ctx context.Context, unitId bson.ObjectID) (int32, error) {
-	filter := bson.M{
-		cst.UnitID: unitId,
-		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
-	}
-	cnt, err := m.conn.CountDocuments(ctx, filter)
-	return int32(cnt), err
-}
-
-// CountByUnitIDAndPeriod 按单位及时间范围统计用户数量（排除已删除）
-func (m *mongoMapper) CountByUnitIDAndPeriod(ctx context.Context, unitId bson.ObjectID, start, end time.Time) (int32, error) {
-	timeFilter := bson.M{}
-	if !start.IsZero() {
-		timeFilter[cst.GT] = start
-	}
-	if !end.IsZero() {
-		timeFilter[cst.LT] = end
-	}
-
-	filter := bson.M{
-		cst.UnitID: unitId,
-		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
-	}
-	if len(timeFilter) > 0 {
-		filter[cst.CreateTime] = timeFilter
-	}
-
-	cnt, err := m.conn.CountDocuments(ctx, filter)
-	return int32(cnt), err
-}
-
-// BatchFindByIDs 根据UserID切片批量查询用户
+// BatchFindByIDs 根据UserID切片批量查询学生
 func (m *mongoMapper) BatchFindByIDs(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*User, error) {
 	if len(userIds) == 0 {
 		logs.Warnf("[user mapper] try to find from empty userIds")
@@ -176,7 +276,7 @@ type ClassStatResult struct {
 	AlarmNum int32 `bson:"alarmNum"`
 }
 
-// CountByClasses 统计各班级（高危）用户人数，结果按班年级排序
+// CountByClasses 统计各班级学生人数
 func (m *mongoMapper) CountByClasses(ctx context.Context, unitId bson.ObjectID, grade, class []int32) ([]*ClassStatResult, error) {
 	match := bson.M{
 		cst.UnitID: unitId,
@@ -224,47 +324,12 @@ func (m *mongoMapper) CountByClasses(ctx context.Context, unitId bson.ObjectID, 
 	return results, nil
 }
 
-// Count 统计用户数量
+// Count 统计所有学生总数
 func (m *mongoMapper) Count(ctx context.Context) (int32, error) {
-	cnt, err := m.conn.CountDocuments(ctx, bson.M{})
-	return int32(cnt), err
-}
-
-// CountAlarmUsers 统计高风险用户数量（riskLevel == high），可选按单位过滤
-func (m *mongoMapper) CountAlarmUsers(ctx context.Context, unitId *bson.ObjectID) (int32, error) {
 	filter := bson.M{
-		cst.RiskLevel: enum.UserRiskLevelHigh,
-		cst.Status:    bson.M{cst.NE: enum.UserStatusDeleted},
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+		cst.Role:   enum.UserRoleStudent,
 	}
-	if unitId != nil {
-		filter[cst.UnitID] = *unitId
-	}
-
-	cnt, err := m.conn.CountDocuments(ctx, filter)
-	return int32(cnt), err
-}
-
-// CountAlarmUsersByPeriod 统计高风险用户数量（riskLevel == high），可选按单位和时间范围过滤
-func (m *mongoMapper) CountAlarmUsersByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error) {
-	timeFilter := bson.M{}
-	if !start.IsZero() {
-		timeFilter["$gte"] = start
-	}
-	if !end.IsZero() {
-		timeFilter["$lte"] = end
-	}
-
-	filter := bson.M{
-		cst.RiskLevel: enum.UserRiskLevelHigh,
-		cst.Status:    bson.M{cst.NE: enum.UserStatusDeleted},
-	}
-	if unitId != nil {
-		filter[cst.UnitID] = *unitId
-	}
-	if len(timeFilter) > 0 {
-		filter[cst.CreateTime] = timeFilter
-	}
-
 	cnt, err := m.conn.CountDocuments(ctx, filter)
 	return int32(cnt), err
 }
@@ -276,10 +341,11 @@ type RiskStat struct {
 	Count  int32 `bson:"count"`
 }
 
-// RiskDistributionStats 统计风险等级分布（按性别拆分），unitId 为空表示全平台
+// RiskDistributionStats 统计学生风险等级分布（按性别拆分），unitId 为空表示全平台
 func (m *mongoMapper) RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID) ([]*RiskStat, error) {
 	match := bson.M{
 		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+		cst.Role:   enum.UserRoleStudent,
 	}
 	if unitId != nil {
 		match[cst.UnitID] = *unitId

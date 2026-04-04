@@ -695,6 +695,7 @@ var file_core_api_conversation_proto_depIdxs = []int32{
 	0,  // [0:6] is the sub-list for field type_name
 }
 
+
 func file_core_api_conversation_proto_init() {
 	if File_core_api_conversation_proto != nil {
 		return
