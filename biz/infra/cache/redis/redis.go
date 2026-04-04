@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/infra/cache"
@@ -33,6 +34,10 @@ func NewWithAddrAndPassword(addr, password string) cache.Cmdable {
 		ReadTimeout:  3 * time.Second, // read operation timed out
 		WriteTimeout: 3 * time.Second, // write operation timed out
 	})
+
+	if err := redisotel.InstrumentTracing(rdb); err != nil {
+		panic(err)
+	}
 
 	return &redisImpl{client: rdb}
 }

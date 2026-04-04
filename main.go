@@ -16,6 +16,7 @@ import (
 	"github.com/hertz-contrib/obs-opentelemetry/tracing"
 	"github.com/xh-polaris/gopkg/hertz/middleware"
 	logx "github.com/xh-polaris/gopkg/util/log"
+	bizMiddleware "github.com/xh-polaris/psych-core-api/biz/adaptor/middleware"
 	"github.com/xh-polaris/psych-core-api/biz/application"
 	"github.com/xh-polaris/psych-core-api/pkg/httpx"
 	"github.com/xh-polaris/psych-core-api/provider"
@@ -58,7 +59,7 @@ func main() {
 	corsHandler := cors.New(corsConf)
 
 	// 增加全局中间件链
-	h.Use(corsHandler, tracing.ServerMiddleware(cfg), middleware.EnvironmentMiddleware, recovery.Recovery(), func(ctx context.Context, c *app.RequestContext) {
+	h.Use(corsHandler, tracing.ServerMiddleware(cfg), bizMiddleware.SetLogIDMW(), middleware.EnvironmentMiddleware, recovery.Recovery(), func(ctx context.Context, c *app.RequestContext) {
 		ctx = httpx.InjectContext(ctx, c)
 		c.Next(ctx)
 	})
