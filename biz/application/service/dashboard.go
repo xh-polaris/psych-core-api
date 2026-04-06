@@ -698,9 +698,12 @@ func (s *DashboardService) getEmotionRatio(ctx context.Context, unitOID *bson.Ob
 	}
 
 	ratio := make(map[int32]int32, len(*emotionDistribution))
+	var abnormalSum int32
 	for emo, cnt := range *emotionDistribution {
 		ratio[int32(emo)] = cnt
+		abnormalSum += cnt
 	}
+	ratio[enum.AlarmEmotionNormal] = total - abnormalSum
 
 	return &core_api.EmotionRatio{
 		Ratio: ratio,
