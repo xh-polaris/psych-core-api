@@ -209,7 +209,7 @@ func parseWeekData(weekData weekData) (map[int32]int32, int32) {
 type EmotionDistribution map[int]int32
 
 // EmotionDistribution 计算某Unit的情绪分布
-// unitId传入零值bson.ObjectID{}则计算所有Unit的情绪分布
+// unitId传入nil则计算所有Unit的情绪分布
 func (m *mongoMapper) EmotionDistribution(ctx context.Context, unitId *bson.ObjectID) (*EmotionDistribution, error) {
 	match := bson.M{
 		//cst.Status: bson.M{cst.NE: cst.DeletedStatus},
@@ -218,8 +218,16 @@ func (m *mongoMapper) EmotionDistribution(ctx context.Context, unitId *bson.Obje
 		match[cst.UnitID] = *unitId
 	}
 
+	// 对每个用户取最新一条Alarm 统计emotion分布
 	pipeline := mongo.Pipeline{
 		{{Key: "$match", Value: match}},
+		{{Key: "$sort", Value: bson.M{cst.CreateTime: -1}}},
+		// per-user latest emotion
+		{{Key: "$group", Value: bson.M{
+			"_id":     "$" + cst.UserID,
+			"emotion": bson.M{"$first": "$emotion"},
+		}}},
+		// count users by latest emotion
 		{{Key: "$group", Value: bson.M{
 			"_id":   "$emotion",
 			"count": bson.M{"$sum": 1},
