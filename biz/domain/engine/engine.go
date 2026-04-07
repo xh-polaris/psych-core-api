@@ -189,7 +189,7 @@ func (e *Engine) Lock() error {
 		return nil
 	}
 	if e.lock == nil {
-		e.lock = lock.Mgr.NewLock(e.info[cst.UserID].(string))
+		e.lock = lock.Mgr.NewLock(e.info[cst.JsonUserID].(string))
 	}
 	if ok, err := e.lock.TryLock(e.ctx, time.Minute*3, time.Second*90, time.Minute*2); err != nil {
 		return errorx.WrapByCode(err, errno.UnKnown)
