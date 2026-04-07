@@ -16,6 +16,13 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+)
+
+var (
+	cozeTracer = otel.Tracer("coze")
 )
 
 const (
@@ -60,6 +67,18 @@ func (c *CozeModel) Generate(ctx context.Context, in []*schema.Message, opts ...
 }
 
 func (c *CozeModel) Stream(ctx context.Context, in []*schema.Message, opts ...model.Option) (sr *schema.StreamReader[*schema.Message], err error) {
+	ctx, span := cozeTracer.Start(ctx, "Coze.Stream")
+	span.SetAttributes(
+		attribute.String("coze.bot_id", c.botId),
+		attribute.String("coze.user_id", c.uid),
+	)
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.End()
+		}
+	}()
+
 	sr, sw := schema.Pipe[*schema.Message](5)
 	request := &coze.CreateChatsReq{
 		BotID:           c.botId,
@@ -73,12 +92,15 @@ func (c *CozeModel) Stream(ctx context.Context, in []*schema.Message, opts ...mo
 	if stream, err = c.cli.Chat.Stream(ctx, request); err != nil {
 		return nil, err
 	}
-	go process(ctx, stream, sw)
+	go process(ctx, stream, sw, span)
 	return sr, nil
 }
 
-func process(ctx context.Context, reader coze.Stream[coze.ChatEvent], writer *schema.StreamWriter[*schema.Message]) {
-	defer func() { _ = reader.Close() }()
+func process(ctx context.Context, reader coze.Stream[coze.ChatEvent], writer *schema.StreamWriter[*schema.Message], span trace.Span) {
+	defer func() {
+		_ = reader.Close()
+		span.End()
+	}()
 	defer writer.Close()
 
 	var err error

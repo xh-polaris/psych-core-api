@@ -6,6 +6,8 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
+	"github.com/xh-polaris/psych-core-api/types/enum"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -21,14 +23,14 @@ const (
 )
 
 type IMongoMapper interface {
-	Insert(ctx context.Context, rep *Report) error
-	FindOneById(ctx context.Context, id bson.ObjectID) (*Report, error)
+	mapper.IMongoMapper[Report]
 	ExistByUser(ctx context.Context, userId bson.ObjectID) (bool, error)
 	FindUserLatest(ctx context.Context, userId bson.ObjectID) (*Report, error)
 	FindAllByUser(ctx context.Context, userId bson.ObjectID) ([]*Report, error)
 	BatchFindUserLatest(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*Report, error)
 	BatchGetUserKeyWords(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID][]string, error)
 	FindByConversation(ctx context.Context, sessionId bson.ObjectID) (*Report, error)
+	FindByConversationPreferSuccess(ctx context.Context, sessionId bson.ObjectID) (*Report, error)
 	BatchFindBySession(ctx context.Context, sessionIds []bson.ObjectID) (map[bson.ObjectID]*Report, error)
 	// 词云相关接口
 	GetAllUnitsKW(ctx context.Context) (map[string]int32, error)
@@ -121,7 +123,7 @@ func (m *mongoMapper) BatchGetUserKeyWords(ctx context.Context, userIds []bson.O
 			continue
 		}
 		// 若存在report，则应存在关键词
-		result[userId] = report.Keywords
+		result[userId] = util.KeywordsMap2Slice(report.Keywords)
 	}
 
 	return result, nil
@@ -140,8 +142,13 @@ func (m *mongoMapper) GetAllUnitsKW(ctx context.Context) (map[string]int32, erro
 				cst.Keywords: bson.M{
 					"$exists": true,
 					"$ne":     nil,
-					"$not":    bson.M{"$size": 0},
 				},
+			},
+		}},
+		// 将关键词map转换为数组便于统计
+		{{
+			Key: "$project", Value: bson.M{
+				"keywords": bson.M{"$objectToArray": "$keywords"},
 			},
 		}},
 		// 展开关键词数组，每个关键词成为一个文档
@@ -151,7 +158,7 @@ func (m *mongoMapper) GetAllUnitsKW(ctx context.Context) (map[string]int32, erro
 		// 按关键词分组并计数
 		{{
 			Key: "$group", Value: bson.M{
-				"_id":   "$keywords",
+				"_id":   "$keywords.k",
 				"count": bson.M{"$sum": 1},
 			},
 		}},
@@ -200,8 +207,13 @@ func (m *mongoMapper) GetUnitKW(ctx context.Context, unitId bson.ObjectID) (map[
 				cst.Keywords: bson.M{
 					"$exists": true,
 					"$ne":     nil,
-					"$not":    bson.M{"$size": 0},
 				},
+			},
+		}},
+		// 将关键词map转换为数组便于统计
+		{{
+			Key: "$project", Value: bson.M{
+				"keywords": bson.M{"$objectToArray": "$keywords"},
 			},
 		}},
 		// 展开关键词数组，每个关键词成为一个文档
@@ -211,7 +223,7 @@ func (m *mongoMapper) GetUnitKW(ctx context.Context, unitId bson.ObjectID) (map[
 		// 按关键词分组并计数
 		{{
 			Key: "$group", Value: bson.M{
-				"_id":   "$keywords",
+				"_id":   "$keywords.k",
 				"count": bson.M{"$sum": 1},
 			},
 		}},
@@ -253,6 +265,20 @@ func (m *mongoMapper) GetUnitKW(ctx context.Context, unitId bson.ObjectID) (map[
 // FindByConversation 根据对话ID查找报表
 func (m *mongoMapper) FindByConversation(ctx context.Context, sessionId bson.ObjectID) (*Report, error) {
 	return m.FindOneByFields(ctx, bson.M{cst.ConversationID: sessionId})
+}
+
+// FindByConversationPreferSuccess 按状态优先级查找报表（success优先）
+func (m *mongoMapper) FindByConversationPreferSuccess(ctx context.Context, sessionId bson.ObjectID) (*Report, error) {
+	report := &Report{}
+	filter := bson.M{
+		cst.ConversationID: sessionId,
+		cst.Status:         bson.M{cst.NE: enum.ReportStatusDeleted},
+	}
+	opt := options.FindOne().SetSort(bson.D{{cst.Status, -1}, {cst.EndTime, -1}})
+	if err := m.conn.FindOneNoCache(ctx, report, filter, opt); err != nil {
+		return nil, err
+	}
+	return report, nil
 }
 
 // BatchFindBySession 批量根据会话ID查找报表

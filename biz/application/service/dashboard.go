@@ -121,16 +121,16 @@ func (s *DashboardService) dashboardOverviewAdmin(ctx context.Context, twoWeeksB
 		weeklyIncreaseUnitsRate = float64(weeklyIncreaseUnits) / float64(beforeUnits)
 	}
 
-	// 用户数量（累计）
-	totalUsers, err := s.UserMapper.Count(ctx)
+	// 学生数量（累计）
+	totalUsers, err := s.UserMapper.CountStudents(ctx, bson.ObjectID{})
 	if err != nil {
 		logs.Errorf("count user error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.WrapByCode(err, errno.ErrDashboardTotalUserStat)
+		return nil, errorx.New(errno.ErrDashboardTotalUserStat)
 	}
-	beforeUsers, err := s.UserMapper.CountByPeriod(ctx, time.Time{}, weekBefore)
+	beforeUsers, err := s.UserMapper.CountStudentsByPeriod(ctx, nil, time.Time{}, weekBefore)
 	if err != nil {
 		logs.Errorf("count user by period error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.WrapByCode(err, errno.ErrDashboardTotalUserStat)
+		return nil, errorx.New(errno.ErrDashboardTotalUserStat)
 	}
 	weeklyIncreaseUsers := totalUsers - beforeUsers
 	var weeklyIncreaseUsersRate float64
@@ -194,16 +194,16 @@ func (s *DashboardService) dashboardOverviewAdmin(ctx context.Context, twoWeeksB
 		weeklyIncreaseAvgDurationRate = weeklyIncreaseAvgDuration / avgLastWeek
 	}
 
-	// 高风险用户数（riskLevel == high），支持周环比
-	alarmUsersThisWeek, err := s.UserMapper.CountAlarmUsersByPeriod(ctx, nil, weekBefore, now)
+	// 高风险学生数（riskLevel == high），支持周环比
+	alarmUsersThisWeek, err := s.UserMapper.CountHighRiskStudents(ctx, nil, weekBefore, now)
 	if err != nil {
 		logs.Errorf("count alarm users this week error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.WrapByCode(err, errno.ErrDashboardAlarmUserStat)
+		return nil, errorx.New(errno.ErrDashboardAlarmUserStat)
 	}
-	alarmUsersLastWeek, err := s.UserMapper.CountAlarmUsersByPeriod(ctx, nil, twoWeeksBefore, weekBefore)
+	alarmUsersLastWeek, err := s.UserMapper.CountHighRiskStudents(ctx, nil, twoWeeksBefore, weekBefore)
 	if err != nil {
 		logs.Errorf("count alarm users last week error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.WrapByCode(err, errno.ErrDashboardAlarmUserStat)
+		return nil, errorx.New(errno.ErrDashboardAlarmUserStat)
 	}
 	weeklyIncreaseAlarmUsers := alarmUsersThisWeek - alarmUsersLastWeek
 	var weeklyIncreaseAlarmUsersRate float64
@@ -238,15 +238,15 @@ func (s *DashboardService) dashboardOverviewAdmin(ctx context.Context, twoWeeksB
 // 单位端数据概览
 func (s *DashboardService) dashboardOverviewUnit(ctx context.Context, unitOID bson.ObjectID, twoWeeksBefore, weekBefore, now time.Time) (*core_api.DashboardGetDataOverviewResp, error) {
 	// 学生总数（当前单位）
-	totalUsers, err := s.UserMapper.CountByUnitID(ctx, unitOID)
+	totalUsers, err := s.UserMapper.CountStudents(ctx, unitOID)
 	if err != nil {
 		logs.Errorf("count unit users error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.WrapByCode(err, errno.ErrDashboardTotalUserStat)
+		return nil, errorx.New(errno.ErrDashboardTotalUserStat)
 	}
-	beforeUsers, err := s.UserMapper.CountByUnitIDAndPeriod(ctx, unitOID, time.Time{}, weekBefore)
+	beforeUsers, err := s.UserMapper.CountStudentsByPeriod(ctx, &unitOID, time.Time{}, weekBefore)
 	if err != nil {
 		logs.Errorf("count unit users by period error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.WrapByCode(err, errno.ErrDashboardTotalUserStat)
+		return nil, errorx.New(errno.ErrDashboardTotalUserStat)
 	}
 	weeklyIncreaseUsers := totalUsers - beforeUsers
 	var weeklyIncreaseUsersRate float64
@@ -310,16 +310,16 @@ func (s *DashboardService) dashboardOverviewUnit(ctx context.Context, unitOID bs
 		weeklyIncreaseAvgDurationRate = weeklyIncreaseAvgDuration / avgLastWeek
 	}
 
-	// 高风险用户数（当前单位，支持周环比）
-	alarmUsersThisWeek, err := s.UserMapper.CountAlarmUsersByPeriod(ctx, &unitOID, weekBefore, now)
+	// 高风险学生数（当前单位，支持周环比）
+	alarmUsersThisWeek, err := s.UserMapper.CountHighRiskStudents(ctx, &unitOID, weekBefore, now)
 	if err != nil {
 		logs.Errorf("count unit alarm users this week error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.WrapByCode(err, errno.ErrDashboardAlarmUserStat)
+		return nil, errorx.New(errno.ErrDashboardAlarmUserStat)
 	}
-	alarmUsersLastWeek, err := s.UserMapper.CountAlarmUsersByPeriod(ctx, &unitOID, twoWeeksBefore, weekBefore)
+	alarmUsersLastWeek, err := s.UserMapper.CountHighRiskStudents(ctx, &unitOID, twoWeeksBefore, weekBefore)
 	if err != nil {
 		logs.Errorf("count unit alarm users last week error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.WrapByCode(err, errno.ErrDashboardAlarmUserStat)
+		return nil, errorx.New(errno.ErrDashboardAlarmUserStat)
 	}
 	weeklyIncreaseAlarmUsers := alarmUsersThisWeek - alarmUsersLastWeek
 	var weeklyIncreaseAlarmUsersRate float64
@@ -518,7 +518,7 @@ func (s *DashboardService) DashboardListUnits(ctx context.Context, req *core_api
 		unitID := u.ID
 
 		// 用户总数
-		userCount, err := s.UserMapper.CountByUnitID(ctx, unitID)
+		userCount, err := s.UserMapper.CountStudents(ctx, unitID)
 		if err != nil {
 			logs.Errorf("count users for unit %s error: %s", u.Name, errorx.ErrorWithoutStack(err))
 			continue
@@ -532,7 +532,7 @@ func (s *DashboardService) DashboardListUnits(ctx context.Context, req *core_api
 		}
 
 		// 高风险用户数（当前单位）
-		riskCount, err := s.UserMapper.CountAlarmUsers(ctx, &unitID)
+		riskCount, err := s.UserMapper.CountHighRiskStudents(ctx, &unitID, time.Time{}, time.Now())
 		if err != nil {
 			logs.Errorf("count alarm users for unit %s error: %s", u.Name, errorx.ErrorWithoutStack(err))
 			riskCount = 0
@@ -674,9 +674,9 @@ func (s *DashboardService) getEmotionRatio(ctx context.Context, unitOID *bson.Ob
 	)
 
 	if unitOID == nil {
-		total, err = s.UserMapper.Count(ctx)
+		total, err = s.UserMapper.CountStudents(ctx, bson.ObjectID{})
 	} else {
-		total, err = s.UserMapper.CountByUnitID(ctx, *unitOID)
+		total, err = s.UserMapper.CountStudents(ctx, *unitOID)
 	}
 
 	if err != nil {
@@ -698,9 +698,12 @@ func (s *DashboardService) getEmotionRatio(ctx context.Context, unitOID *bson.Ob
 	}
 
 	ratio := make(map[int32]int32, len(*emotionDistribution))
+	var abnormalSum int32
 	for emo, cnt := range *emotionDistribution {
 		ratio[int32(emo)] = cnt
+		abnormalSum += cnt
 	}
+	ratio[enum.AlarmEmotionNormal] = total - abnormalSum
 
 	return &core_api.EmotionRatio{
 		Ratio: ratio,
@@ -1085,7 +1088,7 @@ func (s *DashboardService) listUserConvDetails(ctx context.Context, userOID bson
 			tmMu.Unlock()
 
 			// 获取摘要
-			rpt, err := s.ReportMapper.FindByConversation(ctx, c.ID)
+			rpt, err := s.ReportMapper.FindByConversationPreferSuccess(ctx, c.ID)
 			if err != nil {
 				// 报表不存在，可能还未完成创建
 				if errors.Is(err, mongo.ErrNoDocuments) {
@@ -1211,24 +1214,33 @@ func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api
 		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
-	rpt, err := s.ReportMapper.FindByConversation(ctx, convOID)
+	rpt, err := s.ReportMapper.FindByConversationPreferSuccess(ctx, convOID)
 	if err != nil {
 		logs.Errorf("get report error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardGetReport)
 	}
 
-	return &core_api.DashboardGetReportResp{
-		ReportId:    rpt.ID.Hex(),
-		Title:       rpt.Title,
-		Keywords:    rpt.Keywords,
-		Digest:      rpt.Digest,
-		Emotion:     int32(rpt.Emotion),
-		Body:        rpt.Body,
-		Suggestions: rpt.Suggestions,
-		NeedAlarm:   rpt.NeedAlarm,
-		Code:        0,
-		Msg:         "success",
-	}, nil
+	resp := &core_api.DashboardGetReportResp{
+		ReportId:       rpt.ID.Hex(),
+		Title:          rpt.Title,
+		Topics:         rpt.Topics,
+		Digest:         rpt.Digest,
+		Emotion:        int32(rpt.Emotion),
+		Body:           rpt.Body,
+		Suggestions:    rpt.Suggestions,
+		NeedAlarm:      rpt.NeedAlarm,
+		KeywordPercent: rpt.Keywords,
+		ReportStatus:   int32(rpt.Status),
+		Code:           0,
+		Msg:            "success",
+	}
+
+	if rpt.Status != enum.ReportStatusSuccess {
+		resp.Code = errno.ErrReportNotReady
+		resp.Msg = "报表处理中，请稍后"
+	}
+
+	return resp, nil
 }
 
 func (s *DashboardService) DashboardUnitConvRecords(ctx context.Context, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error) {

@@ -1,13 +1,12 @@
-// generic_mapper.go
 package mapper
 
 import (
 	"context"
-	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"github.com/zeromicro/go-zero/core/stores/monc"
 )
@@ -83,12 +82,9 @@ func (m *mongoMapper[T]) ExistsByFields(ctx context.Context, filter bson.M) (boo
 // CountByPeriod 统计指定时间段内的数量
 func (m *mongoMapper[T]) CountByPeriod(ctx context.Context, start, end time.Time) (int32, error) {
 	timeFilter := bson.M{}
-
-	// start 为空，只限制上界：createTime < end
 	if !start.IsZero() {
 		timeFilter[cst.GT] = start
 	}
-	// end 为空，只限制下界：createTime > start
 	if !end.IsZero() {
 		timeFilter[cst.LT] = end
 	}

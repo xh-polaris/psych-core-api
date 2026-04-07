@@ -19,10 +19,8 @@ const (
 )
 
 type IMongoMapper interface {
-	FindOneById(ctx context.Context, id bson.ObjectID) (*Config, error) // 继承模板类
+	mapper.IMongoMapper[Config]
 	FindOneByUnitID(ctx context.Context, unitID bson.ObjectID) (*Config, error)
-	Insert(ctx context.Context, config *Config) error
-	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
 }
 
 type mongoMapper struct {

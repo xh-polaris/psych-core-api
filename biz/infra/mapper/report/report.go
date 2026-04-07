@@ -23,13 +23,15 @@ type Report struct {
 	End            time.Time              `bson:"end" json:"end"`                                            // 对话结束时间
 	Config         *config.Report         `bson:"config" json:"config,omitempty"`                            // 对话配置
 	Info           map[string]interface{} `bson:"info" json:"info,omitempty"`                                // 额外信息
+	Status         int                    `bson:"status" json:"status"`                                      // 报表状态 处理中/已完成/已删除
 
 	// 报表结果
-	Title       string   `bson:"title" json:"title"`                       // 报表标题
-	Keywords    []string `bson:"keywords" json:"keywords,omitempty"`       // 关键词
-	Digest      string   `bson:"digest" json:"digest,omitempty"`           // 对话摘要
-	Emotion     int      `bson:"emotion" json:"emotion,omitempty"`         // 用户情绪状态 1-4: Danger | Depress | Negative | Normal
-	Body        string   `bson:"body" json:"body,omitempty"`               // 正文
-	Suggestions []string `bson:"suggestions" json:"suggestions,omitempty"` // 建议与反馈
-	NeedAlarm   bool     `bson:"need_alarm" json:"needAlarm,omitempty"`    // 是否需要创建预警
+	Title       string             `bson:"title" json:"title"`                       // 报表标题
+	Topics      []string           `bson:"topics" json:"topics,omitempty"`           // 主要话题-模型生成
+	Keywords    map[string]float64 `bson:"keywords" json:"keywords,omitempty"`       // 关键词&权重-由词云域统计
+	Digest      string             `bson:"digest" json:"digest,omitempty"`           // 对话摘要
+	Emotion     int                `bson:"emotion" json:"emotion,omitempty"`         // 用户情绪状态
+	Body        string             `bson:"body" json:"body,omitempty"`               // 正文
+	Suggestions []string           `bson:"suggestions" json:"suggestions,omitempty"` // 建议与反馈
+	NeedAlarm   bool               `bson:"need_alarm" json:"needAlarm,omitempty"`    // 是否需要创建预警
 }

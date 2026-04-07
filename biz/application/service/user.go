@@ -26,7 +26,9 @@ import (
 var _ IUserService = (*UserService)(nil)
 
 type IUserService interface {
-	UserSignIn(ctx context.Context, req *core_api.UserSignInReq) (*core_api.UserSignInResp, error)
+	StudentSignIn(ctx context.Context, req *core_api.StudentSignInReq) (*core_api.UserSignInResp, error)
+	AdminSignIn(ctx context.Context, req *core_api.AdminSignInReq) (*core_api.UserSignInResp, error)
+	UserSignIn(ctx context.Context, req *core_api.UserSignInReq) (*core_api.UserSignInResp, error) // Deprecated
 	UserGetInfo(ctx context.Context, req *core_api.UserGetInfoReq) (*core_api.UserGetInfoResp, error)
 	UserUpdateInfo(ctx context.Context, req *core_api.UserUpdateInfoReq) (*basic.Response, error)
 	UserUpdatePassword(ctx context.Context, req *core_api.UserUpdatePasswordReq) (*basic.Response, error)
@@ -42,6 +44,117 @@ var UserServiceSet = wire.NewSet(
 	wire.Bind(new(IUserService), new(*UserService)),
 )
 
+func (u *UserService) StudentSignIn(ctx context.Context, req *core_api.StudentSignInReq) (*core_api.UserSignInResp, error) {
+	// 参数校验
+	if req.Code == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "学号/手机号"))
+	}
+	if req.UnitId == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
+	}
+	if req.VerifyCode == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "密码/验证码"))
+	}
+
+	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "单位ID"))
+	}
+
+	// 查找学生
+	userDAO, err := u.UserMapper.FindStudentByCode(ctx, req.Code, unitOID)
+	if err != nil {
+		logs.Errorf("[StudentSignIn] find student error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrWrongAccountOrPassword)
+	}
+	if userDAO == nil {
+		return nil, errorx.New(errno.ErrWrongAccountOrPassword)
+	}
+
+	// 密码校验 (目前仅支持密码)
+	if isValid := encrypt.BcryptCheck(req.VerifyCode, userDAO.Password); !isValid {
+		return nil, errorx.New(errno.ErrWrongAccountOrPassword)
+	}
+
+	// 签发 JWT
+	token, err := util.GenerateJwt(map[string]any{
+		cst.JsonUnitID: userDAO.UnitID.Hex(),
+		cst.JsonUserID: userDAO.ID.Hex(),
+		cst.JsonCode:   userDAO.Code,
+		cst.JsonRole:   userDAO.Role,
+	})
+	if err != nil {
+		logs.Errorf("[StudentSignIn] generate token error: %s", errorx.ErrorWithoutStack(err))
+	}
+
+	return &core_api.UserSignInResp{
+		UnitId:    userDAO.UnitID.Hex(),
+		UserId:    userDAO.ID.Hex(),
+		CodeValue: userDAO.Code,
+		CodeType:  int32(userDAO.CodeType),
+		Token:     token,
+		Code:      0,
+		Msg:       "success",
+	}, nil
+}
+
+func (u *UserService) AdminSignIn(ctx context.Context, req *core_api.AdminSignInReq) (*core_api.UserSignInResp, error) {
+	// 参数校验
+	if req.Account == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "账号"))
+	}
+	if req.VerifyCode == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "密码/验证码"))
+	}
+
+	var unitOID *bson.ObjectID
+	if req.UnitId != "" {
+		oid, err := bson.ObjectIDFromHex(req.UnitId)
+		if err != nil {
+			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "单位ID"))
+		}
+		unitOID = &oid
+	}
+
+	// 查找管理员
+	userDAO, err := u.UserMapper.FindAdminByCode(ctx, req.Account, unitOID)
+	if err != nil {
+		logs.Errorf("[AdminSignIn] find admin error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrWrongAccountOrPassword)
+	}
+	if userDAO == nil {
+		return nil, errorx.New(errno.ErrWrongAccountOrPassword)
+	}
+
+	// 密码校验
+	if isValid := encrypt.BcryptCheck(req.VerifyCode, userDAO.Password); !isValid {
+		return nil, errorx.New(errno.ErrWrongAccountOrPassword)
+	}
+
+	// 签发 JWT
+	token, err := util.GenerateJwt(map[string]any{
+		cst.JsonUnitID: userDAO.UnitID.Hex(),
+		cst.JsonUserID: userDAO.ID.Hex(),
+		cst.JsonCode:   userDAO.Code,
+		cst.JsonRole:   userDAO.Role,
+	})
+	if err != nil {
+		logs.Errorf("[AdminSignIn] generate token error: %s", errorx.ErrorWithoutStack(err))
+	}
+
+	return &core_api.UserSignInResp{
+		UnitId:    userDAO.UnitID.Hex(),
+		UserId:    userDAO.ID.Hex(),
+		CodeValue: userDAO.Code,
+		CodeType:  int32(userDAO.CodeType),
+		Token:     token,
+		Code:      0,
+		Msg:       "success",
+	}, nil
+}
+
+// UserSignIn .
+// Deprecated: use StudentSignIn or AdminSignIn instead.
 func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInReq) (*core_api.UserSignInResp, error) {
 	// 参数校验
 	if req.AuthId == "" {

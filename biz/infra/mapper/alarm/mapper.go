@@ -3,13 +3,11 @@ package alarm
 import (
 	"context"
 	"errors"
-
-	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
-	"github.com/xh-polaris/psych-core-api/types/enum"
-
 	"time"
 
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
+	"github.com/xh-polaris/psych-core-api/types/enum"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"github.com/xh-polaris/psych-core-api/biz/conf"
@@ -29,9 +27,7 @@ const (
 )
 
 type IMongoMapper interface {
-	Insert(ctx context.Context, alarm *Alarm) error
-	FindOneById(ctx context.Context, id bson.ObjectID) (*Alarm, error)
-	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
+	mapper.IMongoMapper[Alarm]
 	RetrieveByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time, opt *options.FindOptionsBuilder) ([]*Alarm, error)
 	CountByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (int32, error)
 	ExistsById(ctx context.Context, id bson.ObjectID) (bool, error)
@@ -49,11 +45,6 @@ func NewAlarmMongoMapper(config *conf.Config) IMongoMapper {
 	conn := monc.MustNewModel(config.Mongo.URL, config.Mongo.DB, collection, config.CacheConf)
 	return &mongoMapper{conn: conn, IMongoMapper: mapper.NewMongoMapper[Alarm](conn)}
 }
-
-//func (m *mongoMapper) Insert(ctx context.Context, alarm *Alarm) error {
-//	_, err := m.conn.InsertOneNoCache(ctx, alarm)
-//	return err
-//}
 
 // RetrieveByTime 返回某Unit下一段时间内的所有预警信息 如时间范围传入零值time.Time{} 则查询所有
 func (m *mongoMapper) RetrieveByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time, opt *options.FindOptionsBuilder) (alarms []*Alarm, err error) {
@@ -218,7 +209,7 @@ func parseWeekData(weekData weekData) (map[int32]int32, int32) {
 type EmotionDistribution map[int]int32
 
 // EmotionDistribution 计算某Unit的情绪分布
-// unitId传入零值bson.ObjectID{}则计算所有Unit的情绪分布
+// unitId传入nil则计算所有Unit的情绪分布
 func (m *mongoMapper) EmotionDistribution(ctx context.Context, unitId *bson.ObjectID) (*EmotionDistribution, error) {
 	match := bson.M{
 		//cst.Status: bson.M{cst.NE: cst.DeletedStatus},
@@ -227,8 +218,16 @@ func (m *mongoMapper) EmotionDistribution(ctx context.Context, unitId *bson.Obje
 		match[cst.UnitID] = *unitId
 	}
 
+	// 对每个用户取最新一条Alarm 统计emotion分布
 	pipeline := mongo.Pipeline{
 		{{Key: "$match", Value: match}},
+		{{Key: "$sort", Value: bson.M{cst.CreateTime: -1}}},
+		// per-user latest emotion
+		{{Key: "$group", Value: bson.M{
+			"_id":     "$" + cst.UserID,
+			"emotion": bson.M{"$first": "$emotion"},
+		}}},
+		// count users by latest emotion
 		{{Key: "$group", Value: bson.M{
 			"_id":   "$emotion",
 			"count": bson.M{"$sum": 1},

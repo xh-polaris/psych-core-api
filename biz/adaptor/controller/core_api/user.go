@@ -72,3 +72,35 @@ func UserUpdatePassword(ctx context.Context, c *app.RequestContext) {
 	resp, err := p.UserService.UserUpdatePassword(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
+
+// StudentSignIn .
+// @router /user/student/sign_in [POST]
+func StudentSignIn(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.StudentSignInReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.UserService.StudentSignIn(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// AdminSignIn .
+// @router /user/admin/sign_in [POST]
+func AdminSignIn(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.AdminSignInReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.UserService.AdminSignIn(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
