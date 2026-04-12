@@ -282,7 +282,7 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 			setUpdate["chat.provider"] = chat.GetProvider()
 		}
 		if chat.GetAppId() != "" {
-			setUpdate["chat.appid"] = chat.GetAppId()
+			setUpdate["chat.app_id"] = chat.GetAppId()
 		}
 		setUpdate["chat.update_time"] = now
 	}
@@ -299,7 +299,7 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 			setUpdate["tts.provider"] = tts.GetProvider()
 		}
 		if tts.GetAppId() != "" {
-			setUpdate["tts.appid"] = tts.GetAppId()
+			setUpdate["tts.app_id"] = tts.GetAppId()
 		}
 		if tts.GetSpeaker() != "" {
 			setUpdate["tts.speaker"] = tts.GetSpeaker()
@@ -319,7 +319,7 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 			setUpdate["report.provider"] = report.GetProvider()
 		}
 		if report.GetAppId() != "" {
-			setUpdate["report.appid"] = report.GetAppId()
+			setUpdate["report.app_id"] = report.GetAppId()
 		}
 		setUpdate["report.update_time"] = now
 	}
@@ -367,8 +367,14 @@ func dtoConfig(configDAO *config.Config) *core_api.ConfigVO {
 
 // MaskConfig 隐藏Config的一些敏感字段
 func MaskConfig(conf *core_api.ConfigVO) *core_api.ConfigVO {
-	conf.Chat.AppId = "" // AppID 模型平台标识符
-	conf.Tts.AppId = ""
-	conf.Report.AppId = ""
+	if conf.Chat != nil {
+		conf.Chat.AppId = ""
+	}
+	if conf.Tts != nil {
+		conf.Tts.AppId = ""
+	}
+	if conf.Report != nil {
+		conf.Report.AppId = ""
+	}
 	return conf
 }
