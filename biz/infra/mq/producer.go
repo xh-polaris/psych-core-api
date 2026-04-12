@@ -101,11 +101,14 @@ func GetPostProducer() *PostProducer {
 }
 
 // Produce 创建历史记录消息
-func (p *PostProducer) Produce(ctx context.Context, session string, info map[string]any, start, end time.Time, config *core.Config) (err error) {
+func (p *PostProducer) Produce(ctx context.Context, session string, userId, unitId string, usage *core.Usage, info map[string]any, start, end time.Time, config *core.Config) (err error) {
 	var payload []byte
 	// 构造消息体
 	msg := &core.PostNotify{
 		Session: session,
+		UserId:  userId,
+		UnitId:  unitId,
+		Usage:   usage,
 		Info:    info,
 		Start:   start.Unix(),
 		End:     end.Unix(),

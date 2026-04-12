@@ -121,6 +121,9 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 }
 
 func (e *Engine) llmUsage(usage *schema.ResponseMeta) {
+	if e.usage.LLMUsage == nil {
+		e.usage.LLMUsage = &core.LLMUsage{}
+	}
 	e.usage.LLMUsage.PromptTokens += usage.Usage.PromptTokens
 	e.usage.LLMUsage.PromptTokenDetails.CachedTokens += usage.Usage.PromptTokenDetails.CachedTokens
 	e.usage.LLMUsage.CompletionTokens += usage.Usage.CompletionTokens

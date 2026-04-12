@@ -222,7 +222,17 @@ func (e *Engine) Close() (err error) {
 		e.cancel()
 		// 关闭主线程的ws连接
 		_ = e.wsx.Close()
-		if err = mq.GetPostProducer().Produce(e.ctx, e.uSession, e.info, e.start, time.Now(), e.conf); err != nil {
+		var userId, unitId string
+		if u, ok := util.Convert[string](e.info[cst.JsonUserID]); ok {
+			userId = u
+		}
+		if u, ok := util.Convert[string](e.info[cst.JsonUnitID]); ok {
+			unitId = u
+		}
+		// 使用背景上下文进行最后的消息推送, 避免受到e.ctx被cancel的影响
+		pCtx, pCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer pCancel()
+		if err = mq.GetPostProducer().Produce(pCtx, e.uSession, userId, unitId, e.usage, e.info, e.start, time.Now(), e.conf); err != nil {
 			// 发送失败需要详细记录日志, 以进行后续托底
 			logs.Error("[engine] produce notify error: %s with such state: session:%s start: %d end:%d info:%+v config:%+v", err, e.uSession, e.start, time.Now(), e.info, e.conf)
 			return
