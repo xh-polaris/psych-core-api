@@ -5,6 +5,8 @@ package main
 import (
 	"context"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/middlewares/server/recovery"
@@ -21,24 +23,24 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/httpx"
 	"github.com/xh-polaris/psych-core-api/provider"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-	"go.opentelemetry.io/contrib/propagators/b3"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/propagation"
+	sdkresource "go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
-func Init() {
-	// 初始化依赖注入
-	provider.Init()
-	application.InitApplication()
-	// 初始化自定义日志
-	hlog.SetLogger(logx.NewHlogLogger())
-	// 设置openTelemetry的传播器，用于分布式追踪中传递上下文信息
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(b3.New(), propagation.Baggage{}, propagation.TraceContext{}))
-	http.DefaultTransport = otelhttp.NewTransport(http.DefaultTransport)
-}
-
 func main() {
-	Init()
+	provider.Init()
+
+	ctx := context.Background()
+	shutdown := InitTracer(ctx)
+	defer shutdown()
+
+	application.InitApplication()
+	hlog.SetLogger(logx.NewHlogLogger())
+
 	c := provider.Get().Config
 
 	// 创建服务器追踪器
@@ -69,4 +71,73 @@ func main() {
 	log.Info("server start")
 
 	h.Spin()
+}
+
+// InitTracer 初始化全局 OTel TracerProvider 和 TextMapPropagator。
+// 返回 shutdown 函数，应在进程退出前调用以确保 span 全部 flush。
+func InitTracer(ctx context.Context) (shutdown func()) {
+	cfg := provider.Get().Config
+	telemetry := cfg.Telemetry
+	if telemetry.Disabled || telemetry.Endpoint == "" {
+		hlog.Warnf("otel: tracing disabled (Telemetry.Endpoint not set or Disabled=true)")
+		return func() {}
+	}
+
+	svcName := cfg.Name
+	if svcName == "" {
+		svcName = "psych-core-api"
+	}
+
+	// 针对旧版 Jaeger (14268 HTTP): 必须使用专用的 jaeger 导出器，并指向 /api/traces
+	// 注意：如果 Endpoint 包含 http://，我们需要处理一下
+	url := telemetry.Endpoint
+	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+		url = "http://" + url
+	}
+	if !strings.HasSuffix(url, "/api/traces") {
+		url = strings.TrimSuffix(url, "/") + "/api/traces"
+	}
+
+	exporter, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(url)))
+	if err != nil {
+		hlog.Warnf("otel: init jaeger exporter failed, tracing disabled: %v", err)
+		return func() {}
+	}
+
+	res, err := sdkresource.New(ctx,
+		sdkresource.WithAttributes(
+			semconv.ServiceName(svcName),
+		),
+	)
+	if err != nil {
+		hlog.Warnf("otel: init resource failed, tracing disabled: %v", err)
+		return func() {}
+	}
+
+	sampler := sdktrace.AlwaysSample()
+	if telemetry.Sampler < 1.0 && telemetry.Sampler > 0 {
+		sampler = sdktrace.ParentBased(sdktrace.TraceIDRatioBased(telemetry.Sampler))
+	}
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(res),
+		sdktrace.WithSampler(sampler),
+	)
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	))
+
+	// 设置 http 默认 Transport 开启 OTel
+	http.DefaultTransport = otelhttp.NewTransport(http.DefaultTransport)
+
+	return func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := tp.Shutdown(shutdownCtx); err != nil {
+			hlog.Errorf("otel: shutdown tracer provider: %v", err)
+		}
+	}
 }
