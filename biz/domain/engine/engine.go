@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/application/service"
+	"github.com/xh-polaris/psych-core-api/biz/domain/his"
 	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/cloudwego/eino/components/model"
@@ -58,13 +59,14 @@ type Engine struct {
 	heartbeatTicker *time.Ticker    // heartbeatTicker 是心跳计时器
 
 	// 记录
-	start    time.Time      // 开始时间
-	count    int            //对话轮数
-	info     map[string]any // 基本信息
-	isAuth   bool           // 是否认证
-	uSession string         // uSession 对话ID
-	usage    *core.Usage    // 用量
-	conf     *core.Config
+	start        time.Time      // 开始时间
+	count        int            // 对话轮数 (当前会话新产生的)
+	initialCount int            // 初始消息总数
+	info         map[string]any // 基本信息
+	isAuth       bool           // 是否认证
+	uSession     string         // uSession 对话ID
+	usage        *core.Usage    // 用量
+	conf         *core.Config
 
 	usrSvc     *service.UserService
 	cfgSvc     *service.ConfigService
@@ -192,7 +194,11 @@ func (e *Engine) Lock() error {
 		return nil
 	}
 	if e.lock == nil {
-		e.lock = lock.Mgr.NewLock(e.info[cst.JsonUserID].(string))
+		userId := e.getID(e.info, cst.JsonUserID)
+		if userId == "" {
+			return errorx.New(errno.ErrUnAuth)
+		}
+		e.lock = lock.Mgr.NewLock(userId)
 	}
 	if ok, err := e.lock.TryLock(e.ctx, time.Minute*3, time.Second*90, time.Minute*2); err != nil {
 		return errorx.WrapByCode(err, errno.UnKnown)
@@ -221,39 +227,95 @@ func (e *Engine) Close() (err error) {
 		if err = e.Unlock(); err != nil {
 			logs.Error("[engine] unlock err: %s", err)
 		}
-		// 关闭子线程
+		// 关闭子线程并等待归档任务完成
 		e.cancel()
+		e.llmWg.Wait()
+
 		// 关闭主线程的ws连接
 		_ = e.wsx.Close()
-		var userId, unitId string
-		if u, ok := util.Convert[string](e.info[cst.JsonUserID]); ok {
-			userId = u
+
+		// 只有认证过的连接才进行后处理
+		if !e.isAuth {
+			return
 		}
-		if u, ok := util.Convert[string](e.info[cst.JsonUnitID]); ok {
-			unitId = u
-		}
-		// 使用背景上下文进行最后的消息推送, 避免受到e.ctx被cancel的影响
-		pCtx, pCancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+		// 使用背景上下文进行最后的操作, 避免受到e.ctx被cancel的影响
+		pCtx, pCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer pCancel()
 
-		// 更新会话时间
+		// 检查数据库中会话是否依然有效
 		if oid, err := bson.ObjectIDFromHex(e.uSession); err == nil {
+			active, _ := e.convMapper.IsActive(pCtx, oid)
+			if !active {
+				logs.Infof("[engine] %s is not active in DB, skip post process", e.uSession)
+				return
+			}
+
+			// 再次查询最新的消息总数以确定是否有变化
+			latestMsgs, _ := his.Mgr.RetrieveMessage(pCtx, e.uSession, 0)
+			currentTotal := len(latestMsgs)
+
+			// 只有消息数增加了，才执行更新和 MQ
+			if currentTotal <= e.initialCount && e.count == 0 {
+				logs.Infof("[engine] %s message count no change (%d -> %d), skip post process", e.uSession, e.initialCount, currentTotal)
+				return
+			}
+
+			// 更新会话信息 (时间、消息数)
 			update := bson.M{
-				cst.StartTime: e.start,
-				cst.EndTime:   time.Now(),
+				cst.StartTime:    e.start,
+				cst.EndTime:      time.Now(),
+				cst.MessageCount: currentTotal,
 			}
 			if err = e.convMapper.UpdateFields(pCtx, oid, update); err != nil {
 				logs.Error("[engine] update conversation time err: %v", err)
 			}
 		}
 
-		if err = mq.GetPostProducer().Produce(pCtx, e.uSession, userId, unitId, e.usage, e.info, e.start, time.Now(), e.conf); err != nil {
+		// 发布 MQ 通知
+		if err = mq.GetPostProducer().Produce(pCtx, e.buildPostNotify(time.Now())); err != nil {
 			// 发送失败需要详细记录日志, 以进行后续托底
 			logs.Error("[engine] produce notify error: %s with such state: session:%s start: %d end:%d info:%+v config:%+v", err, e.uSession, e.start, time.Now(), e.info, e.conf)
 			return
 		}
 	})
-	return err
+	return nil
+}
+
+// buildPostNotify 构造后处理消息体
+func (e *Engine) buildPostNotify(end time.Time) *core.PostNotify {
+	return &core.PostNotify{
+		Session: e.uSession,
+		UserId:  e.getID(e.info, cst.JsonUserID),
+		UnitId:  e.getID(e.info, cst.JsonUnitID),
+		Usage:   e.usage,
+		Info:    e.info,
+		Start:   e.start.Unix(),
+		End:     end.Unix(),
+		Config:  e.conf,
+	}
+}
+
+// getID 强效提取 ID 逻辑 (兼容 string 和 ObjectID)
+func (e *Engine) getID(m map[string]any, key string) string {
+	val, ok := m[key]
+	if !ok || val == nil {
+		return ""
+	}
+	switch v := val.(type) {
+	case string:
+		// 只有长度为 24 且是合法 Hex 的字符串才接受
+		if len(v) == 24 {
+			return v
+		}
+	case bson.ObjectID:
+		return v.Hex()
+	case *bson.ObjectID:
+		if v != nil {
+			return v.Hex()
+		}
+	}
+	return ""
 }
 
 func appClose(closers ...io.Closer) {

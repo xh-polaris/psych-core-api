@@ -3,6 +3,7 @@ package engine
 import (
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
+	"github.com/xh-polaris/psych-core-api/biz/domain/his"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/core"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
@@ -32,8 +33,14 @@ func (e *Engine) auth(auth *core.Auth) (bool, error) {
 	} else {
 		e.uSession = bson.NewObjectID().Hex()
 	}
-	util.DPrint("[engine] [auth] info: %+v, merr: %+v, uSession: %s\n", alreadyAuth, merr, e.uSession) // debug
-	return true, e.MWrite(core.MAuth, alreadyAuth)                                                     // 前端收到Auth响应后, 需要显示配置中
+
+	// 记录初始消息总数，用于后续对比是否有新消息产生
+	if msgs, err := his.Mgr.RetrieveMessage(e.ctx, e.uSession, 0); err == nil {
+		e.initialCount = len(msgs)
+	}
+
+	util.DPrint("[engine] [auth] info: %+v, merr: %+v, uSession: %s, initialCount: %d\n", alreadyAuth, merr, e.uSession, e.initialCount) // debug
+	return true, e.MWrite(core.MAuth, alreadyAuth)                                                                                       // 前端收到Auth响应后, 需要显示配置中
 }
 
 // 已登录

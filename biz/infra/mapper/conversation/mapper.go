@@ -25,6 +25,7 @@ const (
 
 type IMongoMapper interface {
 	mapper.IMongoMapper[Conversation]
+	IsActive(ctx context.Context, conversationId bson.ObjectID) (bool, error)
 	Exists(ctx context.Context, conversationId bson.ObjectID) (bool, error)
 	CountByUnit(ctx context.Context, unitId *bson.ObjectID) (int32, error)
 	CountByUser(ctx context.Context, userId bson.ObjectID) (int32, error)
@@ -55,6 +56,15 @@ type mongoMapper struct {
 func NewConversationMongoMapper(config *conf.Config) IMongoMapper {
 	conn := monc.MustNewModel(config.Mongo.URL, config.Mongo.DB, collectionName, config.CacheConf)
 	return &mongoMapper{conn: conn, IMongoMapper: mapper.NewMongoMapper[Conversation](conn)}
+}
+
+func (m *mongoMapper) IsActive(ctx context.Context, conversationId bson.ObjectID) (bool, error) {
+	count, err := m.conn.CountDocuments(ctx, bson.M{cst.ID: conversationId, cst.Status: enum.ConversationStatusActive})
+	if err != nil {
+		logs.Errorf("[conversation mapper] isActive err: %s", errorx.ErrorWithoutStack(err))
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func (m *mongoMapper) Exists(ctx context.Context, conversationId bson.ObjectID) (bool, error) {

@@ -33,7 +33,7 @@ const logIDKey ctxLogKey = "log-id"
 
 // WithLogID stores a log-id (traceID or UUID fallback) in ctx.
 func WithLogID(ctx context.Context, id string) context.Context {
-	// 同时存入私有 key 和 字符串 key 以确保最大兼容性 (按照 2026-04-02 方案)
+	// 同时存入私有 key 和 字符串 key 以确保最大兼容性
 	ctx = context.WithValue(ctx, logIDKey, id)
 	return context.WithValue(ctx, "log-id", id)
 }
@@ -248,7 +248,7 @@ func (ll *defaultLogger) logfCtx(ctx context.Context, lv Level, format *string, 
 	if sc := trace.SpanFromContext(ctx).SpanContext(); sc.IsValid() {
 		msg += fmt.Sprintf("[trace:%s][span:%s] ", sc.TraceID(), sc.SpanID())
 	} else {
-		// 备选：从 Context 字符串 Key 中提取 (按照 2026-04-02 方案)
+		// 备选：从 Context 字符串 Key 中提取
 		traceID, _ := ctx.Value("trace-id").(string)
 		logID, _ := ctx.Value("log-id").(string)
 		if traceID != "" {

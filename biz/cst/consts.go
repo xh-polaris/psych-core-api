@@ -41,6 +41,7 @@ const (
 	RiskLevel      = "risk_level"
 	Remark         = "remark"
 	URI            = "uri"
+	MessageCount   = "message_count"
 
 	Status = "status"
 	Type   = "type"

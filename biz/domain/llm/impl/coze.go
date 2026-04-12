@@ -64,7 +64,7 @@ func (c *CozeModel) Generate(ctx context.Context, in []*schema.Message, opts ...
 }
 
 func (c *CozeModel) Stream(ctx context.Context, in []*schema.Message, opts ...model.Option) (sr *schema.StreamReader[*schema.Message], err error) {
-	// 按照 2026-04-02 方案：记录业务过程 Span，包含参数
+	// 记录业务过程 Span，包含参数
 	ctx, span := otelx.Tracer().Start(ctx, "Coze.Stream",
 		trace.WithSpanKind(trace.SpanKindInternal),
 		trace.WithAttributes(
@@ -123,7 +123,7 @@ func process(ctx context.Context, reader coze.Stream[coze.ChatEvent], writer *sc
 				return
 			}
 
-			// 记录第三方 ID (按照 2026-04-02 方案)
+			// 记录第三方 ID
 			if event.Event == coze.ChatEventConversationChatCreated {
 				if event.Chat != nil {
 					span.SetAttributes(attribute.String("coze.chat_id", event.Chat.ID))
