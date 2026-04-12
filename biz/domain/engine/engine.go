@@ -10,12 +10,14 @@ import (
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/application/service"
+	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/cloudwego/eino/components/model"
 	"github.com/hertz-contrib/websocket"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/lock"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mq"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/app"
@@ -64,18 +66,19 @@ type Engine struct {
 	usage    *core.Usage    // 用量
 	conf     *core.Config
 
-	usrSvc  *service.UserService
-	cfgSvc  *service.ConfigService
-	unitSvc *service.UnitService
+	usrSvc     *service.UserService
+	cfgSvc     *service.ConfigService
+	unitSvc    *service.UnitService
+	convMapper conversation.IMongoMapper
 }
 
 // NewEngine 创建一个新的对话引擎
-func NewEngine(ctx context.Context, conn *websocket.Conn, usrSvc *service.UserService, cfgSvc *service.ConfigService) *Engine {
+func NewEngine(ctx context.Context, conn *websocket.Conn, usrSvc *service.UserService, cfgSvc *service.ConfigService, convMapper conversation.IMongoMapper) *Engine {
 	ctx, cancel := context.WithCancel(ctx)
 	e := &Engine{
 		ctx: ctx, cancel: cancel, wsx: wsx.NewHZWSClient(conn), usage: &core.Usage{}, heartbeatTicker: time.NewTicker(heartbeatTimeout),
 		start: time.Now(), meta: meta, info: make(map[string]any), errs: make(chan error, 3),
-		usrSvc: usrSvc, cfgSvc: cfgSvc,
+		usrSvc: usrSvc, cfgSvc: cfgSvc, convMapper: convMapper,
 	}
 	//e.wsx.SetCloseHandler(func(code int, text string) (err error) { // 处理close消息
 	//	if err = e.wsx.ControlClose(websocket.FormatCloseMessage(code, text)); err != nil { // 给客户端写回一个close消息
@@ -232,6 +235,18 @@ func (e *Engine) Close() (err error) {
 		// 使用背景上下文进行最后的消息推送, 避免受到e.ctx被cancel的影响
 		pCtx, pCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer pCancel()
+
+		// 更新会话时间
+		if oid, err := bson.ObjectIDFromHex(e.uSession); err == nil {
+			update := bson.M{
+				cst.StartTime: e.start,
+				cst.EndTime:   time.Now(),
+			}
+			if err = e.convMapper.UpdateFields(pCtx, oid, update); err != nil {
+				logs.Error("[engine] update conversation time err: %v", err)
+			}
+		}
+
 		if err = mq.GetPostProducer().Produce(pCtx, e.uSession, userId, unitId, e.usage, e.info, e.start, time.Now(), e.conf); err != nil {
 			// 发送失败需要详细记录日志, 以进行后续托底
 			logs.Error("[engine] produce notify error: %s with such state: session:%s start: %d end:%d info:%+v config:%+v", err, e.uSession, e.start, time.Now(), e.info, e.conf)
