@@ -21,6 +21,7 @@ const (
 	ErrDashboardGenerateWordCloud         = 5015 // 生成词云失败
 	ErrDashboardGetReport                 = 5016 // 获取报表失败
 	ErrDashboardAlarmOverview             = 5017
+	ErrDashboardListAlarms                = 5018 // 获取风险记录失败
 )
 
 func init() {
@@ -102,6 +103,11 @@ func init() {
 	code.Register(
 		ErrDashboardAlarmOverview,
 		"预警总览数据获取失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrDashboardListAlarms,
+		"预警记录获取失败",
 		code.WithAffectStability(false),
 	)
 }

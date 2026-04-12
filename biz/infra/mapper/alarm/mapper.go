@@ -34,6 +34,8 @@ type IMongoMapper interface {
 	AggregateStats(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (*OverviewStats, error)
 	EmotionDistribution(ctx context.Context, unitId *bson.ObjectID) (*EmotionDistribution, error)
 	BatchExistsByConvId(ctx context.Context, convId []bson.ObjectID) (map[bson.ObjectID]bool, error)
+	FindManyWithOption(ctx context.Context, filter bson.M, opts options.Lister[options.FindOptions]) ([]*Alarm, error)
+	CountByFields(ctx context.Context, filter bson.M) (int32, error)
 }
 
 type mongoMapper struct {

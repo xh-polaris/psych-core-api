@@ -918,6 +918,7 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 				Id:     dbUser.ID.Hex(),
 				Code:   dbUser.Code,
 				Name:   dbUser.Name,
+				Gender: int32(dbUser.Gender),
 				Grade:  int32(dbUser.Grade),
 				Class:  int32(dbUser.Class),
 				Remark: remark,
