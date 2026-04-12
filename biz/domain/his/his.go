@@ -109,6 +109,14 @@ func (h *HistoryManager) AddMessage(ctx context.Context, id string, msg *message
 		return
 	}
 	util.DPrint("[his] add message storage, id=%s, msg=%v\n", id, msg)
+	// set conversation to be active
+	if msg.Index == 0 {
+		if err = h.convMapper.SetActive(ctx, msg.ConversationId); err != nil {
+			logs.Errorf("activate conversation err: %s", err)
+			return
+		}
+	}
+
 	// add to cache
 	if err = h.CacheMessage(ctx, cachePrefix+id, []*message.Message{msg}); err != nil {
 		logs.Errorf("cache msgs err: %s", err)
