@@ -27,6 +27,9 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 		return errorx.WrapByCode(err, errno.RetrieveHisErr)
 	}
 
+	// 增加当前会话产生的对话轮数
+	e.count++
+
 	// 创建用户消息
 	oids, err := util.ObjectIDsFromHex(e.uSession, e.info[cst.JsonUserID].(string))
 	if err != nil {
@@ -121,6 +124,9 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 }
 
 func (e *Engine) llmUsage(usage *schema.ResponseMeta) {
+	if e.usage.LLMUsage == nil {
+		e.usage.LLMUsage = &core.LLMUsage{}
+	}
 	e.usage.LLMUsage.PromptTokens += usage.Usage.PromptTokens
 	e.usage.LLMUsage.PromptTokenDetails.CachedTokens += usage.Usage.PromptTokenDetails.CachedTokens
 	e.usage.LLMUsage.CompletionTokens += usage.Usage.CompletionTokens

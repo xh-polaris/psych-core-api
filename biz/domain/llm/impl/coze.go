@@ -3,6 +3,7 @@ package impl
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -15,14 +16,10 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
+	"github.com/xh-polaris/psych-core-api/pkg/otelx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-)
-
-var (
-	cozeTracer = otel.Tracer("coze")
 )
 
 const (
@@ -67,14 +64,18 @@ func (c *CozeModel) Generate(ctx context.Context, in []*schema.Message, opts ...
 }
 
 func (c *CozeModel) Stream(ctx context.Context, in []*schema.Message, opts ...model.Option) (sr *schema.StreamReader[*schema.Message], err error) {
-	ctx, span := cozeTracer.Start(ctx, "Coze.Stream")
-	span.SetAttributes(
-		attribute.String("coze.bot_id", c.botId),
-		attribute.String("coze.user_id", c.uid),
+	// 记录业务过程 Span，包含参数
+	ctx, span := otelx.Tracer().Start(ctx, "Coze.Stream",
+		trace.WithSpanKind(trace.SpanKindInternal),
+		trace.WithAttributes(
+			attribute.String("coze.bot_id", c.botId),
+			attribute.String("coze.user_id", c.uid),
+			attribute.String("coze.input", fmt.Sprintf("%+v", in)),
+		),
 	)
 	defer func() {
 		if err != nil {
-			span.RecordError(err)
+			otelx.RecordError(span, err)
 			span.End()
 		}
 	}()
@@ -107,8 +108,6 @@ func process(ctx context.Context, reader coze.Stream[coze.ChatEvent], writer *sc
 	var event *coze.ChatEvent
 	var msg *schema.Message
 
-	//var pass int       // 跳过次数
-	//var collect string // 收集跳过的内容
 	var status = cst.EventMessageContentTypeText
 	for {
 		select {
@@ -116,10 +115,21 @@ func process(ctx context.Context, reader coze.Stream[coze.ChatEvent], writer *sc
 			return
 		default:
 			if event, err = reader.Recv(); err != nil {
+				if !errors.Is(err, io.EOF) {
+					otelx.RecordError(span, err)
+				}
 				logs.CondErrorf(errors.Is(err, io.EOF), "[coze] process recv err: %s", err)
 				writer.Send(nil, err)
 				return
 			}
+
+			// 记录第三方 ID
+			if event.Event == coze.ChatEventConversationChatCreated {
+				if event.Chat != nil {
+					span.SetAttributes(attribute.String("coze.chat_id", event.Chat.ID))
+				}
+			}
+
 			if event.Message == nil || event.Event != coze.ChatEventConversationMessageDelta {
 				if event.Message != nil && event.Message.Type == coze.MessageTypeFollowUp {
 					msg = ce2e(event)
@@ -129,29 +139,6 @@ func process(ctx context.Context, reader coze.Stream[coze.ChatEvent], writer *sc
 				continue
 			}
 			msg = ce2e(event)
-
-			//if pass > 0 { // 跳过指定个数
-			//pass, collect = pass-1, collect+msg.Content
-			//continue
-			//}
-			// 深度思考需要处理 Think标签
-			//if len(msg.Content) > 0 && msg.Content[0] == '<' { // 如果是 < 开头, 可能为深度思考<think>标签, 考虑到都是三个, 所以收集三个
-			//	pass, collect = 2, msg.Content
-			//	continue
-			//}
-			// 处理消息
-			//switch strings.Trim(collect, "\n") {
-			//case cst.ThinkStart:
-			//	collect = ""
-			//	status = cst.EventMessageContentTypeThink
-			//case cst.ThinkEnd:
-			//	collect = ""
-			//	status = cst.EventMessageContentTypeText
-			//default:
-			//}
-			//if collect != "" {
-			//	msg.Content = collect + msg.Content
-			//}
 			util.AddExtra(msg, cst.EventMessageContentType, status)
 			writer.Send(msg, nil)
 		}

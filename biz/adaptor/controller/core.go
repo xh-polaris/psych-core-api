@@ -16,7 +16,7 @@ import (
 func Chat(ctx context.Context, c *app.RequestContext) {
 	handler := func(wsCtx context.Context, conn *websocket.Conn) {
 		p := provider.Get()
-		engine.NewEngine(wsCtx, conn, &p.UserService, &p.ConfigService).Run()
+		engine.NewEngine(wsCtx, conn, &p.UserService, &p.ConfigService, p.ConversationMapper).Run()
 	}
 	if err := wsx.UpgradeWs(ctx, c, handler); err != nil {
 		logs.Error("[controller] [Chat] websocket upgrade error:", err)

@@ -23,6 +23,7 @@ const (
 	UpdateTime     = "update_time"
 	DeleteTime     = "delete_time"
 	EndTime        = "end_time"
+	StartTime      = "start_time"
 	Code           = "code"
 	CodeType       = "code_type"
 	Role           = "role"
@@ -40,6 +41,7 @@ const (
 	RiskLevel      = "risk_level"
 	Remark         = "remark"
 	URI            = "uri"
+	MessageCount   = "message_count"
 
 	Status = "status"
 	Type   = "type"

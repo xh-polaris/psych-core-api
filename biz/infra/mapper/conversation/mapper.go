@@ -25,12 +25,15 @@ const (
 
 type IMongoMapper interface {
 	mapper.IMongoMapper[Conversation]
+	IsActive(ctx context.Context, conversationId bson.ObjectID) (bool, error)
 	Exists(ctx context.Context, conversationId bson.ObjectID) (bool, error)
 	CountByUnit(ctx context.Context, unitId *bson.ObjectID) (int32, error)
 	CountByUser(ctx context.Context, userId bson.ObjectID) (int32, error)
 	FindManyByUserId(ctx context.Context, userId bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error) // 分页查找
 	FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error)                                           // 查找全部
 	FindManyByUnitId(ctx context.Context, unitId *bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
+	// 修改
+	SetActive(ctx context.Context, conversationId bson.ObjectID) error
 	// 聚合统计
 	CountUnitConvByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 	CountUserDailyConv(ctx context.Context, userId bson.ObjectID) (map[int32]int32, error)
@@ -53,6 +56,15 @@ type mongoMapper struct {
 func NewConversationMongoMapper(config *conf.Config) IMongoMapper {
 	conn := monc.MustNewModel(config.Mongo.URL, config.Mongo.DB, collectionName, config.CacheConf)
 	return &mongoMapper{conn: conn, IMongoMapper: mapper.NewMongoMapper[Conversation](conn)}
+}
+
+func (m *mongoMapper) IsActive(ctx context.Context, conversationId bson.ObjectID) (bool, error) {
+	count, err := m.conn.CountDocuments(ctx, bson.M{cst.ID: conversationId, cst.Status: enum.ConversationStatusActive})
+	if err != nil {
+		logs.Errorf("[conversation mapper] isActive err: %s", errorx.ErrorWithoutStack(err))
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func (m *mongoMapper) Exists(ctx context.Context, conversationId bson.ObjectID) (bool, error) {
@@ -561,4 +573,8 @@ func (m *mongoMapper) ConvDurationByGrade(ctx context.Context, unitId *bson.Obje
 	}
 
 	return ratioMap, totalDuration, nil
+}
+
+func (m *mongoMapper) SetActive(ctx context.Context, cid bson.ObjectID) error {
+	return m.UpdateFields(ctx, cid, bson.M{cst.Status: enum.ConversationStatusActive})
 }

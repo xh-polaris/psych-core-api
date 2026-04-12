@@ -12,6 +12,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
+	"github.com/xh-polaris/psych-core-api/types/enum"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -48,6 +49,7 @@ func (c *ConversationService) CreateConversation(ctx context.Context, req *core_
 	if err := c.ConversationMapper.Insert(ctx, &conversation.Conversation{
 		ID:         temp,
 		UserID:     userOID,
+		Status:     enum.ConversationStatusDeleted,
 		CreateTime: time.Now(),
 		UpdateTime: time.Now(),
 	}); err != nil {

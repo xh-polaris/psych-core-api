@@ -101,16 +101,8 @@ func GetPostProducer() *PostProducer {
 }
 
 // Produce 创建历史记录消息
-func (p *PostProducer) Produce(ctx context.Context, session string, info map[string]any, start, end time.Time, config *core.Config) (err error) {
+func (p *PostProducer) Produce(ctx context.Context, msg *core.PostNotify) (err error) {
 	var payload []byte
-	// 构造消息体
-	msg := &core.PostNotify{
-		Session: session,
-		Info:    info,
-		Start:   start.Unix(),
-		End:     end.Unix(),
-		Config:  config,
-	}
 	if payload, err = json.Marshal(msg); err != nil {
 		logs.Error("[mq producer] marshal post notify failed, err:%v", err.Error())
 		return err
