@@ -20,6 +20,7 @@ type IMongoMapper[T any] interface {
 	UpdateFields(ctx context.Context, id bson.ObjectID, update bson.M) error
 	ExistsByFields(ctx context.Context, filter bson.M) (bool, error)
 	CountByPeriod(ctx context.Context, start, end time.Time) (int32, error)
+	CountByFields(ctx context.Context, filter bson.M) (int32, error)
 }
 
 type mongoMapper[T any] struct {
@@ -94,6 +95,11 @@ func (m *mongoMapper[T]) CountByPeriod(ctx context.Context, start, end time.Time
 		filter[cst.CreateTime] = timeFilter
 	}
 
+	cnt, err := m.conn.CountDocuments(ctx, filter)
+	return int32(cnt), err
+}
+
+func (m *mongoMapper[T]) CountByFields(ctx context.Context, filter bson.M) (int32, error) {
 	cnt, err := m.conn.CountDocuments(ctx, filter)
 	return int32(cnt), err
 }

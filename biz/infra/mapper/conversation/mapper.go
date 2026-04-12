@@ -374,49 +374,65 @@ func (m *mongoMapper) FindManyByUserId(ctx context.Context, userId bson.ObjectID
 
 func (m *mongoMapper) FindManyByUnitId(ctx context.Context, unitId *bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error) {
 	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
+	pipeline := []bson.M{{"$match": matchStage}}
 
 	if unitId != nil {
-		// 在 conversation 集合上通过 $lookup 关联 user，并根据 user.unit_id 过滤出相关的 conversation.user_id
-		var userIdDocs []struct {
-			UserID bson.ObjectID `bson:"user_id"`
-		}
-
-		pipeline := []bson.M{
-			{"$lookup": bson.M{
+		pipeline = append(pipeline,
+			bson.M{"$lookup": bson.M{
 				"from":         userCollection,
 				"localField":   cst.UserID,
 				"foreignField": cst.ID,
 				"as":           "userDoc",
 			}},
-			{"$match": bson.M{"userDoc.unit_id": *unitId}},
-			{"$project": bson.M{"user_id": 1}},
-		}
-
-		if err := m.conn.Aggregate(ctx, &userIdDocs, pipeline); err != nil {
-			logs.Errorf("[conversation mapper] find userIds by unit err: %s", errorx.ErrorWithoutStack(err))
-			return nil, err
-		}
-
-		if len(userIdDocs) == 0 {
-			return nil, nil
-		}
-
-		userIds := make([]bson.ObjectID, 0, len(userIdDocs))
-		for _, d := range userIdDocs {
-			userIds = append(userIds, d.UserID)
-		}
-
-		// 2. 直接根据 UserID 过滤
-		matchStage[cst.UserID] = bson.M{cst.In: userIds}
+			bson.M{"$match": bson.M{"userDoc.unit_id": *unitId}},
+		)
 	}
 
-	// 3. 使用标准 FindManyWithOption，它已经完美处理了 opt 中的排序和分页
-	c, err := m.FindManyWithOption(ctx, matchStage, opt)
-	if err != nil {
+	fo := options.FindOptions{}
+	if opt != nil {
+		for _, apply := range opt.List() {
+			if err := apply(&fo); err != nil {
+				logs.Errorf("[conversation mapper] apply find options err: %s", errorx.ErrorWithoutStack(err))
+				return nil, err
+			}
+		}
+	}
+
+	if fo.Sort != nil {
+		sortDoc, ok := fo.Sort.(bson.D)
+		if ok {
+			hasIDSort := false
+			for _, item := range sortDoc {
+				if item.Key == cst.ID {
+					hasIDSort = true
+					break
+				}
+			}
+			if !hasIDSort {
+				sortDoc = append(sortDoc, bson.E{Key: cst.ID, Value: -1})
+			}
+			pipeline = append(pipeline, bson.M{"$sort": sortDoc})
+		} else {
+			pipeline = append(pipeline, bson.M{"$sort": fo.Sort})
+		}
+	} else {
+		pipeline = append(pipeline, bson.M{"$sort": bson.D{{Key: cst.ID, Value: -1}}})
+	}
+
+	if fo.Skip != nil && *fo.Skip > 0 {
+		pipeline = append(pipeline, bson.M{"$skip": *fo.Skip})
+	}
+	if fo.Limit != nil && *fo.Limit > 0 {
+		pipeline = append(pipeline, bson.M{"$limit": *fo.Limit})
+	}
+
+	var convs []*Conversation
+	if err := m.conn.Aggregate(ctx, &convs, pipeline); err != nil {
 		logs.Errorf("[conversation mapper] find many by unit err: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}
-	return c, nil
+
+	return convs, nil
 }
 
 // CountByDurationBucket 按时长分桶统计对话数量（支持四舍五入到整数分钟）

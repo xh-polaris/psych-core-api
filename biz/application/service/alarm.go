@@ -2,8 +2,12 @@ package service
 
 import (
 	"context"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
@@ -104,20 +108,57 @@ func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardL
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 	}
 
-	// 先count total 若为0直接返回响应
-	total, err := s.AlarmMapper.CountByTime(ctx, unitOID, time.Time{}, time.Time{})
+	// 构建筛选条件
+	filter := bson.M{
+		cst.UnitID: unitOID,
+	}
+	if req.Emotion != nil {
+		filter[cst.Emotion] = int(req.GetEmotion())
+	}
+	if req.Status != nil {
+		filter[cst.Status] = int(req.GetStatus())
+	}
+	if req.Keyword != nil {
+		keyword := strings.TrimSpace(req.GetKeyword())
+		if keyword != "" {
+			// 基础防注入：限制长度并过滤控制字符。
+			if utf8.RuneCountInString(keyword) > 64 {
+				return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "keyword"), errorx.KV("value", "关键词长度超限"))
+			}
+			for _, r := range keyword {
+				if unicode.IsControl(r) {
+					return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "keyword"), errorx.KV("value", "关键词包含非法字符"))
+				}
+			}
+
+			filter[cst.Keywords] = bson.M{
+				cst.Regex:   regexp.QuoteMeta(keyword),
+				cst.Options: "i",
+			}
+		}
+	}
+
+	// total 需要与筛选条件保持一致，避免分页总数与查询结果不一致。
+	total, err := s.AlarmMapper.CountByFields(ctx, filter)
+	if err != nil {
+		logs.Errorf("[alarm mapper] CountByFields err: %s", err)
+		return nil, errorx.New(errno.ErrDashboardListAlarms)
+	}
+
 	if total == 0 {
 		return &core_api.DashboardListAlarmRecordsResp{
-			Pagination: util.PaginationRes(total, req.PaginationOptions),
+			Records:    []*core_api.AlarmRecord{},
+			Pagination: util.PaginationRes(0, req.PaginationOptions),
 			Code:       0,
 			Msg:        "success",
 		}, nil
 	}
 
-	// 再retrieve 此时alarm数不应为0
+	// 构建分页和排序option
 	opt := util.PagedFindOpt(req.PaginationOptions).SetSort(bson.D{{cst.Status, -1}})
-	alarms, err := s.AlarmMapper.RetrieveByTime(ctx, unitOID, time.Time{}, time.Time{}, opt)
-	if err != nil || len(alarms) == 0 {
+
+	alarms, err := s.AlarmMapper.FindManyWithOption(ctx, filter, opt)
+	if err != nil {
 		logs.Errorf("retrieve alarms error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrInternalError)
 	}
@@ -142,11 +183,10 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 	// 并行处理：获取user基础信息和对话情况
 	var userInfo map[bson.ObjectID]*user.User
 	var msgStats map[bson.ObjectID]*conversation.ConvStats
-	var keyWords map[bson.ObjectID][]string
-	var userErr, msgErr, kwErr error
+	var userErr, msgErr error
 
 	var wg sync.WaitGroup
-	wg.Add(3)
+	wg.Add(2)
 	go func() { // 获取user基础信息
 		defer wg.Done()
 		userInfo, userErr = s.UserMapper.BatchFindByIDs(ctx, userIds)
@@ -161,13 +201,6 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 			logs.Errorf("查询对话统计失败: %v", errorx.ErrorWithoutStack(msgErr))
 		}
 	}()
-	go func() {
-		defer wg.Done()
-		keyWords, kwErr = s.ReportMapper.BatchGetUserKeyWords(ctx, userIds)
-		if kwErr != nil {
-			logs.Errorf("查询关键词失败: %v", errorx.ErrorWithoutStack(kwErr))
-		}
-	}()
 	wg.Wait()
 
 	if userErr != nil {
@@ -176,16 +209,12 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 	if msgErr != nil {
 		return nil, errorx.New(errno.ErrDashboardConversationStat)
 	}
-	if kwErr != nil {
-		return nil, errorx.New(errno.ErrGetReportKeyWord)
-	}
 
 	// 构建响应
 	records := make([]*core_api.AlarmRecord, len(dbAlarms))
 	for i, al := range dbAlarms {
 		dbUser, userExists := userInfo[al.UserID]
 		msgStats, msgExists := msgStats[al.UserID]
-		kw, kwExists := keyWords[al.UserID]
 		if userExists {
 			records[i] = &core_api.AlarmRecord{
 				Id:       al.ID.Hex(),
@@ -208,9 +237,6 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 		if msgExists {
 			records[i].TotalConversationRounds = msgStats.Rounds
 			records[i].LastConversationTime = msgStats.LatestTime
-		}
-		if kwExists {
-			records[i].Keywords = kw
 		}
 	}
 
