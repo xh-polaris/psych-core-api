@@ -286,13 +286,12 @@ func (e *Engine) Close() (err error) {
 func (e *Engine) buildPostNotify(end time.Time) *core.PostNotify {
 	return &core.PostNotify{
 		Session: e.uSession,
-		UserId:  e.getID(e.info, cst.JsonUserID),
-		UnitId:  e.getID(e.info, cst.JsonUnitID),
-		Usage:   e.usage,
-		Info:    e.info,
-		Start:   e.start.Unix(),
-		End:     end.Unix(),
-		Config:  e.conf,
+		// 根层级的 UserId 和 UnitId 留空，因为它们已经存在于 Info 字典中了
+		Usage:  e.usage,
+		Info:   e.info,
+		Start:  e.start.Unix(),
+		End:    end.Unix(),
+		Config: e.conf,
 	}
 }
 
