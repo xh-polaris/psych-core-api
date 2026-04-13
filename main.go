@@ -5,7 +5,6 @@ package main
 import (
 	"context"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -23,8 +22,9 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/httpx"
 	"github.com/xh-polaris/psych-core-api/provider"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/contrib/propagators/b3"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
 	sdkresource "go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -88,19 +88,13 @@ func InitTracer(ctx context.Context) (shutdown func()) {
 		svcName = "psych-core-api"
 	}
 
-	// 针对旧版 Jaeger (14268 HTTP): 必须使用专用的 jaeger 导出器，并指向 /api/traces
-	// 注意：如果 Endpoint 包含 http://，我们需要处理一下
-	url := telemetry.Endpoint
-	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-		url = "http://" + url
-	}
-	if !strings.HasSuffix(url, "/api/traces") {
-		url = strings.TrimSuffix(url, "/") + "/api/traces"
-	}
-
-	exporter, err := jaeger.New(jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(url)))
+	// 使用 OTLP gRPC 导出器
+	exporter, err := otlptracegrpc.New(ctx,
+		otlptracegrpc.WithEndpoint(telemetry.Endpoint),
+		otlptracegrpc.WithInsecure(),
+	)
 	if err != nil {
-		hlog.Warnf("otel: init jaeger exporter failed, tracing disabled: %v", err)
+		hlog.Warnf("otel: init otlp grpc exporter failed: %v", err)
 		return func() {}
 	}
 
@@ -110,7 +104,7 @@ func InitTracer(ctx context.Context) (shutdown func()) {
 		),
 	)
 	if err != nil {
-		hlog.Warnf("otel: init resource failed, tracing disabled: %v", err)
+		hlog.Warnf("otel: init resource failed: %v", err)
 		return func() {}
 	}
 
@@ -128,6 +122,7 @@ func InitTracer(ctx context.Context) (shutdown func()) {
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},
+		b3.New(), // 增加 B3 支持
 	))
 
 	// 设置 http 默认 Transport 开启 OTel
