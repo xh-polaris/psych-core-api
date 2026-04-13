@@ -244,20 +244,14 @@ func (ll *defaultLogger) logfCtx(ctx context.Context, lv Level, format *string, 
 	}
 	msg := lv.toString()
 
-	// 优先从 OpenTelemetry Span 中提取 (反映当前最深子链路)
+	// 自动提取 TraceID 和 SpanID
 	if sc := trace.SpanFromContext(ctx).SpanContext(); sc.IsValid() {
-		msg += fmt.Sprintf("[trace:%s][span:%s] ", sc.TraceID(), sc.SpanID())
-	} else {
-		// 备选：从 Context 字符串 Key 中提取
-		traceID, _ := ctx.Value("trace-id").(string)
-		logID, _ := ctx.Value("log-id").(string)
-		if traceID != "" {
-			msg += fmt.Sprintf("[trace-id:%s] ", traceID)
-		} else if logID != "" {
-			msg += fmt.Sprintf("[log-id:%s] ", logID)
-		}
+		msg += fmt.Sprintf("[trace:%s][span:%s]", sc.TraceID(), sc.SpanID())
+	} else if logID, ok := ctx.Value("log-id").(string); ok && logID != "" {
+		msg += fmt.Sprintf("[log-id:%s]", logID)
 	}
 
+	msg += " "
 	if format != nil {
 		msg += fmt.Sprintf(*format, v...)
 	} else {

@@ -9,16 +9,14 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-const (
-	tracerName = "psych-core-api"
-)
+const tracerName = "psych-core-api"
 
 func Tracer() trace.Tracer {
 	return otel.Tracer(tracerName)
 }
 
-func StartSpan(ctx context.Context, spanName string, attrs ...attribute.KeyValue) (context.Context, trace.Span) {
-	return Tracer().Start(ctx, spanName, trace.WithAttributes(attrs...), trace.WithSpanKind(trace.SpanKindInternal))
+func StartSpan(ctx context.Context, name string, attrs ...attribute.KeyValue) (context.Context, trace.Span) {
+	return Tracer().Start(ctx, name, trace.WithAttributes(attrs...))
 }
 
 func RecordError(span trace.Span, err error) {
