@@ -22,6 +22,7 @@ const (
 	ErrDashboardGetReport                 = 5016 // 获取报表失败
 	ErrDashboardAlarmOverview             = 5017
 	ErrDashboardListAlarms                = 5018 // 获取风险记录失败
+	ErrDashboardRiskDistribution          = 5019 // 统计风险分布失败
 )
 
 func init() {
@@ -108,6 +109,11 @@ func init() {
 	code.Register(
 		ErrDashboardListAlarms,
 		"预警记录获取失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrDashboardRiskDistribution,
+		"风险等级分布统计失败",
 		code.WithAffectStability(false),
 	)
 }

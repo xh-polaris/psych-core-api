@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"math"
 	"sort"
 	"sync"
 	"time"
@@ -188,6 +189,10 @@ func (s *DashboardService) dashboardOverviewAdmin(ctx context.Context, twoWeeksB
 		logs.Errorf("avg duration last week error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardAvgDurationStat)
 	}
+	// 四舍五入到小数点后两位，避免返回过长的小数
+	round2 := func(f float64) float64 { return math.Round(f*100) / 100 }
+	avgThisWeek = round2(avgThisWeek)
+	avgLastWeek = round2(avgLastWeek)
 	weeklyIncreaseAvgDuration := avgThisWeek - avgLastWeek
 	var weeklyIncreaseAvgDurationRate float64
 	if avgLastWeek > 0 {
@@ -304,6 +309,10 @@ func (s *DashboardService) dashboardOverviewUnit(ctx context.Context, unitOID bs
 		logs.Errorf("unit avg duration last week error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardAvgDurationStat)
 	}
+	// 四舍五入到小数点后两位
+	round2 := func(f float64) float64 { return math.Round(f*100) / 100 }
+	avgThisWeek = round2(avgThisWeek)
+	avgLastWeek = round2(avgLastWeek)
 	weeklyIncreaseAvgDuration := avgThisWeek - avgLastWeek
 	var weeklyIncreaseAvgDurationRate float64
 	if avgLastWeek > 0 {
@@ -530,6 +539,8 @@ func (s *DashboardService) DashboardListUnits(ctx context.Context, req *core_api
 			logs.Errorf("avg conversation duration for unit %s error: %s", u.Name, errorx.ErrorWithoutStack(err))
 			avgMinutes = 0
 		}
+		// 保留两位小数
+		avgMinutes = math.Round(avgMinutes*100) / 100
 
 		// 高风险用户数（当前单位）
 		riskCount, err := s.UserMapper.CountHighRiskStudents(ctx, &unitID, time.Time{}, time.Now())
@@ -585,64 +596,11 @@ func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core
 		}
 	}
 
-	// 统计风险等级分布（按性别拆分）
-	riskStats, err := s.UserMapper.RiskDistributionStats(ctx, unitOID)
+	// 风险等级分布
+	rskDistrib, err := s.getRiskDistribution(ctx, unitOID)
 	if err != nil {
-		logs.Errorf("aggregate risk distribution error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.WrapByCode(err, errno.ErrDashboardAlarmUserStat)
-	}
-
-	// user.RiskLevel: High=1, Medium=2, Low=3, Normal=4
-	levelMap := func(dbLevel int32) int32 {
-		switch dbLevel {
-		case enum.UserRiskLevelHigh:
-			return 4
-		case enum.UserRiskLevelMedium:
-			return 3
-		case enum.UserRiskLevelLow:
-			return 2
-		default:
-			return 1
-		}
-	}
-
-	// 先按 (level, gender) 聚合，再额外算 gender=0（all）
-	type key struct {
-		level  int32
-		gender int32
-	}
-	counts := make(map[key]int32)
-	levelTotals := make(map[int32]int32)
-
-	for _, rs := range riskStats {
-		l := levelMap(rs.Level)
-		g := rs.Gender // 约定：1=男 2=女
-		k := key{level: l, gender: g}
-		counts[k] += rs.Count
-		levelTotals[l] += rs.Count
-	}
-
-	riskDistributions := make([]*core_api.RiskDistribution, 0, len(counts)+4)
-
-	// 先输出按性别拆分的统计（gender=1,2）
-	for k, c := range counts {
-		if k.gender != 1 && k.gender != 2 {
-			continue
-		}
-		riskDistributions = append(riskDistributions, &core_api.RiskDistribution{
-			Level:  k.level,
-			Gender: k.gender,
-			Count:  c,
-		})
-	}
-
-	// 再输出 gender=0（all）
-	for lvl, total := range levelTotals {
-		riskDistributions = append(riskDistributions, &core_api.RiskDistribution{
-			Level:  lvl,
-			Gender: 0,
-			Count:  total,
-		})
+		logs.Errorf("get risk distribution error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrDashboardRiskDistribution)
 	}
 
 	// 关键词词云
@@ -652,6 +610,7 @@ func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core
 		return nil, errorx.New(errno.ErrDashboardGetUserKeywords)
 	}
 
+	// 情绪分布
 	emoRatio, err := s.getEmotionRatio(ctx, unitOID)
 	if err != nil {
 		logs.Errorf("get emotion distribution error: %s", errorx.ErrorWithoutStack(err))
@@ -660,7 +619,7 @@ func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core
 
 	return &core_api.DashboardGetPsychTrendResp{
 		EmotionRatio: emoRatio,
-		Risks:        riskDistributions,
+		Risks:        rskDistrib,
 		Keywords:     keywords,
 		Code:         0,
 		Msg:          "success",
@@ -716,6 +675,38 @@ func (s *DashboardService) getKeywords(ctx context.Context, unitOID *bson.Object
 		return wordcld.Extractor.FromUnitKWs(ctx, *unitOID)
 	}
 	return wordcld.Extractor.FromAllUnitsKWs(ctx)
+}
+
+func (s *DashboardService) getRiskDistribution(ctx context.Context, unitOID *bson.ObjectID) ([]*core_api.RiskDistribution, error) {
+	// 调用 mapper 获取基础统计数据
+	stats, err := s.UserMapper.RiskDistributionStats(ctx, unitOID)
+	if err != nil {
+		logs.Errorf("[DashboardService] getRiskDistribution mapper err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	// 构造嵌套映射，补全count为0的level和gender
+	countMap := make(map[int32]map[int32]int32)
+	for _, s := range stats {
+		if countMap[s.Level] == nil {
+			countMap[s.Level] = make(map[int32]int32)
+		}
+		countMap[s.Level][s.Gender] = s.Count
+	}
+
+	// 返回8条结果：level 1-4, gender 1-2
+	res := make([]*core_api.RiskDistribution, 0, 8)
+	for lvl := int32(1); lvl <= 4; lvl++ {
+		for g := int32(1); g <= 2; g++ {
+			var cnt int32
+			if countMap[lvl] != nil {
+				cnt = countMap[lvl][g]
+			}
+			res = append(res, &core_api.RiskDistribution{Level: lvl, Gender: g, Count: cnt})
+		}
+	}
+
+	return res, nil
 }
 
 func (s *DashboardService) DashboardListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (*core_api.DashboardListClassesResp, error) {
