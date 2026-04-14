@@ -275,14 +275,15 @@ func (m *mongoMapper) CountByClasses(ctx context.Context, unitId bson.ObjectID, 
 	return results, nil
 }
 
-// RiskStat 风险等级 + 性别分布
+// RiskStat “风险等级和性别->数量”的映射
 type RiskStat struct {
-	Level  int32 `bson:"_id.level"`
-	Gender int32 `bson:"_id.gender"`
-	Count  int32 `bson:"count"`
+	Level  int32 `bson:"level" json:"level"`
+	Gender int32 `bson:"gender" json:"gender"`
+	Count  int32 `bson:"count" json:"count"`
 }
 
-// RiskDistributionStats 统计学生风险等级分布（按性别拆分），unitId 为空表示全平台
+// RiskDistributionStats 按风险等级和性别统计，预期返回长为8的切片（4种level*2种gender）
+// unitId传空值则统计所有单位的用户风险分布
 func (m *mongoMapper) RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID) ([]*RiskStat, error) {
 	match := bson.M{
 		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
@@ -301,14 +302,20 @@ func (m *mongoMapper) RiskDistributionStats(ctx context.Context, unitId *bson.Ob
 			},
 			"count": bson.M{"$sum": 1},
 		}},
+		{"$project": bson.M{
+			"level":  "$_id.level",
+			"gender": "$_id.gender",
+			"count":  "$count",
+		}},
 	}
 
-	var results []*RiskStat
-	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
+	var aggrResults []*RiskStat
+	if err := m.conn.Aggregate(ctx, &aggrResults, pipeline); err != nil {
 		logs.Errorf("[user mapper] aggregate risk distribution err:%s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}
-	return results, nil
+
+	return aggrResults, nil
 }
 
 type ClassTeachers map[int]map[int]*User
