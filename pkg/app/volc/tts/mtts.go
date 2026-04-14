@@ -55,25 +55,30 @@ func NewVcMTTSApp(uSession string, setting *app.TTSSetting) app.TTSApp {
 
 // Dial 建立ws连接
 func (tts *VcMTTSApp) Dial(ctx context.Context) (err error) {
-	if !tts.active.Load() { // 只需要建立一次连接
-		if tts.wsx, err = wsx.NewWSClientWithDial(ctx, tts.url, tts.header); err != nil {
-			return
-		}
-		setting := tts.setting // 配置tts参数
-		tts.params = &TTSReqParams{
-			Speaker: setting.Speaker,
-			AudioParams: &AudioParams{
-				Format:     setting.AudioParams.Format,
-				SampleRate: setting.AudioParams.Rate,
-				SpeechRate: setting.AudioParams.SpeechRate,
-				BitRate:    setting.AudioParams.Bits,
-				Volume:     setting.AudioParams.LoudnessRate,
-				Lang:       setting.AudioParams.Lang,
-			},
-			Additions: "{\"disable_markdown_filter\": \"true\"}", // 过滤markdown
-		}
-		tts.active.Store(true)
+	// 强制关闭旧连接（如果存在）
+	if tts.wsx != nil {
+		_ = tts.wsx.Close()
 	}
+
+	// 建立新连接
+	if tts.wsx, err = wsx.NewWSClientWithDial(ctx, tts.url, tts.header); err != nil {
+		return
+	}
+
+	setting := tts.setting // 配置tts参数
+	tts.params = &TTSReqParams{
+		Speaker: setting.Speaker,
+		AudioParams: &AudioParams{
+			Format:     setting.AudioParams.Format,
+			SampleRate: setting.AudioParams.Rate,
+			SpeechRate: setting.AudioParams.SpeechRate,
+			BitRate:    setting.AudioParams.Bits,
+			Volume:     setting.AudioParams.LoudnessRate,
+			Lang:       setting.AudioParams.Lang,
+		},
+		Additions: "{\"disable_markdown_filter\": \"true\"}", // 过滤markdown
+	}
+	tts.active.Store(true)
 	return
 }
 
