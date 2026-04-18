@@ -1,28 +1,139 @@
 package usr
 
 import (
-	"github.com/xh-polaris/psych-core-api/types/enum"
+	"context"
+	"errors"
+
+	"github.com/google/wire"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
+	"github.com/xh-polaris/psych-core-api/biz/infra/synapse"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
+	"github.com/xh-polaris/psych-core-api/pkg/errorx"
+	"github.com/xh-polaris/psych-core-api/pkg/logs"
+	"github.com/xh-polaris/psych-core-api/types/errno"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
-type Meta struct {
-	UserId string `json:"userId"`
-	UnitId string `json:"unitId;omitempty"`
-	Code   string `json:"code;omitempty"`
-	Role   int    `json:"role"` // 权限等级 (学生用户、老师、班主任、单位管理、超管)
+var _ IUserDomainSVC = (*UserDomainSVC)(nil)
+
+type IUserDomainSVC interface {
+	SignInByPhone(ctx context.Context, authType, phone, unitId, verify string) (*user.User, error)
+	SignInByEmail(ctx context.Context, authType, email, unitId, verify string) (*user.User, error)
+	SignInByCode(ctx context.Context, authType, studentID, unitId, verify string) (*user.User, error)
+	CreateUser(ctx context.Context, unitId, email, phone, code, password string, psychUser *user.User) error
+	UpdatePassword(ctx context.Context, userId, newPassword string) error
+	SendVerifyCode(ctx context.Context, authType, authId, cause string) error
 }
 
-func (usrMeta *Meta) HasTeacherAuth() bool {
-	return usrMeta.Role >= enum.UserRoleTeacher
+type UserDomainSVC struct {
+	UsrMapper  user.IMongoMapper
+	UnitMapper unit.IMongoMapper
+	Synp4bCli  synapse.Client
 }
 
-func (usrMeta *Meta) HasClassTeacherAuth() bool {
-	return usrMeta.Role >= enum.UserRoleClassTeacher
+var UserDomainSet = wire.NewSet(
+	wire.Struct(new(UserDomainSVC), "*"),
+	wire.Bind(new(IUserDomainSVC), new(*UserDomainSVC)),
+)
+
+func (u *UserDomainSVC) SignInByPhone(ctx context.Context, authType, phone, unitId, verify string) (*user.User, error) {
+	// 验证中台账号
+	synpResp, err := u.Synp4bCli.Login(ctx, authType, phone, unitId, verify)
+	if err != nil {
+		return nil, err
+	}
+
+	// 查询本地账号
+	pu, err := u.findPsychUser(ctx, synpResp)
+	if err != nil || pu == nil {
+		return nil, err
+	}
+
+	return pu, nil
 }
 
-func (usrMeta *Meta) HasUnitAdminAuth(unitId string) bool {
-	return usrMeta.HasSuperAdminAuth() || (usrMeta.Role == enum.UserRoleUnitAdmin && usrMeta.UnitId == unitId)
+func (u *UserDomainSVC) SignInByEmail(ctx context.Context, authType, email, unitId, verify string) (*user.User, error) {
+	// 验证中台账号
+	synpResp, err := u.Synp4bCli.Login(ctx, authType, email, unitId, verify)
+	if err != nil {
+		return nil, err
+	}
+
+	// 查询本地账号
+	pu, err := u.findPsychUser(ctx, synpResp)
+	if err != nil || pu == nil {
+		return nil, err
+	}
+
+	return pu, nil
 }
 
-func (usrMeta *Meta) HasSuperAdminAuth() bool {
-	return usrMeta.Role >= enum.UserRoleSuperAdmin
+func (u *UserDomainSVC) SignInByCode(ctx context.Context, authType, studentID, unitId, verify string) (*user.User, error) {
+	synpResp, err := u.Synp4bCli.Login(ctx, authType, studentID, unitId, verify)
+	if err != nil {
+		return nil, err
+	}
+
+	// 查询本地账号
+	pu, err := u.findPsychUser(ctx, synpResp)
+	if err != nil || pu == nil {
+		return nil, err
+	}
+
+	return pu, nil
+}
+
+func (u *UserDomainSVC) CreateUser(ctx context.Context, unitId, email, phone, code, password string, psychUser *user.User) error {
+	// 创建basicUser
+	bu, err := u.Synp4bCli.CreateBasicUser(ctx, unitId, code, phone, email, password, 0)
+	if err != nil {
+		return err
+	}
+
+	// 创建psychUser
+	oid, _ := bson.ObjectIDFromHex(bu.BasicUserID)
+	psychUser.ID = oid
+	err = u.UsrMapper.Insert(ctx, psychUser)
+	if err != nil {
+		logs.Error("[user mapper] insert new user failed", errorx.ErrorWithoutStack(err))
+		return err
+	}
+
+	return nil
+}
+
+func (u *UserDomainSVC) UpdatePassword(ctx context.Context, userId, newPassword string) error {
+	// TODO
+	return errorx.New(errno.ErrUnImplement)
+}
+
+// 查询psychUser
+func (u *UserDomainSVC) findPsychUser(ctx context.Context, synpResp *synapse.LoginResult) (*user.User, error) {
+	// 查询psych用户
+	Oids, err := util.ObjectIDsFromHex(synpResp.BasicUserID, synpResp.UnitID)
+	if err != nil {
+		logs.Error("[user domain] get basic user objectID from hex failed")
+		return nil, err
+	}
+
+	usr, err := u.UsrMapper.FindOneById(ctx, Oids[0])
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		logs.Errorf("[user mapper] psych user [id=%s] not found", synpResp.BasicUserID)
+	} else if err != nil {
+		logs.Error("[user mapper] FindOneById failed")
+		return nil, err
+	}
+
+	return usr, nil
+}
+
+func (u *UserDomainSVC) SendVerifyCode(ctx context.Context, authType, authId, cause string) error {
+	err := u.Synp4bCli.SendVerifyCode(ctx, authType, authId, cause)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

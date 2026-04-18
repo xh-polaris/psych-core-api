@@ -9,8 +9,7 @@ import (
 type User struct {
 	ID         bson.ObjectID  `json:"id,omitempty" bson:"_id,omitempty"`
 	CodeType   int            `json:"codeType,omitempty" bson:"code_type,omitempty"` // 1-2: Phone | StudentID
-	Code       string         `json:"code,omitempty" bson:"code,omitempty"`
-	Password   string         `json:"password,omitempty" bson:"password,omitempty"`
+	Code       string         `json:"code,omitempty" bson:"code,omitempty"`          // psychUser需展示学号或手机号
 	UnitID     bson.ObjectID  `json:"unitId,omitempty" bson:"unit_id,omitempty"`
 	Name       string         `json:"name,omitempty" bson:"name,omitempty"`
 	Birth      time.Time      `json:"birth,omitempty" bson:"birth,omitempty"`
@@ -18,8 +17,8 @@ type User struct {
 	RiskLevel  int            `json:"riskLevel,omitempty" bson:"risk_level,omitempty"` // 1-4: High | Medium | Low | Normal
 	Status     int            `json:"status,omitempty" bson:"status,omitempty"`        //  1-2: Active | Deleted
 	EnrollYear int            `json:"enrollYear,omitempty" bson:"enroll_year,omitempty"`
-	Role       int            `json:"role,omitempty" bson:"role,omitempty"` // 1-5: Student | Teacher | ClassTeacher | UnitAdmin | SuperAdmin
-	Grade      int            `json:"grade,omitempty" bson:"grade,omitempty"`
+	Role       int            `json:"role,omitempty" bson:"role,omitempty"`   // 1-5: Student | Teacher | ClassTeacher | UnitAdmin | SuperAdmin
+	Grade      int            `json:"grade,omitempty" bson:"grade,omitempty"` // 年级 应通过EnrollYear维护
 	Class      int            `json:"class,omitempty" bson:"class,omitempty"`
 	Options    map[string]any `json:"option,omitempty" bson:"option,omitempty"`
 	Remark     Remark         `json:"remark,omitempty" bson:"remark,omitempty"` // 后台管理时添加的备注

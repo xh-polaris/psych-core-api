@@ -30,6 +30,12 @@ type Mongo struct {
 	DB  string
 }
 
+type Synapse struct {
+	BaseURL   string
+	CreateKey string
+	State     string
+}
+
 type Config struct {
 	service.ServiceConf
 	ListenOn    string
@@ -40,6 +46,7 @@ type Config struct {
 	RabbitMQ    *RabbitMQ
 	Mongo       *Mongo
 	ModelConfig *ModelConfig
+	Synapse     *Synapse
 }
 
 func NewConfig() (*Config, error) {

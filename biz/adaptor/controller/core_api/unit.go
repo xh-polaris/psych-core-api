@@ -41,38 +41,6 @@ func UnitUpdateInfo(ctx context.Context, c *app.RequestContext) {
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
-// UnitLinkUser .
-// @router /unit/link_user [POST]
-func UnitLinkUser(ctx context.Context, c *app.RequestContext) {
-	var err error
-	var req core_api.UnitLinkUserReq
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		c.String(consts.StatusBadRequest, err.Error())
-		return
-	}
-
-	p := provider.Get()
-	resp, err := p.UnitService.UnitLinkUser(ctx, &req)
-	httpx.PostProcess(ctx, c, &req, resp, err)
-}
-
-// UnitCreateAndLinkUser .
-// @router /unit/create_and_link_user [POST]
-func UnitCreateAndLinkUser(ctx context.Context, c *app.RequestContext) {
-	var err error
-	var req core_api.UnitCreateAndLinkUserReq
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		c.String(consts.StatusBadRequest, err.Error())
-		return
-	}
-
-	p := provider.Get()
-	resp, err := p.UnitService.UnitCreateAndLinkUser(ctx, &req)
-	httpx.PostProcess(ctx, c, &req, resp, err)
-}
-
 // UnitGetByURI .
 // @router /unit/get_by_uri [POST]
 func UnitGetByURI(ctx context.Context, c *app.RequestContext) {
@@ -86,5 +54,21 @@ func UnitGetByURI(ctx context.Context, c *app.RequestContext) {
 
 	p := provider.Get()
 	resp, err := p.UnitService.UnitFindByURI(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// CreateUnit .
+// @router /unit/create [POST]
+func CreateUnit(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.CreateUnitReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.UnitService.UnitCreate(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
