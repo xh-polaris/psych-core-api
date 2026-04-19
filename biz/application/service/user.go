@@ -13,6 +13,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/synapse"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util/encrypt"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"github.com/xh-polaris/psych-core-api/biz/cst"
@@ -36,6 +37,7 @@ type IUserService interface {
 	UserUpdatePassword(ctx context.Context, req *core_api.UserUpdatePasswordReq) (*basic.Response, error)
 	CreateUser(ctx context.Context, req *core_api.CreateUserReq) (*basic.Response, error)
 	SendVerifyCode(ctx context.Context, req *core_api.SendVerifyCodeReq) (*basic.Response, error)
+	SuperAdminSignIn(ctx context.Context, req *core_api.UserSignInReq) (*core_api.UserSignInResp, error)
 }
 
 type UserService struct {
@@ -425,5 +427,61 @@ func (u *UserService) SendVerifyCode(ctx context.Context, req *core_api.SendVeri
 	return &basic.Response{
 		Code: 0,
 		Msg:  "success",
+	}, nil
+}
+
+func (u *UserService) SuperAdminSignIn(ctx context.Context, req *core_api.UserSignInReq) (*core_api.UserSignInResp, error) {
+	// 参数校验
+	if req.AuthId == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "身份凭证"))
+	}
+	if req.VerifyCode == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "密码/验证码"))
+	}
+
+	// 超管无需走synapse4b中台
+	superAdmin, err := u.UserMapper.FindOneByCodeAndRole(ctx, req.AuthId, enum.UserRoleSuperAdmin)
+	if errors.Is(err, mongo.ErrNoDocuments) || superAdmin == nil {
+		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", fmt.Sprintf("超管用户[code=%s]", req.AuthId)))
+	} else if err != nil {
+		return nil, errorx.WrapByCode(err, errno.ErrSignIn)
+	}
+
+	// 校验密码/验证码
+	switch req.AuthType {
+	case cst.AuthTypePhoneVerify:
+		// 超管用name字段存bcrypt加密的密码
+		if ok := encrypt.BcryptCheck(req.VerifyCode, superAdmin.Name); !ok {
+			return nil, errorx.New(errno.ErrWrongPassword)
+		}
+
+	case cst.AuthTypePhonePassword:
+		err = u.Synp4bCli.CheckVerifyCode(ctx, req.AuthType, req.AuthId, "", req.VerifyCode)
+		if err != nil {
+			return nil, errorx.New(errno.ErrWrongPassword)
+		}
+
+	default:
+		return nil, errorx.New(errno.ErrUnSupportAuthType)
+	}
+
+	// 签发 JWT
+	token, err := util.GenerateJwt(map[string]any{
+		cst.JsonUnitID: "",
+		cst.JsonUserID: superAdmin.ID.Hex(),
+		cst.JsonCode:   superAdmin.Code,
+		cst.JsonRole:   enum.UserRoleSuperAdmin,
+	})
+	if err != nil {
+		logs.Errorf("[SuperAdminSignIn] generate token error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.WrapByCode(err, errno.ErrSignIn)
+	}
+
+	return &core_api.UserSignInResp{
+		UserId:    superAdmin.ID.Hex(),
+		Token:     token,
+		CodeValue: superAdmin.Code,
+		Code:      0,
+		Msg:       "success",
 	}, nil
 }

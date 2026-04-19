@@ -24,7 +24,7 @@ type IMongoMapper interface {
 	Count(ctx context.Context) (int32, error)
 	FindAll(ctx context.Context) ([]*Unit, error)
 	FindOneByURI(ctx context.Context, uri string) (*Unit, error)
-	FindOneByPhone(ctx context.Context, phone string) (*Unit, error)
+	FindOneByContact(ctx context.Context, contact string) (*Unit, error)
 }
 
 type mongoMapper struct {
@@ -40,9 +40,9 @@ func NewUnitMongoMapper(config *conf.Config) IMongoMapper {
 	}
 }
 
-// FindOneByPhone 根据手机号查询单位
-func (m *mongoMapper) FindOneByPhone(ctx context.Context, phone string) (*Unit, error) {
-	return m.FindOneByFields(ctx, bson.M{cst.Phone: phone, cst.Status: bson.M{cst.NE: enum.UnitStatusDeleted}})
+// FindOneByContact 根据联系方式查询单位
+func (m *mongoMapper) FindOneByContact(ctx context.Context, contact string) (*Unit, error) {
+	return m.FindOneByFields(ctx, bson.M{cst.Contact: contact, cst.Status: bson.M{cst.NE: enum.UnitStatusDeleted}})
 }
 
 // Count 统计单位数量
