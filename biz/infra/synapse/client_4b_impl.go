@@ -82,8 +82,8 @@ func (c *synapse4bClient) CreateUnit(ctx context.Context, name string) (*UnitRes
 	if resp.Code != 0 {
 		return nil, fmt.Errorf("synapse unit_create error: code=%.0f msg=%s", resp.Code, resp.Msg)
 	}
-	if resp.Unit == nil || resp.Unit.UnitID == "" {
-		return nil, fmt.Errorf("synapse unit_create: missing unitId in response")
+	if resp.Unit == nil || resp.Unit.ID == "" {
+		return nil, fmt.Errorf("synapse unit_create: missing unit_id in response")
 	}
 	return resp.Unit, nil
 }
@@ -100,8 +100,8 @@ func (c *synapse4bClient) GetUnit(ctx context.Context, unitID string) (*UnitResu
 	if resp.Code != 0 {
 		return nil, fmt.Errorf("synapse unit_get error: code=%.0f msg=%s", resp.Code, resp.Msg)
 	}
-	if resp.Unit == nil || resp.Unit.UnitID == "" {
-		return nil, fmt.Errorf("synapse unit_get: missing unitId in response")
+	if resp.Unit == nil || resp.Unit.ID == "" {
+		return nil, fmt.Errorf("synapse unit_get: missing unit_id in response")
 	}
 	return resp.Unit, nil
 }

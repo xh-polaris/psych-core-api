@@ -450,14 +450,14 @@ func (u *UserService) SuperAdminSignIn(ctx context.Context, req *core_api.UserSi
 	// 校验密码/验证码
 	switch req.AuthType {
 	case cst.AuthTypePhoneVerify:
+		//err = u.Synp4bCli.CheckVerifyCode(ctx, req.AuthType, req.AuthId, "", req.VerifyCode)
+		//if err != nil {
+		//	return nil, errorx.New(errno.ErrWrongPassword)
+		//}
+		return nil, errorx.New(errno.ErrUnsupported)
+	case cst.AuthTypePhonePassword:
 		// 超管用name字段存bcrypt加密的密码
 		if ok := encrypt.BcryptCheck(req.VerifyCode, superAdmin.Name); !ok {
-			return nil, errorx.New(errno.ErrWrongPassword)
-		}
-
-	case cst.AuthTypePhonePassword:
-		err = u.Synp4bCli.CheckVerifyCode(ctx, req.AuthType, req.AuthId, "", req.VerifyCode)
-		if err != nil {
 			return nil, errorx.New(errno.ErrWrongPassword)
 		}
 

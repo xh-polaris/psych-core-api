@@ -87,7 +87,7 @@ func (u *UserDomainSVC) SignInByCode(ctx context.Context, authType, studentID, u
 
 func (u *UserDomainSVC) CreateUser(ctx context.Context, unitId, email, phone, code, password string, psychUser *user.User) error {
 	// 创建basicUser
-	bu, err := u.Synp4bCli.CreateBasicUser(ctx, unitId, code, phone, email, password, 0)
+	bu, err := u.Synp4bCli.CreateBasicUser(ctx, unitId, code, phone, email, password, 0) // encryptType为0表示传入明文密码，中台使用bcrypt加密后存储
 	if err != nil {
 		return err
 	}

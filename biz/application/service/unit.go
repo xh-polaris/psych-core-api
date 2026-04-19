@@ -166,12 +166,27 @@ func (u *UnitService) UnitCreate(ctx context.Context, req *core_api.CreateUnitRe
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位等级"))
 	}
 
+	// 鉴权 必须是超管才能创建单位
+	m, err := util.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !m.HasUnitAdminAuth(req.Unit.Name) {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
+	}
+
+	adminOid, _ := bson.ObjectIDFromHex(m.UserId)
+	superAdmin, err := u.UserMapper.FindOneById(ctx, adminOid)
+	if err != nil || superAdmin == nil || superAdmin.Role != enum.UserRoleSuperAdmin {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
+	}
+
 	// 创建synapse unit
 	sUnit, err := u.Synapse4bClient.CreateUnit(ctx, req.Unit.Name)
 	if err != nil {
 		return nil, errorx.WrapByCode(err, errno.ErrUnitCreate)
 	}
-	oid, _ := bson.ObjectIDFromHex(sUnit.UnitID)
+	oid, _ := bson.ObjectIDFromHex(sUnit.ID)
 	// 创建psych unit
 	pUnit := &unit.Unit{
 		ID:         oid,
