@@ -22,7 +22,7 @@ type IUserDomainSVC interface {
 	SignInByPhone(ctx context.Context, authType, phone, unitId, verify string) (*user.User, error)
 	SignInByEmail(ctx context.Context, authType, email, unitId, verify string) (*user.User, error)
 	SignInByCode(ctx context.Context, authType, studentID, unitId, verify string) (*user.User, error)
-	CreateUser(ctx context.Context, unitId, email, phone, code, password string, psychUser *user.User) error
+	CreateUser(ctx context.Context, unitId, email, phone, code, password string, psychUser *user.User) (*user.User, error)
 	UpdatePassword(ctx context.Context, userId, newPassword string) error
 	SendVerifyCode(ctx context.Context, authType, authId, cause string) error
 }
@@ -85,11 +85,11 @@ func (u *UserDomainSVC) SignInByCode(ctx context.Context, authType, studentID, u
 	return pu, nil
 }
 
-func (u *UserDomainSVC) CreateUser(ctx context.Context, unitId, email, phone, code, password string, psychUser *user.User) error {
+func (u *UserDomainSVC) CreateUser(ctx context.Context, unitId, email, phone, code, password string, psychUser *user.User) (*user.User, error) {
 	// 创建basicUser
 	bu, err := u.Synp4bCli.CreateBasicUser(ctx, unitId, code, phone, email, password, 0) // encryptType为0表示传入明文密码，中台使用bcrypt加密后存储
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// 创建psychUser
@@ -98,10 +98,10 @@ func (u *UserDomainSVC) CreateUser(ctx context.Context, unitId, email, phone, co
 	err = u.UsrMapper.Insert(ctx, psychUser)
 	if err != nil {
 		logs.Error("[user mapper] insert new user failed", errorx.ErrorWithoutStack(err))
-		return err
+		return nil, err
 	}
 
-	return nil
+	return psychUser, nil
 }
 
 func (u *UserDomainSVC) UpdatePassword(ctx context.Context, userId, newPassword string) error {

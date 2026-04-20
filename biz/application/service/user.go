@@ -35,7 +35,7 @@ type IUserService interface {
 	UserGetInfo(ctx context.Context, req *core_api.UserGetInfoReq) (*core_api.UserGetInfoResp, error)
 	UserUpdateInfo(ctx context.Context, req *core_api.UserUpdateInfoReq) (*basic.Response, error)
 	UserUpdatePassword(ctx context.Context, req *core_api.UserUpdatePasswordReq) (*basic.Response, error)
-	CreateUser(ctx context.Context, req *core_api.CreateUserReq) (*basic.Response, error)
+	CreateUser(ctx context.Context, req *core_api.CreateUserReq) (*core_api.CreateUserResp, error)
 	SendVerifyCode(ctx context.Context, req *core_api.SendVerifyCodeReq) (*basic.Response, error)
 	SuperAdminSignIn(ctx context.Context, req *core_api.UserSignInReq) (*core_api.UserSignInResp, error)
 }
@@ -209,6 +209,25 @@ func (u *UserService) UserUpdateInfo(ctx context.Context, req *core_api.UserUpda
 
 func (u *UserService) UserUpdatePassword(ctx context.Context, req *core_api.UserUpdatePasswordReq) (*basic.Response, error) {
 	// 参数校验
+	if req.NewPassword == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "新密码"))
+	}
+	// 检查是否是登录态修改密码
+	um, err := util.ExtraUserMeta(ctx)
+	if err != nil && um != nil {
+		// 调用user域更新密码
+		err = u.UserDomain.UpdatePassword(ctx, um.UserId, req.NewPassword)
+		if err != nil {
+			return nil, errorx.WrapByCode(err, errno.ErrUpdatePassword)
+		}
+
+		return &basic.Response{
+			Code: 0,
+			Msg:  "success",
+		}, nil
+	}
+
+	// 非登录态修改密码 需要目标userId，验证凭证等参数
 	if req.UserId == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "用户ID"))
 	}
@@ -217,9 +236,6 @@ func (u *UserService) UserUpdatePassword(ctx context.Context, req *core_api.User
 	}
 	if req.VerifyCode == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "旧密码/验证码"))
-	}
-	if req.NewPassword == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "新密码"))
 	}
 	if req.UnitId == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
@@ -254,7 +270,7 @@ func (u *UserService) UserUpdatePassword(ctx context.Context, req *core_api.User
 	}, nil
 }
 
-func (u *UserService) CreateUser(ctx context.Context, req *core_api.CreateUserReq) (*basic.Response, error) {
+func (u *UserService) CreateUser(ctx context.Context, req *core_api.CreateUserReq) (*core_api.CreateUserResp, error) {
 	// basic user参数校验
 	if req.UnitId == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
@@ -311,12 +327,28 @@ func (u *UserService) CreateUser(ctx context.Context, req *core_api.CreateUserRe
 	}
 
 	// 调用domain层创建用户
-	err = u.UserDomain.CreateUser(ctx, req.UnitId, req.GetEmail(), req.GetPhone(), req.GetCode(), req.Password, pu)
+	puWithId, err := u.UserDomain.CreateUser(ctx, req.UnitId, req.GetEmail(), req.GetPhone(), req.GetCode(), req.Password, pu)
 	if err != nil {
 		return nil, errorx.WrapByCode(err, errno.ErrCreateUser)
 	}
 
-	return &basic.Response{
+	// 构建响应
+	ru := &core_api.UserVO{
+		Id:         puWithId.ID.Hex(),
+		Name:       puWithId.Name,
+		Gender:     int32(puWithId.Gender),
+		Role:       int32(puWithId.Role),
+		EnrollYear: int32(puWithId.EnrollYear),
+		Grade:      int32(puWithId.Grade),
+		Class:      int32(puWithId.Class),
+		UnitId:     req.UnitId,
+		Code:       puWithId.Code,
+		CodeType:   int32(puWithId.CodeType),
+		CreateTime: puWithId.CreateTime.Unix(),
+	}
+
+	return &core_api.CreateUserResp{
+		User: ru,
 		Code: 0,
 		Msg:  "success",
 	}, nil
@@ -365,9 +397,6 @@ func tryBuildPsychUser(req *core_api.CreateUserReq) (*user.User, error) {
 	grade := int(req.Grade)
 	if grade == 0 && enrollYear != 0 {
 		grade = time.Now().Year() - enrollYear + 1
-		if grade < 0 {
-			grade = 0
-		}
 	}
 
 	// 角色
@@ -381,7 +410,6 @@ func tryBuildPsychUser(req *core_api.CreateUserReq) (*user.User, error) {
 	// 时间字段: CreateTime, UpdateTime, DeleteTime
 	var createTime time.Time
 	var updateTime time.Time
-	var deleteTime time.Time
 	if req.CreateTime != 0 {
 		createTime = time.Unix(req.CreateTime, 0)
 	} else {
@@ -391,9 +419,6 @@ func tryBuildPsychUser(req *core_api.CreateUserReq) (*user.User, error) {
 		updateTime = time.Unix(req.UpdateTime, 0)
 	} else {
 		updateTime = time.Now()
-	}
-	if req.DeleteTime != 0 {
-		deleteTime = time.Unix(req.DeleteTime, 0)
 	}
 
 	// 构造 user 对象
@@ -412,7 +437,6 @@ func tryBuildPsychUser(req *core_api.CreateUserReq) (*user.User, error) {
 		Class:      int(req.Class),
 		CreateTime: createTime,
 		UpdateTime: updateTime,
-		DeleteTime: deleteTime,
 	}
 
 	return u, nil

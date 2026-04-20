@@ -26,7 +26,7 @@ type IUnitService interface {
 	UnitGetInfo(ctx context.Context, req *core_api.UnitGetInfoReq) (*core_api.UnitGetInfoResp, error)
 	UnitUpdateInfo(ctx context.Context, req *core_api.UnitUpdateInfoReq) (*basic.Response, error)
 	UnitFindByURI(ctx context.Context, req *core_api.UnitGetByURIReq) (*core_api.UnitGetByURIResp, error)
-	UnitCreate(ctx context.Context, req *core_api.CreateUnitReq) (*basic.Response, error)
+	UnitCreate(ctx context.Context, req *core_api.CreateUnitReq) (*core_api.CreateUnitResp, error)
 }
 
 type UnitService struct {
@@ -151,7 +151,7 @@ func (u *UnitService) UnitUpdateInfo(ctx context.Context, req *core_api.UnitUpda
 	}, nil
 }
 
-func (u *UnitService) UnitCreate(ctx context.Context, req *core_api.CreateUnitReq) (*basic.Response, error) {
+func (u *UnitService) UnitCreate(ctx context.Context, req *core_api.CreateUnitReq) (*core_api.CreateUnitResp, error) {
 	// 参数校验
 	if req.Unit.Name == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位名称"))
@@ -206,7 +206,19 @@ func (u *UnitService) UnitCreate(ctx context.Context, req *core_api.CreateUnitRe
 		return nil, errorx.WrapByCode(err, errno.ErrUnitCreate)
 	}
 
-	return &basic.Response{
+	// 构造返回结果
+	ru := &core_api.UnitVO{
+		Id:         pUnit.ID.Hex(),
+		Name:       pUnit.Name,
+		Address:    pUnit.Address,
+		Contact:    pUnit.Contact,
+		Level:      int32(pUnit.Level),
+		Status:     int32(pUnit.Status),
+		CreateTime: pUnit.CreateTime.Unix(),
+		UpdateTime: pUnit.UpdateTime.Unix(),
+	}
+	return &core_api.CreateUnitResp{
+		Unit: ru,
 		Code: 0,
 		Msg:  "success",
 	}, nil
