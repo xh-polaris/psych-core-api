@@ -359,10 +359,22 @@ func tryBuildPsychUser(req *core_api.CreateUserReq) (*user.User, error) {
 	if req.Name == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "姓名"))
 	}
-	// Gender 必须传入且合法
-	if req.Gender == 0 {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "性别"))
+	if req.EnrollYear == 0 {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "入学年份"))
 	}
+	if req.Class == 0 {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "班级"))
+	}
+	if req.CodeType == 0 {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "code类型"))
+	}
+	if req.Role == 0 {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "角色"))
+	}
+	if req.Role > enum.UserRoleUnitAdmin {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "用户角色不合法"))
+	}
+
 	if req.Gender != enum.UserGenderMale && req.Gender != enum.UserGenderFemale {
 		req.Gender = enum.UserGenderOther
 	}
@@ -392,12 +404,8 @@ func tryBuildPsychUser(req *core_api.CreateUserReq) (*user.User, error) {
 		birth = time.Unix(req.Birth, 0)
 	}
 
-	// EnrollYear 与 Grade
-	enrollYear := int(req.EnrollYear)
-	grade := int(req.Grade)
-	if grade == 0 && enrollYear != 0 {
-		grade = time.Now().Year() - enrollYear + 1
-	}
+	// 根据 EnrollYear 计算 Grade
+	grade := time.Now().Year() - int(req.EnrollYear) + 1
 
 	// 角色
 	if req.Role == 0 {
@@ -407,7 +415,7 @@ func tryBuildPsychUser(req *core_api.CreateUserReq) (*user.User, error) {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "用户角色不合法"))
 	}
 
-	// 时间字段: CreateTime, UpdateTime, DeleteTime
+	// 时间字段: CreateTime, UpdateTime
 	var createTime time.Time
 	var updateTime time.Time
 	if req.CreateTime != 0 {
@@ -431,7 +439,7 @@ func tryBuildPsychUser(req *core_api.CreateUserReq) (*user.User, error) {
 		Gender:     int(req.Gender),
 		RiskLevel:  enum.UserRiskLevelNormal,
 		Status:     enum.UserStatusActive,
-		EnrollYear: enrollYear,
+		EnrollYear: int(req.EnrollYear),
 		Role:       int(req.Role),
 		Grade:      grade,
 		Class:      int(req.Class),
