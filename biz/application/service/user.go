@@ -451,7 +451,15 @@ func tryBuildPsychUser(req *core_api.CreateUserReq) (*user.User, error) {
 }
 
 func (u *UserService) SendVerifyCode(ctx context.Context, req *core_api.SendVerifyCodeReq) (*basic.Response, error) {
-	err := u.UserDomain.SendVerifyCode(ctx, req.AuthType, req.AuthId, "")
+	// 校验authId 确保是既有账号
+	ok, err := u.UserMapper.ExistsByCode(ctx, req.AuthId)
+	if !ok {
+		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", fmt.Sprintf("指定用户[code=%s]", req.AuthId)))
+	} else if err != nil {
+		return nil, errorx.WrapByCode(err, errno.ErrSendVerifyCode)
+	}
+
+	err = u.UserDomain.SendVerifyCode(ctx, req.AuthType, req.AuthId, "")
 	if err != nil {
 		return nil, errorx.WrapByCode(err, errno.ErrSendVerifyCode)
 	}
