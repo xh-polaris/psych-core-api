@@ -11,6 +11,7 @@ const (
 const (
 	UserCodeTypePhone     = 1
 	UserCodeTypeStudentID = 2
+	UserCodeTypeEmail     = 3
 )
 
 // UserRole

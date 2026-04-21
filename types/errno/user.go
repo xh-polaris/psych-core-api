@@ -8,6 +8,10 @@ const (
 	ErrStudentIDAlreadyExist = 3000
 	ErrCountUserByClasses    = 3001
 	ErrUserCount             = 3002
+	ErrUnSupportAuthType     = 3003
+	ErrSignIn                = 3004
+	ErrUpdatePassword        = 3005
+	ErrCreateUser            = 3006
 )
 
 func init() {
@@ -24,6 +28,26 @@ func init() {
 	code.Register(
 		ErrUserCount,
 		"用户数量统计失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrUnSupportAuthType,
+		"不支持的认证类型",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrSignIn,
+		"登录失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrUpdatePassword,
+		"更新密码失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrCreateUser,
+		"创建用户失败",
 		code.WithAffectStability(false),
 	)
 }

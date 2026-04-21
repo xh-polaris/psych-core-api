@@ -108,3 +108,15 @@ const (
 	SuggestEnd   = "</suggest>"
 	CodeBound    = "```"
 )
+
+// AuthType
+const (
+	AuthTypePhone         = "phone"
+	AuthTypeEmail         = "email"
+	AuthTypeCode          = "code"
+	AuthTypePhoneVerify   = "phone-verify"
+	AuthTypePhonePassword = "phone-password"
+	AuthTypeCodePassword  = "code-password"
+	AuthTypeEmailPassword = "email-password"
+	AuthTypeEmailVerify   = "email-verify"
+)

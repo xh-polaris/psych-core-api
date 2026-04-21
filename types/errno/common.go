@@ -22,6 +22,8 @@ const (
 	ErrWrongPassword          = 1010
 	ErrJWTPrase               = 1011
 	ErrInsufficientAuth       = 1012
+	ErrUnsupported            = 1013
+	ErrSendVerifyCode         = 1014
 )
 
 func init() {
@@ -98,6 +100,16 @@ func init() {
 	code.Register(
 		ErrInsufficientAuth,
 		"权限不足",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrUnsupported,
+		"method not supported in current mode: {msg}",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrSendVerifyCode,
+		"发送验证码失败",
 		code.WithAffectStability(false),
 	)
 }

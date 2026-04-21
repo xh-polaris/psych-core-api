@@ -9,6 +9,7 @@ package provider
 import (
 	"github.com/xh-polaris/psych-core-api/biz/application/service"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
+	"github.com/xh-polaris/psych-core-api/biz/domain/usr"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
@@ -16,6 +17,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
+	"github.com/xh-polaris/psych-core-api/biz/infra/synapse"
 )
 
 // Injectors from wire.go:
@@ -49,13 +51,22 @@ func NewProvider() (*Provider, error) {
 	configService := service.ConfigService{
 		ConfigMapper: configIMongoMapper,
 	}
+	client := synapse.New4b(confConfig)
+	userDomainSVC := &usr.UserDomainSVC{
+		UsrMapper:  userIMongoMapper,
+		UnitMapper: unitIMongoMapper,
+		Synp4bCli:  client,
+	}
 	userService := service.UserService{
+		UserDomain: userDomainSVC,
 		UserMapper: userIMongoMapper,
 		UnitMapper: unitIMongoMapper,
+		Synp4bCli:  client,
 	}
 	unitService := service.UnitService{
-		UnitMapper: unitIMongoMapper,
-		UserMapper: userIMongoMapper,
+		UnitMapper:      unitIMongoMapper,
+		UserMapper:      userIMongoMapper,
+		Synapse4bClient: client,
 	}
 	conversationService := service.ConversationService{
 		MessageMapper:      messageIMongoMapper,

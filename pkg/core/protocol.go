@@ -75,7 +75,7 @@ type (
 	// 若用户在其他途径登录过来, 则使用Already类型并在authID传入用户ID, verifyCode中传入JWT, info中传入登录接口获取的额外信息
 	Auth struct {
 		AuthID     string         `json:"authId"`     // 认证ID, 如电话号码等
-		AuthType   int            `json:"authType"`   // 校验方式, 如Phone
+		AuthType   string         `json:"authType"`   // 校验方式, 如Phone
 		VerifyCode string         `json:"verifyCode"` // 校验令牌, 如验证码
 		Info       map[string]any `json:"info"`       // 额外信息
 	}

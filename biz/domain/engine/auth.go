@@ -18,7 +18,7 @@ func (e *Engine) auth(auth *core.Auth) (bool, error) {
 	var alreadyAuth *core.Auth // 返回额外信息
 
 	switch auth.AuthType {
-	case int(core.AlreadyAuth): // 已经在其他环节登录过
+	case "": // 已经在其他环节登录过
 		alreadyAuth, merr = e.already(auth)
 	default:
 		alreadyAuth, merr = e.unAuth(auth)
@@ -72,7 +72,7 @@ func (e *Engine) unAuth(auth *core.Auth) (alreadyAuth *core.Auth, merr *core.Err
 	}
 	signReq := &core_api.UserSignInReq{
 		UnitId:     auth.Info[cst.JsonUnitID].(string),
-		AuthType:   int32(auth.AuthType),
+		AuthType:   auth.AuthType,
 		AuthId:     auth.AuthID,
 		VerifyCode: auth.VerifyCode,
 	}

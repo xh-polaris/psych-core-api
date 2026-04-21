@@ -2,21 +2,18 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
-	"github.com/xh-polaris/psych-core-api/biz/infra/util"
-	"github.com/xh-polaris/psych-core-api/types/enum"
-
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
-	"github.com/xh-polaris/psych-core-api/biz/infra/util/encrypt"
-	"github.com/xh-polaris/psych-core-api/biz/infra/util/reg"
+	"github.com/xh-polaris/psych-core-api/biz/infra/synapse"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
+	"github.com/xh-polaris/psych-core-api/types/enum"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"go.mongodb.org/mongo-driver/v2/bson"
 
@@ -28,14 +25,14 @@ var _ IUnitService = (*UnitService)(nil)
 type IUnitService interface {
 	UnitGetInfo(ctx context.Context, req *core_api.UnitGetInfoReq) (*core_api.UnitGetInfoResp, error)
 	UnitUpdateInfo(ctx context.Context, req *core_api.UnitUpdateInfoReq) (*basic.Response, error)
-	UnitLinkUser(ctx context.Context, req *core_api.UnitLinkUserReq) (*basic.Response, error)
-	UnitCreateAndLinkUser(ctx context.Context, req *core_api.UnitCreateAndLinkUserReq) (*core_api.UnitCreateAndLinkUserResp, error)
 	UnitFindByURI(ctx context.Context, req *core_api.UnitGetByURIReq) (*core_api.UnitGetByURIResp, error)
+	UnitCreate(ctx context.Context, req *core_api.CreateUnitReq) (*core_api.CreateUnitResp, error)
 }
 
 type UnitService struct {
-	UnitMapper unit.IMongoMapper
-	UserMapper user.IMongoMapper
+	UnitMapper      unit.IMongoMapper
+	UserMapper      user.IMongoMapper
+	Synapse4bClient synapse.Client
 }
 
 func (u *UnitService) UnitFindByURI(ctx context.Context, req *core_api.UnitGetByURIReq) (*core_api.UnitGetByURIResp, error) {
@@ -154,215 +151,75 @@ func (u *UnitService) UnitUpdateInfo(ctx context.Context, req *core_api.UnitUpda
 	}, nil
 }
 
-func (u *UnitService) UnitLinkUser(ctx context.Context, req *core_api.UnitLinkUserReq) (*basic.Response, error) {
+func (u *UnitService) UnitCreate(ctx context.Context, req *core_api.CreateUnitReq) (*core_api.CreateUnitResp, error) {
 	// 参数校验
-	if req.UnitId == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
+	if req.Unit.Name == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位名称"))
 	}
-	if req.UserId == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "用户ID"))
+	if req.Unit.Address == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位地址"))
+	}
+	if req.Unit.Contact == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位联系人"))
+	}
+	if req.Unit.Level == 0 {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位等级"))
 	}
 
-	// 鉴权
+	// 鉴权 必须是超管才能创建单位
 	m, err := util.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if !m.HasUnitAdminAuth(req.UnitId) {
+	if !m.HasUnitAdminAuth(req.Unit.Name) {
 		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
-	// 转换ID
-	unitId, err := bson.ObjectIDFromHex(req.UnitId)
-	if err != nil {
-		logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-	userId, err := bson.ObjectIDFromHex(req.UserId)
-	if err != nil {
-		logs.Errorf("parse user id error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
+	adminOid, _ := bson.ObjectIDFromHex(m.UserId)
+	superAdmin, err := u.UserMapper.FindOneById(ctx, adminOid)
+	if err != nil || superAdmin == nil || superAdmin.Role != enum.UserRoleSuperAdmin {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
-	// 绑定用户
-	if err := u.UserMapper.UpdateFields(ctx, userId, bson.M{cst.UnitID: unitId}); err != nil {
-		logs.Errorf("update user error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
+	// 创建synapse unit
+	sUnit, err := u.Synapse4bClient.CreateUnit(ctx, req.Unit.Name)
+	if err != nil {
+		return nil, errorx.WrapByCode(err, errno.ErrUnitCreate)
+	}
+	oid, _ := bson.ObjectIDFromHex(sUnit.ID)
+	// 创建psych unit
+	pUnit := &unit.Unit{
+		ID:         oid,
+		Name:       req.Unit.Name,
+		Address:    req.Unit.Address,
+		Contact:    req.Unit.Contact,
+		Level:      int(req.Unit.Level),
+		Status:     enum.UnitStatusActive,
+		URI:        req.Unit.Uri,
+		CreateTime: time.Unix(sUnit.CreateTime, 0),
+		UpdateTime: time.Unix(sUnit.UpdateTime, 0),
 	}
 
-	return &basic.Response{
+	// 存储psych unit
+	if err = u.UnitMapper.Insert(ctx, pUnit); err != nil {
+		logs.Errorf("insert unit error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.WrapByCode(err, errno.ErrUnitCreate)
+	}
+
+	// 构造返回结果
+	ru := &core_api.UnitVO{
+		Id:         pUnit.ID.Hex(),
+		Name:       pUnit.Name,
+		Address:    pUnit.Address,
+		Contact:    pUnit.Contact,
+		Level:      int32(pUnit.Level),
+		Status:     int32(pUnit.Status),
+		CreateTime: pUnit.CreateTime.Unix(),
+		UpdateTime: pUnit.UpdateTime.Unix(),
+	}
+	return &core_api.CreateUnitResp{
+		Unit: ru,
 		Code: 0,
 		Msg:  "success",
-	}, nil
-}
-
-func (u *UnitService) UnitCreateAndLinkUser(ctx context.Context, req *core_api.UnitCreateAndLinkUserReq) (*core_api.UnitCreateAndLinkUserResp, error) {
-	// 参数校验
-	if req.UnitId == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
-	}
-	//if req.CodeType == "" {
-	//	return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "验证方式"))
-	//}
-	if len(req.Users) == 0 {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "用户列表"))
-	}
-
-	// 鉴权
-	m, err := util.ExtraUserMeta(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if !m.HasUnitAdminAuth(req.UnitId) {
-		return nil, errorx.New(errno.ErrInsufficientAuth)
-	}
-
-	// 转换ID
-	unitId, err := bson.ObjectIDFromHex(req.UnitId)
-	if err != nil {
-		logs.Errorf("parse unit id error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-
-	// 验证方式标记
-	isCodeTypePhone := req.CodeType == enum.AuthTypeCode
-
-	// 找出所有属于这个单位的用户
-	users, err := u.UserMapper.FindAllByUnitID(ctx, unitId)
-	if err != nil {
-		logs.Errorf("find users by unit id error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-
-	// 创建一个map用于快速查找已存在的用户code
-	existingCodes := make(map[string]bool)
-	for _, userDAO := range users {
-		existingCodes[userDAO.Code] = true
-	}
-
-	// 记录需要插入的用户数量、成功数量和跳过数量
-	all := len(req.Users)
-	success := 0
-	skip := 0
-
-	// 记录批量创建中已处理的班主任班级，避免同批数据中重复
-	creatingClassTeachers := make(map[string]bool) // key: "grade-class"
-	// 插入用户
-	for _, userReq := range req.Users {
-		// 参数校验
-		if userReq.Code == "" && isCodeTypePhone {
-			return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "电话"))
-		}
-		if userReq.Code == "" && !isCodeTypePhone {
-			return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "学号"))
-		}
-		if userReq.Name == "" {
-			return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "姓名"))
-		}
-		if userReq.Password == "" {
-			return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "密码"))
-		}
-		if userReq.Role == 0 {
-			return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "角色"))
-		}
-
-		// 检查是否已存在相同的code
-		if existingCodes[userReq.Code] {
-			// 如果在这个unit中已经存在该code，则跳过
-			skip++
-			continue
-		}
-
-		// 检查班主任唯一性：一个班级只能有一个班主任
-		if userReq.Role == enum.UserRoleClassTeacher {
-			classKey := fmt.Sprintf("%d-%d", userReq.Grade, userReq.Class)
-			// 检查同批数据中是否已有该班级的班主任
-			if creatingClassTeachers[classKey] {
-				return nil, errorx.New(errno.ErrUnitCreateClassTeacher)
-			}
-			// 检查数据库中是否已有该班级的班主任
-			exists, err := u.UserMapper.ExistsClassTeacher(ctx, unitId, int(userReq.Grade), int(userReq.Class))
-			if err != nil {
-				logs.Errorf("check class teacher exists error: %s", errorx.ErrorWithoutStack(err))
-				return nil, err
-			}
-			if exists {
-				return nil, errorx.New(errno.ErrUnitCreateClassTeacher)
-			}
-			// 标记该班级班主任已在创建中
-			creatingClassTeachers[classKey] = true
-		}
-
-		if isCodeTypePhone {
-			// 检查同一Unit下手机号是否已注册
-			if exists, err := u.UserMapper.ExistsByCodeAndUnitID(ctx, userReq.Code, unitId); err != nil {
-				logs.Errorf("check phone exists in unit error: %s", errorx.ErrorWithoutStack(err))
-				return nil, err
-			} else if exists {
-				// 如果在这个unit中已经存在该手机号，则跳过
-				skip++
-				continue
-			}
-
-			// 如果说验证方式是手机，则需要检测手机号的格式
-			if !reg.CheckMobile(userReq.Code) {
-				return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "手机号"))
-			}
-		} else {
-			// 检查同一Unit下学号是否已注册
-			if exists, err := u.UserMapper.ExistsByCodeAndUnitID(ctx, userReq.Code, unitId); err != nil {
-				logs.Errorf("check student id exists in unit error: %s", errorx.ErrorWithoutStack(err))
-				return nil, err
-			} else if exists {
-				// 如果在这个unit中已经存在该学号，则跳过
-				skip++
-				continue
-			}
-		}
-
-		// 加密密码
-		hashedPwd, err := encrypt.BcryptEncrypt(userReq.Password)
-		if err != nil {
-			logs.Errorf("bcrypt encrypt error: %s", errorx.ErrorWithoutStack(err))
-			return nil, err
-		}
-
-		// 构造用户
-		userDAO := &user.User{
-			ID:         bson.NewObjectID(),
-			CodeType:   int(req.CodeType),
-			Code:       userReq.Code,
-			Password:   hashedPwd,
-			Name:       userReq.Name,
-			Birth:      time.Unix(userReq.Birth, 0),
-			Gender:     int(userReq.Gender),
-			Status:     enum.UserStatusActive,
-			Class:      int(userReq.Class),
-			Grade:      int(userReq.Grade),
-			EnrollYear: int(userReq.EnrollYear),
-			UnitID:     unitId,
-			UpdateTime: time.Now(),
-			CreateTime: time.Now(),
-		}
-
-		// 插入用户
-		if err = u.UserMapper.Insert(ctx, userDAO); err != nil {
-			logs.Errorf("insert user error: %s", errorx.ErrorWithoutStack(err))
-			return nil, err
-		}
-
-		// 添加到existingCodes map中，避免后续重复创建
-		existingCodes[userReq.Code] = true
-
-		// 添加成功数量
-		success++
-	}
-
-	return &core_api.UnitCreateAndLinkUserResp{
-		AllCount:     int32(all),
-		SuccessCount: int32(success),
-		SkipCount:    int32(skip),
-		Code:         0,
-		Msg:          "success",
 	}, nil
 }

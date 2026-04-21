@@ -49,25 +49,19 @@ func Register(r *server.Hertz) {
 	}
 	{
 		_unit := root.Group("/unit", _unitMw()...)
-		_unit.POST("/create_and_link_user", append(_unitcreateandlinkuserMw(), core_api.UnitCreateAndLinkUser)...)
+		_unit.POST("/create", append(_createunitMw(), core_api.CreateUnit)...)
 		_unit.POST("/get_by_uri", append(_unitgetbyuriMw(), core_api.UnitGetByURI)...)
 		_unit.GET("/get_info", append(_unitgetinfoMw(), core_api.UnitGetInfo)...)
-		_unit.POST("/link_user", append(_unitlinkuserMw(), core_api.UnitLinkUser)...)
 		_unit.POST("/update_info", append(_unitupdateinfoMw(), core_api.UnitUpdateInfo)...)
 	}
 	{
 		_user := root.Group("/user", _userMw()...)
+		_user.POST("/create", append(_createuserMw(), core_api.CreateUser)...)
 		_user.GET("/get_info", append(_usergetinfoMw(), core_api.UserGetInfo)...)
+		_user.POST("/send_verify_code", append(_sendverifycodeMw(), core_api.SendVerifyCode)...)
 		_user.POST("/sign_in", append(_usersigninMw(), core_api.UserSignIn)...)
+		_user.POST("/super_admin_sign_in", append(_superadminsigninMw(), core_api.SuperAdminSignIn)...)
 		_user.POST("/update_info", append(_userupdateinfoMw(), core_api.UserUpdateInfo)...)
 		_user.POST("/update_password", append(_userupdatepasswordMw(), core_api.UserUpdatePassword)...)
-		{
-			_admin := _user.Group("/admin", _adminMw()...)
-			_admin.POST("/sign_in", append(_adminsigninMw(), core_api.AdminSignIn)...)
-		}
-		{
-			_student := _user.Group("/student", _studentMw()...)
-			_student.POST("/sign_in", append(_studentsigninMw(), core_api.StudentSignIn)...)
-		}
 	}
 }

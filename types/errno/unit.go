@@ -7,6 +7,7 @@ const (
 	ErrUnitCount              = 2000
 	ErrUnitCreateClassTeacher = 2001
 	ErrUnitFindByURI          = 2002
+	ErrUnitCreate             = 2003
 )
 
 func init() {
@@ -22,6 +23,10 @@ func init() {
 	)
 	code.Register(ErrUnitFindByURI,
 		"通过uri获取unit失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(ErrUnitCreate,
+		"创建单位失败",
 		code.WithAffectStability(false),
 	)
 }

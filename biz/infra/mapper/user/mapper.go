@@ -45,6 +45,7 @@ type IMongoMapper interface {
 	RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID) ([]*RiskStat, error)
 	FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID) (ClassTeachers, error)
 	ExistsClassTeacher(ctx context.Context, unitId bson.ObjectID, grade, class int) (bool, error)
+	ExistsByCode(ctx context.Context, code string) (bool, error)
 }
 
 type mongoMapper struct {
@@ -355,6 +356,21 @@ func (m *mongoMapper) ExistsClassTeacher(ctx context.Context, unitId bson.Object
 	count, err := m.conn.CountDocuments(ctx, filter)
 	if err != nil {
 		logs.Errorf("[user mapper] exists class teacher err: %s", errorx.ErrorWithoutStack(err))
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
+func (m *mongoMapper) ExistsByCode(ctx context.Context, code string) (bool, error) {
+	filter := bson.M{
+		cst.Code:   code,
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+	}
+
+	count, err := m.conn.CountDocuments(ctx, filter)
+	if err != nil {
+		logs.Errorf("[user mapper] exists by code err: %s", errorx.ErrorWithoutStack(err))
 		return false, err
 	}
 
