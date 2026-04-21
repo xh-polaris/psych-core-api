@@ -104,19 +104,3 @@ func SendVerifyCode(ctx context.Context, c *app.RequestContext) {
 	resp, err := p.UserService.SendVerifyCode(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
-
-// SuperAdminSignIn .
-// @router /user/super_admin_sign_in [POST]
-func SuperAdminSignIn(ctx context.Context, c *app.RequestContext) {
-	var err error
-	var req core_api.UserSignInReq
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		c.String(consts.StatusBadRequest, err.Error())
-		return
-	}
-
-	p := provider.Get()
-	resp, err := p.UserService.SuperAdminSignIn(ctx, &req)
-	httpx.PostProcess(ctx, c, &req, resp, err)
-}
