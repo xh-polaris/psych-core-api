@@ -134,7 +134,7 @@ func (u *UserDomainSVC) findPsychUser(ctx context.Context, synpResp *synapse.Log
 		return nil, err
 	}
 
-	return usr, nil
+	return usr, err
 }
 
 func (u *UserDomainSVC) SendVerifyCode(ctx context.Context, authType, authId, cause string) error {

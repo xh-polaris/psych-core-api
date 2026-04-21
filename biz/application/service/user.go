@@ -75,7 +75,7 @@ func (u *UserService) UserSignIn(ctx context.Context, req *core_api.UserSignInRe
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return nil, errorx.New(errno.ErrSignIn, errorx.KV("field", "用户不存在"))
 	} else if err != nil {
-		return nil, errorx.WrapByCode(err, errno.ErrSignIn, errorx.KV("field", "密码或验证码错误"))
+		return nil, errorx.WrapByCode(err, errno.ErrSignIn, errorx.KV("field", err.Error()))
 	}
 
 	// 签发 JWT
