@@ -8,8 +8,8 @@ import (
 
 type User struct {
 	ID         bson.ObjectID  `json:"id,omitempty" bson:"_id,omitempty"`
-	CodeType   int            `json:"codeType,omitempty" bson:"code_type,omitempty"` // 1-2: Phone | StudentID
-	Code       string         `json:"code,omitempty" bson:"code,omitempty"`          // psychUser需展示学号或手机号
+	CodeType   int            `json:"codeType,omitempty" bson:"code_type,omitempty"` // 1-3: Phone | StudentID | Email
+	Code       string         `json:"code,omitempty" bson:"code,omitempty"`          // psychUser需展示学号/手机号/邮箱
 	UnitID     bson.ObjectID  `json:"unitId,omitempty" bson:"unit_id,omitempty"`
 	Name       string         `json:"name,omitempty" bson:"name,omitempty"`
 	Birth      time.Time      `json:"birth,omitempty" bson:"birth,omitempty"`

@@ -305,12 +305,6 @@ func (u *UserService) CreateUser(ctx context.Context, req *core_api.CreateUserRe
 		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
-	// 校验psychUser字段
-	pu, err := tryBuildPsychUser(req)
-	if err != nil {
-		return nil, err
-	}
-
 	// 校验unit存在
 	// synapse unit
 	su, err := u.Synp4bCli.GetUnit(ctx, req.UnitId)
@@ -324,6 +318,12 @@ func (u *UserService) CreateUser(ctx context.Context, req *core_api.CreateUserRe
 	} else if err != nil {
 		logs.Errorf("find unit error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrInternalError)
+	}
+
+	// 校验psychUser字段
+	pu, err := tryBuildPsychUser(req, pUnit)
+	if err != nil {
+		return nil, err
 	}
 
 	// 调用domain层创建用户
@@ -354,7 +354,7 @@ func (u *UserService) CreateUser(ctx context.Context, req *core_api.CreateUserRe
 	}, nil
 }
 
-func tryBuildPsychUser(req *core_api.CreateUserReq) (*user.User, error) {
+func tryBuildPsychUser(req *core_api.CreateUserReq, pUnit *unit.Unit) (*user.User, error) {
 	// psychUser所需参数校验
 	if req.Name == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "姓名"))
@@ -405,7 +405,14 @@ func tryBuildPsychUser(req *core_api.CreateUserReq) (*user.User, error) {
 	}
 
 	// 根据 EnrollYear 计算 Grade
-	grade := time.Now().Year() - int(req.EnrollYear) + 1
+	var grade int
+	now := time.Now()
+	startGrade := pUnit.StartGrade
+	if now.Month() >= time.September {
+		grade = startGrade - int(req.EnrollYear) + now.Year()
+	} else {
+		grade = startGrade - int(req.EnrollYear) + now.Year() - 1
+	}
 
 	// 角色
 	if req.Role == 0 {
@@ -421,12 +428,12 @@ func tryBuildPsychUser(req *core_api.CreateUserReq) (*user.User, error) {
 	if req.CreateTime != 0 {
 		createTime = time.Unix(req.CreateTime, 0)
 	} else {
-		createTime = time.Now()
+		createTime = now
 	}
 	if req.UpdateTime != 0 {
 		updateTime = time.Unix(req.UpdateTime, 0)
 	} else {
-		updateTime = time.Now()
+		updateTime = now
 	}
 
 	// 构造 user 对象

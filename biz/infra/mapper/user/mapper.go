@@ -25,16 +25,13 @@ const (
 type IMongoMapper interface {
 	mapper.IMongoMapper[User]
 
-	// --- 语义化查询 (Business-level) ---
 	FindStudentByCode(ctx context.Context, code string, unitId bson.ObjectID) (*User, error)
 	FindAdminByCode(ctx context.Context, code string, unitId *bson.ObjectID) (*User, error)
 
-	// --- 语义化统计 (Business-level) ---
 	CountStudents(ctx context.Context, unitId bson.ObjectID) (int32, error)
 	CountStudentsByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 	CountHighRiskStudents(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 
-	// --- 基础业务查询 ---
 	FindOneByCodeAndUnitID(ctx context.Context, code string, unitId bson.ObjectID) (*User, error)
 	FindOneByCodeAndRole(ctx context.Context, code string, role int) (*User, error)
 	ExistsByCodeAndUnitID(ctx context.Context, code string, unitId bson.ObjectID) (bool, error)
