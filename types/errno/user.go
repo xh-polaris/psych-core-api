@@ -37,7 +37,7 @@ func init() {
 	)
 	code.Register(
 		ErrSignIn,
-		"登录失败",
+		"登录失败：{field}",
 		code.WithAffectStability(false),
 	)
 	code.Register(
@@ -47,7 +47,7 @@ func init() {
 	)
 	code.Register(
 		ErrCreateUser,
-		"创建用户失败",
+		"创建用户失败：{field}",
 		code.WithAffectStability(false),
 	)
 }

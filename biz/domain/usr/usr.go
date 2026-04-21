@@ -95,10 +95,18 @@ func (u *UserDomainSVC) CreateUser(ctx context.Context, unitId, email, phone, co
 	// 创建psychUser
 	oid, _ := bson.ObjectIDFromHex(bu.BasicUserID)
 	psychUser.ID = oid
+
+	// 校验重复创建
+	if old, err := u.UsrMapper.FindOneById(ctx, oid); old != nil {
+		return nil, errorx.New(errno.ErrCreateUser, errorx.KV("field", "用户已存在"))
+	} else if err != nil {
+		return nil, err
+	}
+
 	err = u.UsrMapper.Insert(ctx, psychUser)
 	if err != nil {
 		logs.Error("[user mapper] insert new user failed", errorx.ErrorWithoutStack(err))
-		return nil, err
+		return nil, errorx.New(errno.ErrCreateUser, errorx.KV("field", "存储用户失败"))
 	}
 
 	return psychUser, nil
@@ -126,7 +134,7 @@ func (u *UserDomainSVC) findPsychUser(ctx context.Context, synpResp *synapse.Log
 		return nil, err
 	}
 
-	return usr, nil
+	return usr, err
 }
 
 func (u *UserDomainSVC) SendVerifyCode(ctx context.Context, authType, authId, cause string) error {

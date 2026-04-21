@@ -60,7 +60,6 @@ func Register(r *server.Hertz) {
 		_user.GET("/get_info", append(_usergetinfoMw(), core_api.UserGetInfo)...)
 		_user.POST("/send_verify_code", append(_sendverifycodeMw(), core_api.SendVerifyCode)...)
 		_user.POST("/sign_in", append(_usersigninMw(), core_api.UserSignIn)...)
-		_user.POST("/super_admin_sign_in", append(_superadminsigninMw(), core_api.SuperAdminSignIn)...)
 		_user.POST("/update_info", append(_userupdateinfoMw(), core_api.UserUpdateInfo)...)
 		_user.POST("/update_password", append(_userupdatepasswordMw(), core_api.UserUpdatePassword)...)
 	}
