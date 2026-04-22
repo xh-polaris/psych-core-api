@@ -46,6 +46,14 @@ type IMongoMapper interface {
 	CountByDurationBucket(ctx context.Context, unitId *bson.ObjectID, minMinutes, maxMinutes float64) (int32, error)
 	// 按年级统计对话时长分布
 	ConvDurationByGrade(ctx context.Context, unitId *bson.ObjectID) (map[int32]int32, int32, error)
+
+	// 班主任相关 - 按班级列表查询
+	CountConversationsByClassList(ctx context.Context, grades, classes []int32, start, end time.Time) (int32, error)
+	CountActiveUsersByClassList(ctx context.Context, grades, classes []int32, start, end time.Time) (int32, error)
+	AverageDurationByClassListAndPeriod(ctx context.Context, grades, classes []int32, start, end time.Time) (float64, error)
+	// 按班级列表查询对话（不分时间范围）
+	CountByClassList(ctx context.Context, grades, classes []int32) (int32, error)
+	FindManyByClassList(ctx context.Context, grades, classes []int32, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
 }
 
 type mongoMapper struct {
@@ -577,4 +585,397 @@ func (m *mongoMapper) ConvDurationByGrade(ctx context.Context, unitId *bson.Obje
 
 func (m *mongoMapper) SetActive(ctx context.Context, cid bson.ObjectID) error {
 	return m.UpdateFields(ctx, cid, bson.M{cst.Status: enum.ConversationStatusActive})
+}
+
+// CountConversationsByClassList 按班级列表统计对话数量
+func (m *mongoMapper) CountConversationsByClassList(ctx context.Context, grades, classes []int32, start, end time.Time) (int32, error) {
+	if len(grades) == 0 && len(classes) == 0 {
+		return 0, nil
+	}
+
+	// 先查询符合条件的用户 ID 列表
+	userFilter := bson.M{
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+	}
+
+	andFilters := make([]bson.M, 0)
+	if len(grades) > 0 {
+		andFilters = append(andFilters, bson.M{cst.Grade: bson.M{cst.In: grades}})
+	}
+	if len(classes) > 0 {
+		andFilters = append(andFilters, bson.M{cst.Class: bson.M{cst.In: classes}})
+	}
+	if len(andFilters) > 0 {
+		userFilter[cst.And] = andFilters
+	}
+
+	users, err := m.findAllUsersByFilter(ctx, userFilter)
+	if err != nil {
+		logs.Errorf("[conversation mapper] find users by class list err: %s", errorx.ErrorWithoutStack(err))
+		return 0, err
+	}
+
+	if len(users) == 0 {
+		return 0, nil
+	}
+
+	userIds := make([]bson.ObjectID, len(users))
+	for i, u := range users {
+		userIds[i] = u.ID
+	}
+
+	// 查询这些用户的对话数量
+	convFilter := bson.M{
+		cst.UserID: bson.M{cst.In: userIds},
+		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+	}
+
+	if !start.IsZero() || !end.IsZero() {
+		timeFilter := bson.M{}
+		if !start.IsZero() {
+			timeFilter[cst.GTE] = start
+		}
+		if !end.IsZero() {
+			timeFilter[cst.LTE] = end
+		}
+		convFilter[cst.StartTime] = timeFilter
+	}
+
+	count, err := m.conn.CountDocuments(ctx, convFilter)
+	if err != nil {
+		logs.Errorf("[conversation mapper] count conversations by class list err: %s", errorx.ErrorWithoutStack(err))
+		return 0, err
+	}
+
+	return int32(count), nil
+}
+
+// CountActiveUsersByClassList 按班级列表统计活跃用户数
+func (m *mongoMapper) CountActiveUsersByClassList(ctx context.Context, grades, classes []int32, start, end time.Time) (int32, error) {
+	if len(grades) == 0 && len(classes) == 0 {
+		return 0, nil
+	}
+
+	// 先查询符合条件的用户 ID 列表
+	userFilter := bson.M{
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+	}
+
+	andFilters := make([]bson.M, 0)
+	if len(grades) > 0 {
+		andFilters = append(andFilters, bson.M{cst.Grade: bson.M{cst.In: grades}})
+	}
+	if len(classes) > 0 {
+		andFilters = append(andFilters, bson.M{cst.Class: bson.M{cst.In: classes}})
+	}
+	if len(andFilters) > 0 {
+		userFilter[cst.And] = andFilters
+	}
+
+	users, err := m.findAllUsersByFilter(ctx, userFilter)
+	if err != nil {
+		logs.Errorf("[conversation mapper] find users by class list err: %s", errorx.ErrorWithoutStack(err))
+		return 0, err
+	}
+
+	if len(users) == 0 {
+		return 0, nil
+	}
+
+	userIds := make([]bson.ObjectID, len(users))
+	for i, u := range users {
+		userIds[i] = u.ID
+	}
+
+	// 查询这些用户在时间范围内有对话的用户数量
+	timeFilter := bson.M{}
+	if !start.IsZero() {
+		timeFilter[cst.GTE] = start
+	}
+	if !end.IsZero() {
+		timeFilter[cst.LTE] = end
+	}
+
+	pipeline := []bson.M{
+		{"$match": bson.M{
+			cst.UserID:    bson.M{cst.In: userIds},
+			cst.Status:    bson.M{cst.NE: enum.ConversationStatusDeleted},
+			cst.StartTime: timeFilter,
+		}},
+		{"$group": bson.M{"_id": "$" + cst.UserID}},
+		{"$count": "count"},
+	}
+
+	var results []struct {
+		Count int32 `bson:"count"`
+	}
+
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
+		logs.Errorf("[conversation mapper] aggregate active users by class list err: %s", errorx.ErrorWithoutStack(err))
+		return 0, err
+	}
+
+	if len(results) == 0 {
+		return 0, nil
+	}
+
+	return results[0].Count, nil
+}
+
+// AverageDurationByClassListAndPeriod 按班级列表和时间段统计平均对话时长
+func (m *mongoMapper) AverageDurationByClassListAndPeriod(ctx context.Context, grades, classes []int32, start, end time.Time) (float64, error) {
+	if len(grades) == 0 && len(classes) == 0 {
+		return 0, nil
+	}
+
+	// 先查询符合条件的用户 ID 列表
+	userFilter := bson.M{
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+	}
+
+	andFilters := make([]bson.M, 0)
+	if len(grades) > 0 {
+		andFilters = append(andFilters, bson.M{cst.Grade: bson.M{cst.In: grades}})
+	}
+	if len(classes) > 0 {
+		andFilters = append(andFilters, bson.M{cst.Class: bson.M{cst.In: classes}})
+	}
+	if len(andFilters) > 0 {
+		userFilter[cst.And] = andFilters
+	}
+
+	users, err := m.findAllUsersByFilter(ctx, userFilter)
+	if err != nil {
+		logs.Errorf("[conversation mapper] find users by class list err: %s", errorx.ErrorWithoutStack(err))
+		return 0, err
+	}
+
+	if len(users) == 0 {
+		return 0, nil
+	}
+
+	userIds := make([]bson.ObjectID, len(users))
+	for i, u := range users {
+		userIds[i] = u.ID
+	}
+
+	// 构建查询条件
+	matchStage := bson.M{
+		cst.UserID: bson.M{cst.In: userIds},
+		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+	}
+
+	if !start.IsZero() || !end.IsZero() {
+		timeFilter := bson.M{}
+		if !start.IsZero() {
+			timeFilter[cst.GTE] = start
+		}
+		if !end.IsZero() {
+			timeFilter[cst.LTE] = end
+		}
+		matchStage[cst.StartTime] = timeFilter
+	}
+
+	// 聚合计算平均时长
+	pipeline := []bson.M{
+		{"$match": matchStage},
+		{"$addFields": bson.M{
+			"durationMinutes": bson.M{
+				"$divide": []interface{}{
+					bson.M{"$subtract": []interface{}{"$end_time", "$start_time"}},
+					60000, // milliseconds to minutes
+				},
+			},
+		}},
+		{"$group": bson.M{
+			"_id":   nil,
+			"avg":   bson.M{"$avg": "$durationMinutes"},
+			"count": bson.M{"$sum": 1},
+		}},
+	}
+
+	var result []struct {
+		Avg   float64 `bson:"avg"`
+		Count int32   `bson:"count"`
+	}
+	if err := m.conn.Aggregate(ctx, &result, pipeline); err != nil {
+		logs.Errorf("[conversation mapper] average duration by class list err: %s", errorx.ErrorWithoutStack(err))
+		return 0, err
+	}
+	if len(result) == 0 || result[0].Count == 0 {
+		return 0, nil
+	}
+	return result[0].Avg, nil
+}
+
+// findAllUsersByFilter 辅助函数：按条件查询所有用户
+func (m *mongoMapper) findAllUsersByFilter(ctx context.Context, filter bson.M) ([]struct {
+	ID bson.ObjectID `bson:"_id"`
+}, error) {
+	// 使用聚合管道查询用户 ID
+	pipeline := []bson.M{
+		{"$match": filter},
+		{"$project": bson.M{"_id": 1}},
+	}
+
+	var results []struct {
+		ID bson.ObjectID `bson:"_id"`
+	}
+
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
+// CountByClassList 按班级列表统计对话数量（不分时间范围）
+func (m *mongoMapper) CountByClassList(ctx context.Context, grades, classes []int32) (int32, error) {
+	if len(grades) == 0 && len(classes) == 0 {
+		return 0, nil
+	}
+
+	// 构建用户查询条件
+	userFilter := bson.M{
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+	}
+	if len(grades) > 0 || len(classes) > 0 {
+		andFilters := make([]bson.M, 0)
+		if len(grades) > 0 {
+			andFilters = append(andFilters, bson.M{cst.Grade: bson.M{cst.In: grades}})
+		}
+		if len(classes) > 0 {
+			andFilters = append(andFilters, bson.M{cst.Class: bson.M{cst.In: classes}})
+		}
+		if len(andFilters) > 0 {
+			userFilter[cst.And] = andFilters
+		}
+	}
+
+	// 查询符合条件的用户 ID 列表
+	pipeline := []bson.M{
+		{"$match": userFilter},
+		{"$project": bson.M{"_id": 1}},
+	}
+
+	var users []struct {
+		ID bson.ObjectID `bson:"_id"`
+	}
+	if err := m.conn.Aggregate(ctx, &users, pipeline); err != nil {
+		logs.Errorf("[conversation mapper] find users by class list err: %s", errorx.ErrorWithoutStack(err))
+		return 0, err
+	}
+
+	if len(users) == 0 {
+		return 0, nil
+	}
+
+	userIds := make([]bson.ObjectID, len(users))
+	for i, u := range users {
+		userIds[i] = u.ID
+	}
+
+	// 查询这些用户的对话数量
+	convFilter := bson.M{
+		cst.UserID: bson.M{cst.In: userIds},
+		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+	}
+
+	count, err := m.conn.CountDocuments(ctx, convFilter)
+	if err != nil {
+		logs.Errorf("[conversation mapper] count conversations by class list err: %s", errorx.ErrorWithoutStack(err))
+		return 0, err
+	}
+
+	return int32(count), nil
+}
+
+// FindManyByClassList 按班级列表查询对话
+func (m *mongoMapper) FindManyByClassList(ctx context.Context, grades, classes []int32, opt options.Lister[options.FindOptions]) ([]*Conversation, error) {
+	if len(grades) == 0 && len(classes) == 0 {
+		return []*Conversation{}, nil
+	}
+
+	// 构建用户查询条件
+	userFilter := bson.M{
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+	}
+	if len(grades) > 0 || len(classes) > 0 {
+		andFilters := make([]bson.M, 0)
+		if len(grades) > 0 {
+			andFilters = append(andFilters, bson.M{cst.Grade: bson.M{cst.In: grades}})
+		}
+		if len(classes) > 0 {
+			andFilters = append(andFilters, bson.M{cst.Class: bson.M{cst.In: classes}})
+		}
+		if len(andFilters) > 0 {
+			userFilter[cst.And] = andFilters
+		}
+	}
+
+	// 查询符合条件的用户 ID 列表
+	pipeline := []bson.M{
+		{"$match": userFilter},
+		{"$project": bson.M{"_id": 1}},
+	}
+
+	var users []struct {
+		ID bson.ObjectID `bson:"_id"`
+	}
+	if err := m.conn.Aggregate(ctx, &users, pipeline); err != nil {
+		logs.Errorf("[conversation mapper] find users by class list err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	if len(users) == 0 {
+		return []*Conversation{}, nil
+	}
+
+	userIds := make([]bson.ObjectID, len(users))
+	for i, u := range users {
+		userIds[i] = u.ID
+	}
+
+	// 查询这些用户的对话
+	matchStage := bson.M{
+		cst.UserID: bson.M{cst.In: userIds},
+		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+	}
+
+	pipeline = []bson.M{{"$match": matchStage}}
+
+	fo := options.FindOptions{}
+	if opt != nil {
+		for _, apply := range opt.List() {
+			if err := apply(&fo); err != nil {
+				logs.Errorf("[conversation mapper] apply find options err: %s", errorx.ErrorWithoutStack(err))
+				return nil, err
+			}
+		}
+	}
+
+	if fo.Sort != nil {
+		sortDoc, ok := fo.Sort.(bson.D)
+		if !ok {
+			logs.Errorf("[conversation mapper] invalid sort type")
+		} else {
+			pipeline = append(pipeline, bson.M{"$sort": sortDoc})
+		}
+	}
+
+	if fo.Limit != nil {
+		pipeline = append(pipeline, bson.M{"$limit": *fo.Limit})
+	}
+
+	if fo.Skip != nil {
+		pipeline = append(pipeline, bson.M{"$skip": *fo.Skip})
+	}
+
+	var results []*Conversation
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
+		logs.Errorf("[conversation mapper] find many by class list err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	return results, nil
 }

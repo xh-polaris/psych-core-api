@@ -32,6 +32,7 @@ type IMongoMapper interface {
 	CountByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (int32, error)
 	ExistsById(ctx context.Context, id bson.ObjectID) (bool, error)
 	AggregateStats(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (*OverviewStats, error)
+	AggregateStatsByClassList(ctx context.Context, unitID bson.ObjectID, grades, classes []int32, start, end time.Time) (*OverviewStats, error)
 	EmotionDistribution(ctx context.Context, unitId *bson.ObjectID) (*EmotionDistribution, error)
 	BatchExistsByConvId(ctx context.Context, convId []bson.ObjectID) (map[bson.ObjectID]bool, error)
 	FindManyWithOption(ctx context.Context, filter bson.M, opts options.Lister[options.FindOptions]) ([]*Alarm, error)
@@ -280,4 +281,112 @@ func (m *mongoMapper) BatchExistsByConvId(ctx context.Context, convId []bson.Obj
 	}
 
 	return result, nil
+}
+
+// AggregateStatsByClassList 按班级列表统计预警数据
+func (m *mongoMapper) AggregateStatsByClassList(ctx context.Context, unitID bson.ObjectID, grades, classes []int32, start, end time.Time) (*OverviewStats, error) {
+	if len(grades) == 0 && len(classes) == 0 {
+		return &OverviewStats{}, nil
+	}
+
+	// 先查询符合条件的用户 ID 列表
+	userFilter := bson.M{
+		cst.UnitID: unitID,
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+	}
+	if len(grades) > 0 || len(classes) > 0 {
+		andFilters := make([]bson.M, 0)
+		if len(grades) > 0 {
+			andFilters = append(andFilters, bson.M{cst.Grade: bson.M{cst.In: grades}})
+		}
+		if len(classes) > 0 {
+			andFilters = append(andFilters, bson.M{cst.Class: bson.M{cst.In: classes}})
+		}
+		if len(andFilters) > 0 {
+			userFilter[cst.And] = andFilters
+		}
+	}
+
+	pipeline := []bson.M{
+		{"$match": userFilter},
+		{"$project": bson.M{"_id": 1}},
+	}
+
+	var users []struct {
+		ID bson.ObjectID `bson:"_id"`
+	}
+	if err := m.conn.Aggregate(ctx, &users, pipeline); err != nil {
+		logs.Errorf("[alarm mapper] find users by class list err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	if len(users) == 0 {
+		return &OverviewStats{}, nil
+	}
+
+	userIds := make([]bson.ObjectID, len(users))
+	for i, u := range users {
+		userIds[i] = u.ID
+	}
+
+	// 使用 $facet 查询当前周和上周的数据
+	now := time.Now()
+	lastweek := now.AddDate(0, 0, -7)
+
+	aggPipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{
+			cst.UserID: bson.M{cst.In: userIds},
+			// cst.Status: bson.M{cst.NE: cst.DeletedStatus},
+		}}},
+		{{Key: "$facet", Value: bson.M{
+			"currentWeek": []bson.M{
+				{"$match": bson.M{
+					cst.CreateTime: bson.M{cst.LT: now},
+				}},
+				{"$group": bson.M{
+					"_id":   "$" + cst.Status,
+					"count": bson.M{"$sum": 1},
+				}},
+			},
+			"lastWeek": []bson.M{
+				{"$match": bson.M{
+					cst.CreateTime: bson.M{cst.LT: lastweek},
+				}},
+				{"$group": bson.M{
+					"_id":   "$" + cst.Status,
+					"count": bson.M{"$sum": 1},
+				}},
+			},
+		}}},
+	}
+
+	var results []struct {
+		CurrentWeek weekData `bson:"currentWeek"`
+		LastWeek    weekData `bson:"lastWeek"`
+	}
+	if err := m.conn.Aggregate(ctx, &results, aggPipeline); err != nil {
+		return nil, err
+	}
+	if len(results) == 0 {
+		return &OverviewStats{}, nil
+	}
+
+	// 构建返回结果
+	stats := OverviewStats{}
+	cu, cuTotal := parseWeekData(results[0].CurrentWeek)
+	stats.Processed = cu[1]
+	stats.Pending = cu[2]
+	stats.Total = cuTotal
+	stats.Track = cuTotal
+
+	lw, lwTotal := parseWeekData(results[0].LastWeek)
+	lwProcessed := lw[1]
+	lwPending := lw[2]
+
+	stats.TotalChange = util.CalculateChange(float64(stats.Total), float64(lwTotal))
+	stats.ProcessedChange = util.CalculateChange(float64(stats.Processed), float64(lwProcessed))
+	stats.PendingChange = util.CalculateChange(float64(stats.Pending), float64(lwPending))
+	stats.TrackChange = stats.TotalChange
+
+	return &stats, nil
 }
