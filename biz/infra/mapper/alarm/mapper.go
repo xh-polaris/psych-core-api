@@ -34,6 +34,7 @@ type IMongoMapper interface {
 	AggregateStats(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (*OverviewStats, error)
 	AggregateStatsByClassList(ctx context.Context, unitID bson.ObjectID, grades, classes []int32, start, end time.Time) (*OverviewStats, error)
 	EmotionDistribution(ctx context.Context, unitId *bson.ObjectID) (*EmotionDistribution, error)
+	EmotionDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) (*EmotionDistribution, error)
 	BatchExistsByConvId(ctx context.Context, convId []bson.ObjectID) (map[bson.ObjectID]bool, error)
 	FindManyWithOption(ctx context.Context, filter bson.M, opts options.Lister[options.FindOptions]) ([]*Alarm, error)
 	CountByFields(ctx context.Context, filter bson.M) (int32, error)
@@ -244,6 +245,67 @@ func (m *mongoMapper) EmotionDistribution(ctx context.Context, unitId *bson.Obje
 
 	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
 		logs.Errorf("[alarm mapper] emotion distribution aggregate err:%s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	distribution := make(EmotionDistribution)
+	for _, result := range results {
+		distribution[result.Emotion] = result.Count
+	}
+
+	return &distribution, nil
+}
+
+func (m *mongoMapper) EmotionDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) (*EmotionDistribution, error) {
+	match := bson.M{
+		cst.UnitID: unitId,
+	}
+
+	pipeline := mongo.Pipeline{
+		bson.D{{Key: "$match", Value: match}},
+		bson.D{{Key: "$sort", Value: bson.M{cst.CreateTime: -1}}},
+		bson.D{{Key: "$group", Value: bson.M{
+			"_id":     "$" + cst.UserID,
+			"emotion": bson.M{"$first": "$emotion"},
+		}}},
+		bson.D{{Key: "$lookup", Value: bson.M{
+			"from":         "user",
+			"localField":   "_id",
+			"foreignField": "_id",
+			"as":           "userDoc",
+		}}},
+		bson.D{{Key: "$unwind", Value: "$userDoc"}},
+	}
+
+	if len(grades) > 0 || len(classes) > 0 {
+		matchFilter := bson.M{}
+		andFilters := make([]bson.M, 0)
+		if len(grades) > 0 {
+			andFilters = append(andFilters, bson.M{"userDoc.grade": bson.M{"$in": grades}})
+		}
+		if len(classes) > 0 {
+			andFilters = append(andFilters, bson.M{"userDoc.class": bson.M{"$in": classes}})
+		}
+		if len(andFilters) > 0 {
+			matchFilter["$and"] = andFilters
+		}
+		pipeline = append(pipeline, bson.D{{Key: "$match", Value: matchFilter}})
+	}
+
+	pipeline = append(pipeline, bson.D{
+		{Key: "$group", Value: bson.M{
+			"_id":   "$emotion",
+			"count": bson.M{"$sum": 1},
+		}},
+	})
+
+	var results []struct {
+		Emotion int   `bson:"_id"`
+		Count   int32 `bson:"count"`
+	}
+
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
+		logs.Errorf("[alarm mapper] emotion distribution by class list aggregate err:%s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}
 

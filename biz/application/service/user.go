@@ -120,6 +120,14 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 		return nil, err
 	}
 
+	unitDAO, err := u.UnitMapper.FindOneById(ctx, userDAO.UnitID)
+	if err != nil {
+		logs.Errorf("find unit error: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	calculatedGrade := userDAO.CalculateGrade(unitDAO.StartGrade)
+
 	optionsAny, err := convert.Any2Anypb(userDAO.Options)
 	if err != nil {
 		return nil, err
@@ -137,7 +145,7 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 			Status:     int32(userDAO.Status),
 			EnrollYear: int32(userDAO.EnrollYear),
 			Class:      int32(userDAO.Class),
-			Grade:      int32(userDAO.Grade),
+			Grade:      int32(calculatedGrade),
 			Role:       int32(userDAO.Role),
 			Options:    optionsAny,
 			CreateTime: userDAO.CreateTime.Unix(),
@@ -179,9 +187,6 @@ func (u *UserService) UserUpdateInfo(ctx context.Context, req *core_api.UserUpda
 	}
 	if req.User.Class != 0 {
 		update[cst.Class] = int(req.User.Class)
-	}
-	if req.User.Grade != 0 {
-		update[cst.Grade] = int(req.User.Grade)
 	}
 	if req.User.Options != nil {
 		optionsAnypb, err := convert.Anypb2Any(req.User.Options)
@@ -332,6 +337,13 @@ func (u *UserService) CreateUser(ctx context.Context, req *core_api.CreateUserRe
 		return nil, errorx.WrapByCode(err, errno.ErrCreateUser)
 	}
 
+	unitDAO, err := u.UnitMapper.FindOneById(ctx, puWithId.UnitID)
+	if err != nil {
+		logs.Errorf("find unit error: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+	calculatedGrade := puWithId.CalculateGrade(unitDAO.StartGrade)
+
 	// 构建响应
 	ru := &core_api.UserVO{
 		Id:         puWithId.ID.Hex(),
@@ -339,7 +351,7 @@ func (u *UserService) CreateUser(ctx context.Context, req *core_api.CreateUserRe
 		Gender:     int32(puWithId.Gender),
 		Role:       int32(puWithId.Role),
 		EnrollYear: int32(puWithId.EnrollYear),
-		Grade:      int32(puWithId.Grade),
+		Grade:      int32(calculatedGrade),
 		Class:      int32(puWithId.Class),
 		UnitId:     req.UnitId,
 		Code:       puWithId.Code,
@@ -404,15 +416,7 @@ func tryBuildPsychUser(req *core_api.CreateUserReq, pUnit *unit.Unit) (*user.Use
 		birth = time.Unix(req.Birth, 0)
 	}
 
-	// 根据 EnrollYear 计算 Grade
-	var grade int
 	now := time.Now()
-	startGrade := pUnit.StartGrade
-	if now.Month() >= time.September {
-		grade = startGrade - int(req.EnrollYear) + now.Year()
-	} else {
-		grade = startGrade - int(req.EnrollYear) + now.Year() - 1
-	}
 
 	// 角色
 	if req.Role == 0 {
@@ -448,7 +452,6 @@ func tryBuildPsychUser(req *core_api.CreateUserReq, pUnit *unit.Unit) (*user.Use
 		Status:     enum.UserStatusActive,
 		EnrollYear: int(req.EnrollYear),
 		Role:       int(req.Role),
-		Grade:      grade,
 		Class:      int(req.Class),
 		CreateTime: createTime,
 		UpdateTime: updateTime,

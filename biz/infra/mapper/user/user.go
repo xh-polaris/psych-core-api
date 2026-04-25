@@ -3,6 +3,7 @@ package user
 import (
 	"time"
 
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
@@ -17,8 +18,7 @@ type User struct {
 	RiskLevel   int            `json:"riskLevel,omitempty" bson:"risk_level,omitempty"` // 1-4: High | Medium | Low | Normal
 	Status      int            `json:"status,omitempty" bson:"status,omitempty"`        //  1-2: Active | Deleted
 	EnrollYear  int            `json:"enrollYear,omitempty" bson:"enroll_year,omitempty"`
-	Role        int            `json:"role,omitempty" bson:"role,omitempty"`   // 1-5: Student | Teacher | ClassTeacher | UnitAdmin | SuperAdmin
-	Grade       int            `json:"grade,omitempty" bson:"grade,omitempty"` // 年级 应通过EnrollYear维护
+	Role        int            `json:"role,omitempty" bson:"role,omitempty"` // 1-5: Student | Teacher | ClassTeacher | UnitAdmin | SuperAdmin
 	Class       int            `json:"class,omitempty" bson:"class,omitempty"`
 	BindClasses []ClassInfo    `json:"bindClasses,omitempty" bson:"bind_classes,omitempty"` // 只有班主任/心理老师需要确定其管理的班级
 	Options     map[string]any `json:"option,omitempty" bson:"option,omitempty"`
@@ -36,4 +36,10 @@ type Remark struct {
 type ClassInfo struct {
 	EnrollYear int `json:"enrollYear,omitempty" bson:"enroll_year,omitempty"`
 	Class      int `json:"class,omitempty" bson:"class,omitempty"`
+}
+
+// CalculateGrade 根据单位的起始年级和用户的入学年份计算当前年级
+// startGrade: 单位起始年级 (如小学=1, 初中=6/7, 高中=10)
+func (u *User) CalculateGrade(startGrade int) int {
+	return util.CalculateGrade(startGrade, u.EnrollYear)
 }

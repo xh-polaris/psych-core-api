@@ -7,6 +7,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/enum"
@@ -40,7 +41,7 @@ type IMongoMapper interface {
 	BatchFindByIDs(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*User, error)
 	CountByClasses(ctx context.Context, unitId bson.ObjectID, grade, class []int32) ([]*ClassStatResult, error)
 	RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID) ([]*RiskStat, error)
-	FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID) (ClassTeachers, error)
+	FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID, startGrade int) (ClassTeachers, error)
 	ExistsClassTeacher(ctx context.Context, unitId bson.ObjectID, grade, class int) (bool, error)
 	ExistsByCode(ctx context.Context, code string) (bool, error)
 
@@ -49,6 +50,7 @@ type IMongoMapper interface {
 	CountStudentsByPeriodAndClassList(ctx context.Context, unitId *bson.ObjectID, grades, classes []int32, start, end time.Time) (int32, error)
 	CountHighRiskStudentsByClassList(ctx context.Context, grades, classes []int32, start, end time.Time) (int32, error)
 	FindManyByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) ([]*User, error)
+	GetRiskDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) ([]*RiskStat, error)
 }
 
 type mongoMapper struct {
@@ -324,7 +326,7 @@ func (m *mongoMapper) RiskDistributionStats(ctx context.Context, unitId *bson.Ob
 
 type ClassTeachers map[int]map[int]*User
 
-func (m *mongoMapper) FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID) (ClassTeachers, error) {
+func (m *mongoMapper) FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID, startGrade int) (ClassTeachers, error) {
 	filter := bson.M{
 		cst.UnitID: unitId,
 		cst.Role:   enum.UserRoleClassTeacher,
@@ -339,12 +341,13 @@ func (m *mongoMapper) FindUnitClassTeachers(ctx context.Context, unitId bson.Obj
 	clsTeachers := make(map[int]map[int]*User)
 	for _, u := range clsTeacherUsers {
 		for _, info := range u.BindClasses {
-			year := info.EnrollYear
+			// 根据入学年份和起始年级计算当前年级
+			grade := util.CalculateGrade(startGrade, info.EnrollYear)
 			class := info.Class
-			if _, ok := clsTeachers[year]; !ok {
-				clsTeachers[year] = make(map[int]*User)
+			if _, ok := clsTeachers[grade]; !ok {
+				clsTeachers[grade] = make(map[int]*User)
 			}
-			clsTeachers[year][class] = u
+			clsTeachers[grade][class] = u
 		}
 	}
 
@@ -519,4 +522,55 @@ func (m *mongoMapper) FindManyByClassList(ctx context.Context, unitId bson.Objec
 	}
 
 	return m.FindAllByFields(ctx, filter)
+}
+
+// GetRiskDistributionByClassList 按班级列表获取风险分布统计（按风险等级和性别分组）
+func (m *mongoMapper) GetRiskDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) ([]*RiskStat, error) {
+	match := bson.M{
+		cst.UnitID: unitId,
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+		cst.Role:   enum.UserRoleStudent,
+	}
+
+	if len(grades) > 0 || len(classes) > 0 {
+		andFilters := make([]bson.M, 0)
+		if len(grades) > 0 {
+			andFilters = append(andFilters, bson.M{cst.Grade: bson.M{cst.In: grades}})
+		}
+		if len(classes) > 0 {
+			andFilters = append(andFilters, bson.M{cst.Class: bson.M{cst.In: classes}})
+		}
+		if len(andFilters) > 0 {
+			match[cst.And] = andFilters
+		}
+	}
+
+	pipeline := []bson.M{
+		{"$match": match},
+		{
+			"$group": bson.M{
+				cst.ID: bson.M{
+					"level":  "$" + cst.RiskLevel,
+					"gender": "$" + cst.Gender,
+				},
+				"count": bson.M{"$sum": 1},
+			},
+		},
+		{
+			"$project": bson.M{
+				"level":  "$_id.level",
+				"gender": "$_id.gender",
+				"count":  1,
+				cst.ID:   0,
+			},
+		},
+	}
+
+	var results []*RiskStat
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
+		logs.Errorf("[user mapper] get risk distribution by class list err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	return results, nil
 }

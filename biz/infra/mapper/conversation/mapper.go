@@ -29,8 +29,10 @@ type IMongoMapper interface {
 	Exists(ctx context.Context, conversationId bson.ObjectID) (bool, error)
 	CountByUnit(ctx context.Context, unitId *bson.ObjectID) (int32, error)
 	CountByUser(ctx context.Context, userId bson.ObjectID) (int32, error)
-	FindManyByUserId(ctx context.Context, userId bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error) // 分页查找
-	FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error)                                           // 查找全部
+	CountByUserIds(ctx context.Context, userIds []bson.ObjectID) (int32, error)
+	FindManyByUserId(ctx context.Context, userId bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
+	FindManyByUserIds(ctx context.Context, userIds []bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
+	FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error)
 	FindManyByUnitId(ctx context.Context, unitId *bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
 	// 修改
 	SetActive(ctx context.Context, conversationId bson.ObjectID) error
@@ -54,6 +56,10 @@ type IMongoMapper interface {
 	// 按班级列表查询对话（不分时间范围）
 	CountByClassList(ctx context.Context, grades, classes []int32) (int32, error)
 	FindManyByClassList(ctx context.Context, grades, classes []int32, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
+	// 按时长分桶统计（按班级列表）
+	CountByDurationBucketByClassList(ctx context.Context, grades, classes []int32, minMinutes, maxMinutes float64) (int32, error)
+	// 按年级统计对话时长分布（按班级列表）
+	ConvDurationByGradeByClassList(ctx context.Context, grades, classes []int32) (map[int32]int32, int32, error)
 }
 
 type mongoMapper struct {
@@ -387,6 +393,30 @@ func (m *mongoMapper) FindManyByUserId(ctx context.Context, userId bson.ObjectID
 	c, err := m.FindManyWithOption(ctx, bson.M{cst.UserID: userId, cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}, opt)
 	if err != nil {
 		logs.Errorf("[conversation mapper] paged find many by user err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+	return c, nil
+}
+
+func (m *mongoMapper) CountByUserIds(ctx context.Context, userIds []bson.ObjectID) (int32, error) {
+	if len(userIds) == 0 {
+		return 0, nil
+	}
+	count, err := m.conn.CountDocuments(ctx, bson.M{cst.UserID: bson.M{cst.In: userIds}, cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}})
+	if err != nil {
+		logs.Errorf("[conversation mapper] count by user ids err: %s", errorx.ErrorWithoutStack(err))
+		return 0, err
+	}
+	return int32(count), nil
+}
+
+func (m *mongoMapper) FindManyByUserIds(ctx context.Context, userIds []bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error) {
+	if len(userIds) == 0 {
+		return []*Conversation{}, nil
+	}
+	c, err := m.FindManyWithOption(ctx, bson.M{cst.UserID: bson.M{cst.In: userIds}, cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}, opt)
+	if err != nil {
+		logs.Errorf("[conversation mapper] find many by user ids err: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}
 	return c, nil
@@ -978,4 +1008,159 @@ func (m *mongoMapper) FindManyByClassList(ctx context.Context, grades, classes [
 	}
 
 	return results, nil
+}
+
+// CountByDurationBucketByClassList 按时长分桶统计对话数量（按班级列表）
+func (m *mongoMapper) CountByDurationBucketByClassList(ctx context.Context, grades, classes []int32, minMinutes, maxMinutes float64) (int32, error) {
+	if len(grades) == 0 && len(classes) == 0 {
+		return 0, nil
+	}
+
+	userIds, err := m.getUserIdsByGradesClasses(ctx, grades, classes)
+	if err != nil {
+		return 0, err
+	}
+	if len(userIds) == 0 {
+		return 0, nil
+	}
+
+	matchStage := bson.M{
+		cst.UserID: bson.M{cst.In: userIds},
+		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+	}
+
+	durationExpr := bson.M{
+		"$divide": []interface{}{
+			bson.M{"$subtract": []interface{}{"$end_time", "$start_time"}},
+			60000,
+		},
+	}
+
+	durationFilter := bson.M{}
+	if maxMinutes < 0 {
+		durationFilter["$gte"] = minMinutes
+	} else {
+		durationFilter["$gte"] = minMinutes
+		durationFilter["$lte"] = maxMinutes
+	}
+
+	pipeline := []bson.M{{"$match": matchStage}}
+	pipeline = append(pipeline,
+		bson.M{"$addFields": bson.M{
+			"roundedDuration": bson.M{"$round": []interface{}{durationExpr, 0}},
+		}},
+		bson.M{"$match": bson.M{
+			"roundedDuration": durationFilter,
+		}},
+		bson.M{"$count": "count"},
+	)
+
+	var result []struct {
+		Count int32 `bson:"count"`
+	}
+	if err := m.conn.Aggregate(ctx, &result, pipeline); err != nil {
+		logs.Errorf("[conversation mapper] count by duration bucket by class list err: %s", errorx.ErrorWithoutStack(err))
+		return 0, err
+	}
+	if len(result) == 0 {
+		return 0, nil
+	}
+	return result[0].Count, nil
+}
+
+// ConvDurationByGradeByClassList 按年级统计对话时长分布（按班级列表）
+func (m *mongoMapper) ConvDurationByGradeByClassList(ctx context.Context, grades, classes []int32) (map[int32]int32, int32, error) {
+	if len(grades) == 0 && len(classes) == 0 {
+		return make(map[int32]int32, 0), 0, nil
+	}
+
+	userIds, err := m.getUserIdsByGradesClasses(ctx, grades, classes)
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(userIds) == 0 {
+		return make(map[int32]int32, 0), 0, nil
+	}
+
+	matchStage := bson.M{
+		cst.UserID: bson.M{cst.In: userIds},
+		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+	}
+
+	pipeline := []bson.M{{"$match": matchStage}}
+	pipeline = append(pipeline,
+		bson.M{"$lookup": bson.M{
+			"from":         userCollection,
+			"localField":   cst.UserID,
+			"foreignField": cst.ID,
+			"as":           "userInfo",
+		}},
+		bson.M{"$match": bson.M{
+			"userInfo.0": bson.M{"$exists": true},
+		}},
+		bson.M{"$unwind": "$userInfo"},
+		bson.M{"$addFields": bson.M{
+			"grade": "$userInfo.grade",
+		}},
+		bson.M{"$match": bson.M{
+			"grade": bson.M{cst.GTE: 1, cst.LTE: 12},
+		}},
+		bson.M{"$group": bson.M{
+			"_id":   "$grade",
+			"total": bson.M{"$sum": bson.M{"$subtract": []interface{}{"$end_time", "$start_time"}}},
+		}},
+	)
+
+	var results2 []struct {
+		Grade int32 `bson:"_id"`
+		Total int32 `bson:"total"`
+	}
+	if err := m.conn.Aggregate(ctx, &results2, pipeline); err != nil {
+		logs.Errorf("[conversation mapper] conv duration by grade by class list err: %s", errorx.ErrorWithoutStack(err))
+		return nil, 0, err
+	}
+
+	ratioMap := make(map[int32]int32, 12)
+	var totalDuration int32
+	for _, r := range results2 {
+		if r.Grade >= 1 && r.Grade <= 12 {
+			ratioMap[r.Grade] = r.Total
+			totalDuration += r.Total
+		}
+	}
+
+	return ratioMap, totalDuration, nil
+}
+
+// getUserIdsByGradesClasses 根据年级和班级获取用户 ID 列表（内部复用方法）
+func (m *mongoMapper) getUserIdsByGradesClasses(ctx context.Context, grades, classes []int32) ([]bson.ObjectID, error) {
+	userFilter := bson.M{
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+	}
+
+	andFilters := make([]bson.M, 0)
+	if len(grades) > 0 {
+		andFilters = append(andFilters, bson.M{cst.Grade: bson.M{cst.In: grades}})
+	}
+	if len(classes) > 0 {
+		andFilters = append(andFilters, bson.M{cst.Class: bson.M{cst.In: classes}})
+	}
+	if len(andFilters) > 0 {
+		userFilter[cst.And] = andFilters
+	}
+
+	users, err := m.findAllUsersByFilter(ctx, userFilter)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(users) == 0 {
+		return nil, nil
+	}
+
+	userIds := make([]bson.ObjectID, len(users))
+	for i, u := range users {
+		userIds[i] = u.ID
+	}
+	return userIds, nil
 }
