@@ -11,9 +11,11 @@ import (
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
+	"github.com/xh-polaris/psych-core-api/types/enum"
 
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
@@ -35,6 +37,7 @@ type IAlarmService interface {
 type AlarmService struct {
 	AlarmMapper        alarm.IMongoMapper
 	UserMapper         user.IMongoMapper
+	UnitMapper         unit.IMongoMapper
 	ConversationMapper conversation.IMongoMapper
 	ReportMapper       report.IMongoMapper
 }
@@ -51,19 +54,26 @@ func (s *AlarmService) Overview(ctx context.Context, req *core_api.DashboardGetA
 		return nil, err
 	}
 
+	// 提取unitID
+	var unitOID bson.ObjectID
 	if req.UnitId != "" {
-		if !userMeta.HasUnitAdminAuth(req.UnitId) {
+		id, err := bson.ObjectIDFromHex(req.UnitId)
+		if err != nil {
+			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
+		}
+		unitOID = id
+
+		// 检查权限：单位管理员或班主任
+		if userMeta.Role == enum.UserRoleClassTeacher {
+			return s.getAlarmOverviewClassTeacher(ctx, userMeta.UserId, unitOID)
+		} else if !userMeta.HasUnitAdminAuth(req.UnitId) {
 			return nil, errorx.New(errno.ErrInsufficientAuth)
 		}
-	}
-	if req.UnitId == "" && !userMeta.HasSuperAdminAuth() {
-		return nil, errorx.New(errno.ErrInsufficientAuth)
-	}
-
-	// 提取unitID
-	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
-	if err != nil {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
+	} else {
+		// 管理端 - 需要超级管理员权限
+		if !userMeta.HasSuperAdminAuth() {
+			return nil, errorx.New(errno.ErrInsufficientAuth)
+		}
 	}
 
 	st, err := s.AlarmMapper.AggregateStats(ctx, unitOID, time.Time{}, time.Time{})
@@ -93,24 +103,40 @@ func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardL
 		return nil, err
 	}
 
+	// 提取unitID
+	var unitOID bson.ObjectID
 	if req.UnitId != "" {
-		if !userMeta.HasUnitAdminAuth(req.UnitId) {
+		id, err := bson.ObjectIDFromHex(req.UnitId)
+		if err != nil {
+			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
+		}
+		unitOID = id
+	} else {
+		// 管理端 - 需要超级管理员权限
+		if !userMeta.HasSuperAdminAuth() {
 			return nil, errorx.New(errno.ErrInsufficientAuth)
 		}
-	}
-	if req.UnitId == "" && !userMeta.HasSuperAdminAuth() {
-		return nil, errorx.New(errno.ErrInsufficientAuth)
-	}
-
-	// 提取unitID
-	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
-	if err != nil {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 	}
 
 	// 构建筛选条件
 	filter := bson.M{
 		cst.UnitID: unitOID,
+	}
+
+	// 检查权限并添加班级筛选
+	if req.UnitId != "" {
+		if userMeta.Role == enum.UserRoleClassTeacher {
+			grades, classes, err := s.getClassTeacherGradesClasses(ctx, userMeta.UserId)
+			if err != nil {
+				return nil, err
+			}
+			if len(grades) > 0 {
+				filter[cst.Grade] = bson.M{"$in": grades}
+				filter[cst.Class] = bson.M{"$in": classes}
+			}
+		} else if !userMeta.HasUnitAdminAuth(req.UnitId) {
+			return nil, errorx.New(errno.ErrInsufficientAuth)
+		}
 	}
 	if req.Emotion != nil {
 		filter[cst.Emotion] = int(req.GetEmotion())
@@ -174,27 +200,25 @@ func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardL
 }
 
 func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alarm) ([]*core_api.AlarmRecord, error) {
-	// 提取需获取信息的userId列表
 	userIds := make([]bson.ObjectID, len(dbAlarms))
 	for i, al := range dbAlarms {
 		userIds[i] = al.UserID
 	}
 
-	// 并行处理：获取user基础信息和对话情况
 	var userInfo map[bson.ObjectID]*user.User
 	var msgStats map[bson.ObjectID]*conversation.ConvStats
 	var userErr, msgErr error
 
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go func() { // 获取user基础信息
+	go func() {
 		defer wg.Done()
 		userInfo, userErr = s.UserMapper.BatchFindByIDs(ctx, userIds)
 		if userErr != nil {
 			logs.Errorf("批量查询用户信息失败: %v", errorx.ErrorWithoutStack(userErr))
 		}
 	}()
-	go func() { // 对话情况
+	go func() {
 		defer wg.Done()
 		msgStats, msgErr = s.ConversationMapper.BatchConvStats(ctx, userIds)
 		if msgErr != nil {
@@ -210,12 +234,30 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 		return nil, errorx.New(errno.ErrDashboardConversationStat)
 	}
 
-	// 构建响应
+	unitIds := make(map[bson.ObjectID]bool)
+	for _, u := range userInfo {
+		unitIds[u.UnitID] = true
+	}
+
+	unitMap := make(map[bson.ObjectID]*unit.Unit)
+	for unitId := range unitIds {
+		u, err := s.UnitMapper.FindOneById(ctx, unitId)
+		if err != nil {
+			logs.Errorf("查询单位信息失败: %v", errorx.ErrorWithoutStack(err))
+			continue
+		}
+		unitMap[unitId] = u
+	}
+
 	records := make([]*core_api.AlarmRecord, len(dbAlarms))
 	for i, al := range dbAlarms {
 		dbUser, userExists := userInfo[al.UserID]
 		msgStats, msgExists := msgStats[al.UserID]
 		if userExists {
+			var calculatedGrade int32
+			if u, ok := unitMap[dbUser.UnitID]; ok {
+				calculatedGrade = int32(dbUser.CalculateGrade(u.StartGrade))
+			}
 			records[i] = &core_api.AlarmRecord{
 				Id:       al.ID.Hex(),
 				Emotion:  int32(al.Emotion),
@@ -225,7 +267,7 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 					Id:    dbUser.ID.Hex(),
 					Code:  dbUser.Code,
 					Name:  dbUser.Name,
-					Grade: int32(dbUser.Grade),
+					Grade: calculatedGrade,
 					Class: int32(dbUser.Class),
 					Remark: &core_api.Remark{
 						Content: dbUser.Remark.Content,
@@ -302,4 +344,79 @@ func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardU
 		Code: 0,
 		Msg:  "success",
 	}, nil
+}
+
+// getAlarmOverviewClassTeacher 班主任版预警概览
+func (s *AlarmService) getAlarmOverviewClassTeacher(ctx context.Context, userId string, unitOID bson.ObjectID) (*core_api.DashboardGetAlarmOverviewResp, error) {
+	userOID, err := bson.ObjectIDFromHex(userId)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UserID"))
+	}
+
+	boundClasses, err := s.UserMapper.GetClassTeacherBoundClasses(ctx, userOID)
+	if err != nil {
+		logs.Errorf("get class teacher bound classes error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrDashboardAlarmUserStat)
+	}
+
+	if len(boundClasses) == 0 {
+		return &core_api.DashboardGetAlarmOverviewResp{
+			Total:       0,
+			Processed:   0,
+			Pending:     0,
+			Track:       0,
+			TotalChange: 0,
+			Code:        0,
+			Msg:         "success",
+		}, nil
+	}
+
+	grades := make([]int32, 0, len(boundClasses))
+	classes := make([]int32, 0, len(boundClasses))
+	for _, bc := range boundClasses {
+		grades = append(grades, int32(7))
+		classes = append(classes, int32(bc.Class))
+	}
+
+	st, err := s.AlarmMapper.AggregateStatsByClassList(ctx, unitOID, grades, classes, time.Time{}, time.Time{})
+	if err != nil {
+		logs.Errorf("aggregate alarm by class list error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrDashboardAlarmUserStat)
+	}
+
+	return &core_api.DashboardGetAlarmOverviewResp{
+		Total:           st.Total,
+		Processed:       st.Processed,
+		Pending:         st.Pending,
+		Track:           st.Track,
+		TotalChange:     st.TotalChange,
+		ProcessedChange: st.ProcessedChange,
+		PendingChange:   st.PendingChange,
+		TrackChange:     st.TrackChange,
+		Code:            0,
+		Msg:             "success",
+	}, nil
+}
+
+// getClassTeacherGradesClasses 获取班主任的年级班级列表
+func (s *AlarmService) getClassTeacherGradesClasses(ctx context.Context, userId string) ([]int32, []int32, error) {
+	userOID, err := bson.ObjectIDFromHex(userId)
+	if err != nil {
+		return nil, nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UserID"))
+	}
+
+	boundClasses, err := s.UserMapper.GetClassTeacherBoundClasses(ctx, userOID)
+	if err != nil {
+		logs.Errorf("get class teacher bound classes error: %s", errorx.ErrorWithoutStack(err))
+		return nil, nil, errorx.New(errno.ErrDashboardAlarmUserStat)
+	}
+
+	grades := make([]int32, 0, len(boundClasses))
+	classes := make([]int32, 0, len(boundClasses))
+	for _, bc := range boundClasses {
+		grades = append(grades, int32(7))
+		classes = append(classes, int32(bc.Class))
+	}
+
+	return grades, classes, nil
 }

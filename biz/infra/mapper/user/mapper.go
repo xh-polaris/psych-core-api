@@ -7,6 +7,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/enum"
@@ -25,16 +26,13 @@ const (
 type IMongoMapper interface {
 	mapper.IMongoMapper[User]
 
-	// --- 语义化查询 (Business-level) ---
 	FindStudentByCode(ctx context.Context, code string, unitId bson.ObjectID) (*User, error)
 	FindAdminByCode(ctx context.Context, code string, unitId *bson.ObjectID) (*User, error)
 
-	// --- 语义化统计 (Business-level) ---
 	CountStudents(ctx context.Context, unitId bson.ObjectID) (int32, error)
 	CountStudentsByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 	CountHighRiskStudents(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 
-	// --- 基础业务查询 ---
 	FindOneByCodeAndUnitID(ctx context.Context, code string, unitId bson.ObjectID) (*User, error)
 	FindOneByCodeAndRole(ctx context.Context, code string, role int) (*User, error)
 	ExistsByCodeAndUnitID(ctx context.Context, code string, unitId bson.ObjectID) (bool, error)
@@ -43,9 +41,16 @@ type IMongoMapper interface {
 	BatchFindByIDs(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*User, error)
 	CountByClasses(ctx context.Context, unitId bson.ObjectID, grade, class []int32) ([]*ClassStatResult, error)
 	RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID) ([]*RiskStat, error)
-	FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID) (ClassTeachers, error)
+	FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID, startGrade int) (ClassTeachers, error)
 	ExistsClassTeacher(ctx context.Context, unitId bson.ObjectID, grade, class int) (bool, error)
 	ExistsByCode(ctx context.Context, code string) (bool, error)
+
+	GetClassTeacherBoundClasses(ctx context.Context, userId bson.ObjectID) ([]ClassInfo, error)
+	CountStudentsByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) (int32, error)
+	CountStudentsByPeriodAndClassList(ctx context.Context, unitId *bson.ObjectID, grades, classes []int32, start, end time.Time) (int32, error)
+	CountHighRiskStudentsByClassList(ctx context.Context, grades, classes []int32, start, end time.Time) (int32, error)
+	FindManyByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) ([]*User, error)
+	GetRiskDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) ([]*RiskStat, error)
 }
 
 type mongoMapper struct {
@@ -298,8 +303,8 @@ func (m *mongoMapper) RiskDistributionStats(ctx context.Context, unitId *bson.Ob
 		{"$match": match},
 		{"$group": bson.M{
 			cst.ID: bson.M{
-				"level":  "$" + cst.RiskLevel,
-				"gender": "$" + cst.Gender,
+				"level":    "$" + cst.RiskLevel,
+				cst.Gender: "$" + cst.Gender,
 			},
 			"count": bson.M{"$sum": 1},
 		}},
@@ -321,7 +326,7 @@ func (m *mongoMapper) RiskDistributionStats(ctx context.Context, unitId *bson.Ob
 
 type ClassTeachers map[int]map[int]*User
 
-func (m *mongoMapper) FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID) (ClassTeachers, error) {
+func (m *mongoMapper) FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID, startGrade int) (ClassTeachers, error) {
 	filter := bson.M{
 		cst.UnitID: unitId,
 		cst.Role:   enum.UserRoleClassTeacher,
@@ -335,10 +340,15 @@ func (m *mongoMapper) FindUnitClassTeachers(ctx context.Context, unitId bson.Obj
 
 	clsTeachers := make(map[int]map[int]*User)
 	for _, u := range clsTeacherUsers {
-		if clsTeachers[u.Grade] == nil {
-			clsTeachers[u.Grade] = make(map[int]*User)
+		for _, info := range u.BindClasses {
+			// 根据入学年份和起始年级计算当前年级
+			grade := util.CalculateGrade(startGrade, info.EnrollYear)
+			class := info.Class
+			if _, ok := clsTeachers[grade]; !ok {
+				clsTeachers[grade] = make(map[int]*User)
+			}
+			clsTeachers[grade][class] = u
 		}
-		clsTeachers[u.Grade][u.Class] = u
 	}
 
 	return clsTeachers, nil
@@ -375,4 +385,192 @@ func (m *mongoMapper) ExistsByCode(ctx context.Context, code string) (bool, erro
 	}
 
 	return count > 0, nil
+}
+
+// GetClassTeacherBoundClasses 获取班主任绑定的班级列表
+func (m *mongoMapper) GetClassTeacherBoundClasses(ctx context.Context, userId bson.ObjectID) ([]ClassInfo, error) {
+	user, err := m.FindOneById(ctx, userId)
+	if err != nil {
+		logs.Errorf("[user mapper] get class teacher bound classes err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	return user.BindClasses, nil
+}
+
+// CountStudentsByClassList 按班级列表统计学生数
+func (m *mongoMapper) CountStudentsByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) (int32, error) {
+	filter := bson.M{
+		cst.UnitID: unitId,
+		cst.Role:   enum.UserRoleStudent,
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+	}
+
+	// 如果提供了年级和班级过滤条件
+	if len(grades) > 0 || len(classes) > 0 {
+		andFilters := make([]bson.M, 0)
+		if len(grades) > 0 {
+			andFilters = append(andFilters, bson.M{cst.Grade: bson.M{cst.In: grades}})
+		}
+		if len(classes) > 0 {
+			andFilters = append(andFilters, bson.M{cst.Class: bson.M{cst.In: classes}})
+		}
+		if len(andFilters) > 0 {
+			filter[cst.And] = andFilters
+		}
+	}
+
+	count, err := m.conn.CountDocuments(ctx, filter)
+	if err != nil {
+		logs.Errorf("[user mapper] count students by class list err: %s", errorx.ErrorWithoutStack(err))
+		return 0, err
+	}
+
+	return int32(count), nil
+}
+
+// CountStudentsByPeriodAndClassList 按时间段和班级列表统计学生数
+func (m *mongoMapper) CountStudentsByPeriodAndClassList(ctx context.Context, unitId *bson.ObjectID, grades, classes []int32, start, end time.Time) (int32, error) {
+	filter := bson.M{
+		cst.Role:   enum.UserRoleStudent,
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+		cst.CreateTime: bson.M{
+			cst.GTE: start,
+			cst.LTE: end,
+		},
+	}
+
+	if unitId != nil {
+		filter[cst.UnitID] = *unitId
+	}
+
+	if len(grades) > 0 || len(classes) > 0 {
+		andFilters := make([]bson.M, 0)
+		if len(grades) > 0 {
+			andFilters = append(andFilters, bson.M{cst.Grade: bson.M{cst.In: grades}})
+		}
+		if len(classes) > 0 {
+			andFilters = append(andFilters, bson.M{cst.Class: bson.M{cst.In: classes}})
+		}
+		if len(andFilters) > 0 {
+			filter[cst.And] = andFilters
+		}
+	}
+
+	count, err := m.conn.CountDocuments(ctx, filter)
+	if err != nil {
+		logs.Errorf("[user mapper] count students by period and class list err: %s", errorx.ErrorWithoutStack(err))
+		return 0, err
+	}
+
+	return int32(count), nil
+}
+
+// CountHighRiskStudentsByClassList 按班级列表统计高风险学生数
+func (m *mongoMapper) CountHighRiskStudentsByClassList(ctx context.Context, grades, classes []int32, start, end time.Time) (int32, error) {
+	filter := bson.M{
+		cst.Role:      enum.UserRoleStudent,
+		cst.Status:    bson.M{cst.NE: enum.UserStatusDeleted},
+		cst.RiskLevel: enum.UserRiskLevelHigh,
+		cst.UpdateTime: bson.M{
+			cst.GTE: start,
+			cst.LTE: end,
+		},
+	}
+
+	if len(grades) > 0 || len(classes) > 0 {
+		andFilters := make([]bson.M, 0)
+		if len(grades) > 0 {
+			andFilters = append(andFilters, bson.M{cst.Grade: bson.M{cst.In: grades}})
+		}
+		if len(classes) > 0 {
+			andFilters = append(andFilters, bson.M{cst.Class: bson.M{cst.In: classes}})
+		}
+		if len(andFilters) > 0 {
+			filter[cst.And] = andFilters
+		}
+	}
+
+	count, err := m.conn.CountDocuments(ctx, filter)
+	if err != nil {
+		logs.Errorf("[user mapper] count high risk students by class list err: %s", errorx.ErrorWithoutStack(err))
+		return 0, err
+	}
+
+	return int32(count), nil
+}
+
+// FindManyByClassList 按班级列表查询用户
+func (m *mongoMapper) FindManyByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) ([]*User, error) {
+	filter := bson.M{
+		cst.UnitID: unitId,
+		cst.Role:   enum.UserRoleStudent,
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+	}
+
+	if len(grades) > 0 || len(classes) > 0 {
+		andFilters := make([]bson.M, 0)
+		if len(grades) > 0 {
+			andFilters = append(andFilters, bson.M{cst.Grade: bson.M{cst.In: grades}})
+		}
+		if len(classes) > 0 {
+			andFilters = append(andFilters, bson.M{cst.Class: bson.M{cst.In: classes}})
+		}
+		if len(andFilters) > 0 {
+			filter[cst.And] = andFilters
+		}
+	}
+
+	return m.FindAllByFields(ctx, filter)
+}
+
+// GetRiskDistributionByClassList 按班级列表获取风险分布统计（按风险等级和性别分组）
+func (m *mongoMapper) GetRiskDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) ([]*RiskStat, error) {
+	match := bson.M{
+		cst.UnitID: unitId,
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+		cst.Role:   enum.UserRoleStudent,
+	}
+
+	if len(grades) > 0 || len(classes) > 0 {
+		andFilters := make([]bson.M, 0)
+		if len(grades) > 0 {
+			andFilters = append(andFilters, bson.M{cst.Grade: bson.M{cst.In: grades}})
+		}
+		if len(classes) > 0 {
+			andFilters = append(andFilters, bson.M{cst.Class: bson.M{cst.In: classes}})
+		}
+		if len(andFilters) > 0 {
+			match[cst.And] = andFilters
+		}
+	}
+
+	pipeline := []bson.M{
+		{"$match": match},
+		{
+			"$group": bson.M{
+				cst.ID: bson.M{
+					"level":  "$" + cst.RiskLevel,
+					"gender": "$" + cst.Gender,
+				},
+				"count": bson.M{"$sum": 1},
+			},
+		},
+		{
+			"$project": bson.M{
+				"level":  "$_id.level",
+				"gender": "$_id.gender",
+				"count":  1,
+				cst.ID:   0,
+			},
+		},
+	}
+
+	var results []*RiskStat
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
+		logs.Errorf("[user mapper] get risk distribution by class list err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	return results, nil
 }

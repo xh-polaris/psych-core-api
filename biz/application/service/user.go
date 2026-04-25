@@ -120,6 +120,14 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 		return nil, err
 	}
 
+	unitDAO, err := u.UnitMapper.FindOneById(ctx, userDAO.UnitID)
+	if err != nil {
+		logs.Errorf("find unit error: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	calculatedGrade := userDAO.CalculateGrade(unitDAO.StartGrade)
+
 	optionsAny, err := convert.Any2Anypb(userDAO.Options)
 	if err != nil {
 		return nil, err
@@ -137,7 +145,7 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 			Status:     int32(userDAO.Status),
 			EnrollYear: int32(userDAO.EnrollYear),
 			Class:      int32(userDAO.Class),
-			Grade:      int32(userDAO.Grade),
+			Grade:      int32(calculatedGrade),
 			Role:       int32(userDAO.Role),
 			Options:    optionsAny,
 			CreateTime: userDAO.CreateTime.Unix(),
@@ -179,9 +187,6 @@ func (u *UserService) UserUpdateInfo(ctx context.Context, req *core_api.UserUpda
 	}
 	if req.User.Class != 0 {
 		update[cst.Class] = int(req.User.Class)
-	}
-	if req.User.Grade != 0 {
-		update[cst.Grade] = int(req.User.Grade)
 	}
 	if req.User.Options != nil {
 		optionsAnypb, err := convert.Anypb2Any(req.User.Options)
@@ -305,12 +310,6 @@ func (u *UserService) CreateUser(ctx context.Context, req *core_api.CreateUserRe
 		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
-	// 校验psychUser字段
-	pu, err := tryBuildPsychUser(req)
-	if err != nil {
-		return nil, err
-	}
-
 	// 校验unit存在
 	// synapse unit
 	su, err := u.Synp4bCli.GetUnit(ctx, req.UnitId)
@@ -326,11 +325,24 @@ func (u *UserService) CreateUser(ctx context.Context, req *core_api.CreateUserRe
 		return nil, errorx.New(errno.ErrInternalError)
 	}
 
+	// 校验psychUser字段
+	pu, err := tryBuildPsychUser(req, pUnit)
+	if err != nil {
+		return nil, err
+	}
+
 	// 调用domain层创建用户
 	puWithId, err := u.UserDomain.CreateUser(ctx, req.UnitId, req.GetEmail(), req.GetPhone(), req.GetCode(), req.Password, pu)
 	if err != nil {
 		return nil, err
 	}
+
+	unitDAO, err := u.UnitMapper.FindOneById(ctx, puWithId.UnitID)
+	if err != nil {
+		logs.Errorf("find unit error: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+	calculatedGrade := puWithId.CalculateGrade(unitDAO.StartGrade)
 
 	// 构建响应
 	ru := &core_api.UserVO{
@@ -339,7 +351,7 @@ func (u *UserService) CreateUser(ctx context.Context, req *core_api.CreateUserRe
 		Gender:     int32(puWithId.Gender),
 		Role:       int32(puWithId.Role),
 		EnrollYear: int32(puWithId.EnrollYear),
-		Grade:      int32(puWithId.Grade),
+		Grade:      int32(calculatedGrade),
 		Class:      int32(puWithId.Class),
 		UnitId:     req.UnitId,
 		Code:       puWithId.Code,
@@ -354,7 +366,7 @@ func (u *UserService) CreateUser(ctx context.Context, req *core_api.CreateUserRe
 	}, nil
 }
 
-func tryBuildPsychUser(req *core_api.CreateUserReq) (*user.User, error) {
+func tryBuildPsychUser(req *core_api.CreateUserReq, pUnit *unit.Unit) (*user.User, error) {
 	// psychUser所需参数校验
 	if req.Name == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "姓名"))
@@ -404,8 +416,7 @@ func tryBuildPsychUser(req *core_api.CreateUserReq) (*user.User, error) {
 		birth = time.Unix(req.Birth, 0)
 	}
 
-	// 根据 EnrollYear 计算 Grade
-	grade := time.Now().Year() - int(req.EnrollYear) + 1
+	now := time.Now()
 
 	// 角色
 	if req.Role == 0 {
@@ -421,12 +432,12 @@ func tryBuildPsychUser(req *core_api.CreateUserReq) (*user.User, error) {
 	if req.CreateTime != 0 {
 		createTime = time.Unix(req.CreateTime, 0)
 	} else {
-		createTime = time.Now()
+		createTime = now
 	}
 	if req.UpdateTime != 0 {
 		updateTime = time.Unix(req.UpdateTime, 0)
 	} else {
-		updateTime = time.Now()
+		updateTime = now
 	}
 
 	// 构造 user 对象
@@ -441,7 +452,6 @@ func tryBuildPsychUser(req *core_api.CreateUserReq) (*user.User, error) {
 		Status:     enum.UserStatusActive,
 		EnrollYear: int(req.EnrollYear),
 		Role:       int(req.Role),
-		Grade:      grade,
 		Class:      int(req.Class),
 		CreateTime: createTime,
 		UpdateTime: updateTime,
