@@ -22,7 +22,9 @@ type Cache struct {
 }
 
 type RabbitMQ struct {
-	URL string
+	URL        string
+	Exchange   string
+	RoutingKey string
 }
 
 type Mongo struct {

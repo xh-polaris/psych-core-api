@@ -115,7 +115,7 @@ func (p *PostProducer) Produce(ctx context.Context, msg *core.PostNotify) (err e
 	operator := func() error {
 		p.mu.Lock()
 		defer p.mu.Unlock()
-		return p.channel.PublishWithContext(ctx, "psych_his", "psych_his.end", false, false,
+		return p.channel.PublishWithContext(ctx, conf.GetConfig().RabbitMQ.Exchange, conf.GetConfig().RabbitMQ.RoutingKey, false, false,
 			amqp.Publishing{
 				DeliveryMode: amqp.Persistent,
 				ContentType:  "application/json",
