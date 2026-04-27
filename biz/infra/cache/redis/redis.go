@@ -19,9 +19,15 @@ func New() cache.Cmdable {
 func NewWithAddrAndPassword(addr, password string) cache.Cmdable {
 	cache.SetDefaultNilError(redis.Nil)
 
+	db := 0
+	// 隔离测试环境
+	if conf.GetConfig().State == "test" {
+		db = 1
+	}
+
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     addr, // Redis地址
-		DB:       0,    // 默认数据库
+		DB:       db,
 		Password: password,
 		// connection pool configuration
 		PoolSize:        100,             // Maximum number of connections (recommended to set to CPU cores * 10)
