@@ -19,6 +19,7 @@ type Auth struct {
 type Cache struct {
 	Addr     string
 	Password string
+	DB       int `json:"DB,omitempty,default=0"`
 }
 
 type RabbitMQ struct {
