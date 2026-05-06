@@ -99,7 +99,7 @@ func (u *UserDomainSVC) CreateUser(ctx context.Context, unitId, email, phone, co
 	// 校验重复创建
 	if old, err := u.UsrMapper.FindOneById(ctx, oid); old != nil {
 		return nil, errorx.New(errno.ErrCreateUser, errorx.KV("field", "用户已存在"))
-	} else if err != nil {
+	} else if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
 		return nil, err
 	}
 
