@@ -11,7 +11,7 @@ on:
     tags: [ 'v*.*.*' ]
     branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "test" ]
 
 env:
   REGISTRY: docker.io
