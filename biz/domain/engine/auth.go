@@ -39,8 +39,8 @@ func (e *Engine) auth(auth *core.Auth) (bool, error) {
 		e.initialCount = len(msgs)
 	}
 
-	util.DPrint("[engine] [auth] info: %+v, merr: %+v, uSession: %s, initialCount: %d\n", alreadyAuth, merr, e.uSession, e.initialCount) // debug
-	return true, e.MWrite(core.MAuth, alreadyAuth)                                                                                       // 前端收到Auth响应后, 需要显示配置中
+	logs.Infof("[engine] [auth] info: %+v, merr: %+v, uSession: %s, initialCount: %d", alreadyAuth, merr, e.uSession, e.initialCount)
+	return true, e.MWrite(core.MAuth, alreadyAuth) // 前端收到Auth响应后, 需要显示配置中
 }
 
 // 已登录

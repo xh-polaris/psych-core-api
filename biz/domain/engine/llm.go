@@ -15,6 +15,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/app"
 	"github.com/xh-polaris/psych-core-api/pkg/core"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
+	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/convert"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 )
@@ -47,7 +48,7 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	// 创建模型消息
 	astMsg := convert.AssistantMMsg(oids[0], oids[1], "", index+1)
 
-	util.DPrint("mMsgs:%+v", mMsgs)
+	logs.Infof("mMsgs:%+v", mMsgs)
 	// 调用大模型
 	eMsgs := convert.MMsgToEMsgList(mMsgs) // 存储域消息转模型域
 
@@ -107,7 +108,7 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 			if msg.ResponseMeta != nil {
 				e.llmUsage(msg.ResponseMeta) // 记录用量
 			}
-			util.DPrint("llm msg:%v\n", msg.Content)
+			logs.Infof("llm msg:%v", msg.Content)
 			frame := &app.ChatFrame{Id: index, Content: msg.Content, SessionId: e.uSession, Timestamp: time.Now().Unix(), Finish: finish}
 			// 写回给前端
 			if err = e.MWrite(core.MResp, &core.Resp{ID: id, Type: core.RModelText, Content: frame}); err != nil {
