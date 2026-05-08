@@ -88,7 +88,7 @@ func NewEngine(ctx context.Context, conn *websocket.Conn, usrSvc *service.UserSe
 	//	}
 	//	return e.Close()
 	//})
-	util.DPrint("[engine] [new] with session %s\n", e.uSession) // debug
+	logs.Infof("[engine] [new] with session %s", e.uSession)
 	return e
 }
 
@@ -126,7 +126,7 @@ func (e *Engine) Run() {
 
 // init, 初始化, 主要与前端协商协议信息
 func (e *Engine) init() (err error) {
-	util.DPrint("[engine] [init] meta: %+v\n", e.meta) //debug
+	logs.Infof("[engine] [init] meta: %+v", e.meta)
 	if err = e.wsx.WriteJSON(e.meta); err != nil {
 		logs.CondError(!wsx.IsNormal(err), "[engine] protocol init error: %s\n", err) //debug
 	}
@@ -141,13 +141,13 @@ func (e *Engine) unexpected(err error, cause string) bool {
 			e.unexpected(err, cause)
 		}
 		if custom.IsAffectStability() {
-			util.DPrint("%s [engine] [unexpected] at: %s err: %s, cause: %s\n", time.Now().String(),
+			logs.Errorf("%s [engine] [unexpected] at: %s err: %s, cause: %s", time.Now().String(),
 				util.CallerInfo(2), err, cause)
 			_ = e.Close()
 			return true
 		}
 	} else if (err != nil && !wsx.IsNormal(err)) || strings.HasPrefix(cause, must) { // 错误或影响稳定性
-		util.DPrint("%s [engine] [unexpected] at: %s err: %s,cause: %s\n", time.Now().String(),
+		logs.Errorf("%s [engine] [unexpected] at: %s err: %s,cause: %s", time.Now().String(),
 			util.CallerInfo(2), err, cause)
 		fmt.Println(err)
 		_ = e.Close()
@@ -220,7 +220,7 @@ func (e *Engine) Unlock() error {
 
 // Close 释放engine的资源
 func (e *Engine) Close() (err error) {
-	util.DPrint("[engine] %s closed by %s", e.uSession, util.CallerInfo(2))
+	logs.Infof("[engine] %s closed by %s", e.uSession, util.CallerInfo(2))
 	e.once.Do(func() {
 		// 关闭各个应用, llm无需关闭
 		appClose(e.asr, e.tts)

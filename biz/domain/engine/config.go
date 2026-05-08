@@ -4,7 +4,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
-	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/app"
 	_ "github.com/xh-polaris/psych-core-api/pkg/app/volc/asr"
 	_ "github.com/xh-polaris/psych-core-api/pkg/app/volc/tts"
@@ -29,7 +28,7 @@ func (e *Engine) config() error {
 		logs.Errorf("[engine] [%s] UnitAppConfigGetByUnitId err: %v", core.AConfig, err)
 		return e.MWrite(core.MErr, core.ToErr(errorx.WrapByCode(err, errno.GetConfigErr)))
 	}
-	util.DPrint("configResp: %+v\n", configResp)
+	logs.Infof("configResp: %+v", configResp)
 
 	// 构造配置
 	if cf, wfc, err = e.buildConfig(configResp); err != nil {
@@ -41,7 +40,7 @@ func (e *Engine) config() error {
 		logs.Error("[workflow] [config] new chatApp err: %v", err)
 		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "llm"))
 	}
-	util.DPrint("llm: %+v\n", e.llm)
+	logs.Infof("llm: %+v", e.llm)
 	// 构造asr
 	if e.asr, err = app.NewASRApp(e.uSession, wfc.ASRConfig); err != nil {
 		logs.Error("[workflow] [config] new asrApp err: %v", err)
@@ -52,9 +51,9 @@ func (e *Engine) config() error {
 		logs.Error("[workflow] [config] new asrApp err: %v", err)
 		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "tts"))
 	}
-	util.DPrint("tts: %+v\n", e.tts)
+	logs.Infof("tts: %+v", e.tts)
 	// 返回前端
-	util.DPrint("[engine] [config] workflow config: %+v\n conf: %+v\n", wfc, cf)
+	logs.Infof("[engine] [config] workflow config: %+v conf: %+v", wfc, cf)
 	return e.MWrite(core.MConfig, cf)
 }
 

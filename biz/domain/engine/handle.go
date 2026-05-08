@@ -34,7 +34,7 @@ func (e *Engine) handle(data []byte) (err error) {
 		return e.Write(core.DecodeMsgErr) // 解码失败要告知客户端错误消息
 	}
 
-	util.DPrint("[engine] receive message: %+v\n", payload) // debug
+	logs.Infof("[engine] receive message: %+v", payload) // debug
 	if msg.Type == core.MAuth {
 		if !e.isAuth { // 一次连接中不能多次Auth
 			if auth, ok := util.Convert[*core.Auth](payload); ok { // 认证消息

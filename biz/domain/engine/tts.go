@@ -5,9 +5,9 @@ import (
 	"io"
 
 	"github.com/cloudwego/eino/schema"
-	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/app"
 	"github.com/xh-polaris/psych-core-api/pkg/core"
+	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/pkg/wsx"
 )
 
@@ -22,7 +22,7 @@ func (e *Engine) execTTS(ctx context.Context, id uint, stream *schema.StreamRead
 	if err := e.tts.Send(ctx, app.FirstTTS); err != nil { // 首包
 		e.unexpected(err, "tts first send err")
 	}
-	util.DPrint("[tts] send FirstTTS\n")
+	logs.Infof("[tts] send FirstTTS")
 	// 启用tts接收
 	go e.execTTSRecv(ctx, id)
 	var stop bool
@@ -50,7 +50,7 @@ func (e *Engine) execTTS(ctx context.Context, id uint, stream *schema.StreamRead
 				if err = e.tts.Send(ctx, app.LastTTS); err != nil {
 					e.unexpected(err, "tts send last err")
 				}
-				util.DPrint("[tts] send LastTTS\n")
+				logs.Infof("[tts] send LastTTS")
 				return
 			}
 			if err = e.tts.Send(ctx, msg.Content); err != nil {
@@ -59,7 +59,7 @@ func (e *Engine) execTTS(ctx context.Context, id uint, stream *schema.StreamRead
 				e.unexpected(err, "tts send err")
 				return
 			}
-			util.DPrint("[tts] send %s\n", msg.Content)
+			logs.Infof("[tts] send %s", msg.Content)
 		}
 	}
 }
@@ -81,9 +81,9 @@ func (e *Engine) execTTSRecv(ctx context.Context, id uint) {
 				e.unexpected(err, "tts resp err")
 				return
 			}
-			util.DPrint("[tts] receive audio with length %d\n", len(audio))
+			logs.Infof("[tts] receive audio with length %d", len(audio))
 			if last {
-				util.DPrint("[tts] last audio\n")
+				logs.Infof("[tts] last audio")
 				return
 			}
 		}

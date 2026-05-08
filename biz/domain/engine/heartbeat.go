@@ -3,7 +3,6 @@ package engine
 import (
 	"time"
 
-	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/core"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
@@ -18,7 +17,7 @@ func (e *Engine) mockHeartbeat(ping *core.Ping) (err error) {
 	if ping.Data != "" {
 		logs.Infof("[engine] mock heartbeat: %s", ping.Data)
 	}
-	util.DPrint("[engine] [heartbeat] receive ping\n")
+	logs.Infof("[engine] [heartbeat] receive ping")
 	if err = e.wsx.Pong(nil); err != nil {
 		logs.CondError(!wsx.IsNormal(err), "[engine] %s error %s", core.APong, err)
 		return errorx.WrapByCode(err, errno.PongErr)
