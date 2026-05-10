@@ -18,7 +18,7 @@ func (e *Engine) auth(auth *core.Auth) (bool, error) {
 	var alreadyAuth *core.Auth // 返回额外信息
 
 	switch auth.AuthType {
-	case "": // 已经在其他环节登录过
+	case core.AlreadyAuth: // 已经在其他环节登录过
 		alreadyAuth, merr = e.already(auth)
 	default:
 		alreadyAuth, merr = e.unAuth(auth)
