@@ -18,7 +18,7 @@ func (e *Engine) auth(auth *core.Auth) (bool, error) {
 	var alreadyAuth *core.Auth // 返回额外信息
 
 	switch auth.AuthType {
-	case "": // 已经在其他环节登录过
+	case core.AlreadyAuth: // 已经在其他环节登录过
 		alreadyAuth, merr = e.already(auth)
 	default:
 		alreadyAuth, merr = e.unAuth(auth)
@@ -39,8 +39,8 @@ func (e *Engine) auth(auth *core.Auth) (bool, error) {
 		e.initialCount = len(msgs)
 	}
 
-	util.DPrint("[engine] [auth] info: %+v, merr: %+v, uSession: %s, initialCount: %d\n", alreadyAuth, merr, e.uSession, e.initialCount) // debug
-	return true, e.MWrite(core.MAuth, alreadyAuth)                                                                                       // 前端收到Auth响应后, 需要显示配置中
+	logs.Infof("[engine] [auth] info: %+v, merr: %+v, uSession: %s, initialCount: %d", alreadyAuth, merr, e.uSession, e.initialCount)
+	return true, e.MWrite(core.MAuth, alreadyAuth) // 前端收到Auth响应后, 需要显示配置中
 }
 
 // 已登录

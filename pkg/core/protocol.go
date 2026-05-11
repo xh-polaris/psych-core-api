@@ -47,7 +47,7 @@ var (
 )
 
 var (
-	AlreadyAuth int32 = -1 //"Already"
+	AlreadyAuth string = "already"
 )
 
 type (
