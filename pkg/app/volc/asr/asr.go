@@ -124,7 +124,11 @@ func (asr *VcASRApp) Receive(_ context.Context) (text string, last bool, definit
 		case websocket.BinaryMessage:
 			resp := ParseResponse(msg)
 			if len(resp.PayloadMsg.Result.Utterances) > 0 {
-				definite = resp.PayloadMsg.Result.Utterances[0].Definite
+				for _, u := range resp.PayloadMsg.Result.Utterances {
+					if u.Definite {
+						definite = true
+					}
+				}
 			}
 			return resp.PayloadMsg.Result.Text, resp.IsLastPackage, definite, nil
 		case websocket.TextMessage:
