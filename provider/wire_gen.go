@@ -9,6 +9,7 @@ package provider
 import (
 	"github.com/xh-polaris/psych-core-api/biz/application/service"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
+	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	"github.com/xh-polaris/psych-core-api/biz/domain/usr"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
@@ -27,48 +28,58 @@ func NewProvider() (*Provider, error) {
 	if err != nil {
 		return nil, err
 	}
-	iMongoMapper := alarm.NewAlarmMongoMapper(confConfig)
-	userIMongoMapper := user.NewUserMongoMapper(confConfig)
+	iMongoMapper := user.NewUserMongoMapper(confConfig)
+	authDomain := &auth.AuthDomain{
+		UserMapper: iMongoMapper,
+	}
+	alarmIMongoMapper := alarm.NewAlarmMongoMapper(confConfig)
+	unitIMongoMapper := unit.NewUnitMongoMapper(confConfig)
 	conversationIMongoMapper := conversation.NewConversationMongoMapper(confConfig)
 	reportIMongoMapper := report.NewReportMongoMapper(confConfig)
 	alarmService := service.AlarmService{
-		AlarmMapper:        iMongoMapper,
-		UserMapper:         userIMongoMapper,
+		AuthDomain:         authDomain,
+		AlarmMapper:        alarmIMongoMapper,
+		UserMapper:         iMongoMapper,
+		UnitMapper:         unitIMongoMapper,
 		ConversationMapper: conversationIMongoMapper,
 		ReportMapper:       reportIMongoMapper,
 	}
-	unitIMongoMapper := unit.NewUnitMongoMapper(confConfig)
 	messageIMongoMapper := message.NewMessageMongoMapper(confConfig)
 	dashboardService := service.DashboardService{
-		UserMapper:         userIMongoMapper,
+		AuthDomain:         authDomain,
+		UserMapper:         iMongoMapper,
 		UnitMapper:         unitIMongoMapper,
 		MessageMapper:      messageIMongoMapper,
 		ConversationMapper: conversationIMongoMapper,
 		ReportMapper:       reportIMongoMapper,
-		AlarmMapper:        iMongoMapper,
+		AlarmMapper:        alarmIMongoMapper,
 	}
 	configIMongoMapper := config.NewConfigMongoMapper(confConfig)
 	configService := service.ConfigService{
+		AuthDomain:   authDomain,
 		ConfigMapper: configIMongoMapper,
 	}
 	client := synapse.New4b(confConfig)
 	userDomainSVC := &usr.UserDomainSVC{
-		UsrMapper:  userIMongoMapper,
+		UsrMapper:  iMongoMapper,
 		UnitMapper: unitIMongoMapper,
 		Synp4bCli:  client,
 	}
 	userService := service.UserService{
 		UserDomain: userDomainSVC,
-		UserMapper: userIMongoMapper,
+		UserMapper: iMongoMapper,
 		UnitMapper: unitIMongoMapper,
 		Synp4bCli:  client,
+		AuthDomain: authDomain,
 	}
 	unitService := service.UnitService{
+		AuthDomain:      authDomain,
 		UnitMapper:      unitIMongoMapper,
-		UserMapper:      userIMongoMapper,
+		UserMapper:      iMongoMapper,
 		Synapse4bClient: client,
 	}
 	conversationService := service.ConversationService{
+		AuthDomain:         authDomain,
 		MessageMapper:      messageIMongoMapper,
 		ConversationMapper: conversationIMongoMapper,
 	}

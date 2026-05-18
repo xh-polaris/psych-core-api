@@ -7,6 +7,7 @@ import (
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
+	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	"github.com/xh-polaris/psych-core-api/biz/domain/his"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
@@ -25,6 +26,7 @@ type IConversationService interface {
 }
 
 type ConversationService struct {
+	AuthDomain         auth.IAuthDomain
 	MessageMapper      message.IMongoMapper
 	ConversationMapper conversation.IMongoMapper
 }
@@ -35,7 +37,7 @@ var ConversationServiceSet = wire.NewSet(
 )
 
 func (c *ConversationService) CreateConversation(ctx context.Context, req *core_api.CreateConversationReq) (resp *core_api.CreateConversationResp, err error) {
-	userMeta, err := util.ExtraUserMeta(ctx)
+	userMeta, err := c.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +66,7 @@ func (c *ConversationService) CreateConversation(ctx context.Context, req *core_
 }
 
 func (c *ConversationService) ListConversations(ctx context.Context, req *core_api.ListConversationsReq) (resp *core_api.ListConversationsResp, err error) {
-	userMeta, err := util.ExtraUserMeta(ctx)
+	userMeta, err := c.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +114,7 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 }
 
 func (c *ConversationService) GetConversation(ctx context.Context, req *core_api.GetConversationReq) (resp *core_api.GetConversationResp, err error) {
-	_, err = util.ExtraUserMeta(ctx)
+	_, err = c.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -12,6 +12,7 @@ import (
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/types/enum"
 
@@ -56,6 +57,7 @@ type IDashboardService interface {
 }
 
 type DashboardService struct {
+	AuthDomain         auth.IAuthDomain
 	UserMapper         user.IMongoMapper
 	UnitMapper         unit.IMongoMapper
 	MessageMapper      message.IMongoMapper
@@ -70,8 +72,7 @@ var DashboardServiceSet = wire.NewSet(
 )
 
 func (s *DashboardService) DashboardGetDataOverview(ctx context.Context, req *core_api.DashboardGetDataOverviewReq) (*core_api.DashboardGetDataOverviewResp, error) {
-	// 提取用户Meta
-	userMeta, err := util.ExtraUserMeta(ctx)
+	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -80,37 +81,34 @@ func (s *DashboardService) DashboardGetDataOverview(ctx context.Context, req *co
 	weekBefore := now.AddDate(0, 0, -7)
 	twoWeeksBefore := now.AddDate(0, 0, -14)
 
-	// 区分管理端 / 单位端
+	// 超管端（无 unitId）
 	if req.UnitId == nil || req.GetUnitId() == "" {
-		// 管理端 - 需要超级管理员权限
-		if !userMeta.HasSuperAdminAuth() {
-			return nil, errorx.New(errno.ErrInsufficientAuth)
+		if err := s.AuthDomain.VerifySuperAdmin(ctx, meta); err != nil {
+			return nil, err
 		}
 		return s.dashboardOverviewAdmin(ctx, twoWeeksBefore, weekBefore, now)
 	}
 
-	// 单位端 - 检查用户是否属于该单位
+	// 单位端
 	unitOID, err := bson.ObjectIDFromHex(req.GetUnitId())
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 	}
 
-	// 获取单位配置（用于计算年级）
 	pUnit, err := s.UnitMapper.FindOneById(ctx, unitOID)
 	if err != nil {
 		logs.Errorf("get unit error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"))
 	}
 
-	// 验证用户权限
-	if userMeta.HasUnitAdminAuth(req.GetUnitId()) {
-		// 单位管理员
+	// 单位管理员
+	if err := s.AuthDomain.VerifyUnitAdmin(meta, req.GetUnitId()); err == nil {
 		return s.dashboardOverviewUnit(ctx, unitOID, twoWeeksBefore, weekBefore, now)
 	}
 
-	// 班主任
-	if userMeta.Role == enum.UserRoleClassTeacher {
-		return s.dashboardOverviewClassTeacher(ctx, userMeta.UserId, unitOID, pUnit, twoWeeksBefore, weekBefore, now)
+	// 班主任（精确匹配）
+	if meta.Role == enum.UserRoleClassTeacher {
+		return s.dashboardOverviewClassTeacher(ctx, meta.UserId, unitOID, pUnit, twoWeeksBefore, weekBefore, now)
 	}
 
 	return nil, errorx.New(errno.ErrInsufficientAuth)
@@ -527,18 +525,16 @@ func (s *DashboardService) dashboardOverviewClassTeacher(ctx context.Context, us
 }
 
 func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_api.DashboardGetDataTrendReq) (*core_api.DashboardGetDataTrendResp, error) {
-	// 提取用户Meta
-	userMeta, err := util.ExtraUserMeta(ctx)
+	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	now := time.Now()
-	// 统计过去7天（含今天），避免“本周”窗口落到未来日期
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	startDay := todayStart.AddDate(0, 0, -6)
 	toWeek := func(t time.Time) int32 {
-		wd := int32(t.Weekday()) // Sunday=0
+		wd := int32(t.Weekday())
 		if wd == 0 {
 			return 7
 		}
@@ -548,7 +544,7 @@ func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_
 	var unitOID *bson.ObjectID
 	var pUnit *unit.Unit
 
-	// 区分管理端 / 单位端
+	// 单位端
 	if req.UnitId != nil && req.GetUnitId() != "" {
 		id, err := bson.ObjectIDFromHex(req.GetUnitId())
 		if err != nil {
@@ -556,28 +552,25 @@ func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_
 		}
 		unitOID = &id
 
-		// 获取单位配置（用于计算年级）
 		pUnit, err = s.UnitMapper.FindOneById(ctx, *unitOID)
 		if err != nil {
 			logs.Errorf("get unit error: %s", errorx.ErrorWithoutStack(err))
 			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"))
 		}
 
-		// 班主任权限
-		if userMeta.Role == enum.UserRoleClassTeacher {
-			return s.getDataTrendClassTeacher(ctx, userMeta.UserId, *unitOID, pUnit, startDay, toWeek)
+		// 班主任（精确匹配，避免 UnitAdmin 误入）
+		if meta.Role == enum.UserRoleClassTeacher {
+			return s.getDataTrendClassTeacher(ctx, meta.UserId, *unitOID, pUnit, startDay, toWeek)
 		}
 
-		// 单位管理员权限
-		if userMeta.HasUnitAdminAuth(req.GetUnitId()) {
-			// admin path falls through to full-unit query below
-		} else {
-			return nil, errorx.New(errno.ErrInsufficientAuth)
+		// 单位管理员
+		if err := s.AuthDomain.VerifyUnitAdmin(meta, req.GetUnitId()); err != nil {
+			return nil, err
 		}
 	} else {
-		// 管理端 - 需要超级管理员权限
-		if !userMeta.HasSuperAdminAuth() {
-			return nil, errorx.New(errno.ErrInsufficientAuth)
+		// 管理端 - 需要超管
+		if err := s.AuthDomain.VerifySuperAdmin(ctx, meta); err != nil {
+			return nil, err
 		}
 	}
 
@@ -810,15 +803,13 @@ func emptyDataTrendResp() *core_api.DashboardGetDataTrendResp {
 }
 
 func (s *DashboardService) DashboardListUnits(ctx context.Context, req *core_api.DashboardListUnitsReq) (*core_api.DashboardListUnitsResp, error) {
-	// 提取用户Meta并检查管理员权限
-	userMeta, err := util.ExtraUserMeta(ctx)
+	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// 需要管理员权限
-	if !userMeta.HasSuperAdminAuth() {
-		return nil, errorx.New(errno.ErrInsufficientAuth)
+	if err := s.AuthDomain.VerifySuperAdmin(ctx, meta); err != nil {
+		return nil, err
 	}
 
 	// 查询所有单位
@@ -878,8 +869,7 @@ func (s *DashboardService) DashboardListUnits(ctx context.Context, req *core_api
 }
 
 func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core_api.DashboardGetPsychTrendReq) (*core_api.DashboardGetPsychTrendResp, error) {
-	// 提取用户Meta
-	userMeta, err := util.ExtraUserMeta(ctx)
+	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -887,9 +877,11 @@ func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core
 	unitIdStr := req.GetUnitId()
 	var unitOID *bson.ObjectID
 	if unitIdStr != "" {
-		// 验证用户权限：单位管理员或班主任
-		if !userMeta.HasUnitAdminAuth(req.GetUnitId()) && userMeta.Role != enum.UserRoleClassTeacher {
-			return nil, errorx.New(errno.ErrInsufficientAuth)
+		// 单位管理员或班主任
+		if err := s.AuthDomain.VerifyUnitAdmin(meta, unitIdStr); err != nil {
+			if meta.Role != enum.UserRoleClassTeacher {
+				return nil, err
+			}
 		}
 		id, err := bson.ObjectIDFromHex(unitIdStr)
 		if err != nil {
@@ -897,7 +889,6 @@ func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core
 		}
 		unitOID = &id
 
-		// 获取单位配置（用于班主任计算年级）
 		pUnit, err := s.UnitMapper.FindOneById(ctx, *unitOID)
 		if err != nil {
 			logs.Errorf("get unit error: %s", errorx.ErrorWithoutStack(err))
@@ -905,12 +896,12 @@ func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core
 		}
 
 		// 班主任
-		if userMeta.Role == enum.UserRoleClassTeacher {
-			return s.getPsychTrendClassTeacher(ctx, userMeta.UserId, *unitOID, pUnit)
+		if meta.Role == enum.UserRoleClassTeacher {
+			return s.getPsychTrendClassTeacher(ctx, meta.UserId, *unitOID, pUnit)
 		}
 
 		// 单位管理员
-		userOID, err := bson.ObjectIDFromHex(userMeta.UserId)
+		userOID, err := bson.ObjectIDFromHex(meta.UserId)
 		if err != nil {
 			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UserID"))
 		}
@@ -929,9 +920,9 @@ func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core
 			}, nil
 		}
 	} else {
-		// 管理端 - 需要管理员权限
-		if !userMeta.HasSuperAdminAuth() {
-			return nil, errorx.New(errno.ErrInsufficientAuth)
+		// 管理端 - 需要超管
+		if err := s.AuthDomain.VerifySuperAdmin(ctx, meta); err != nil {
+			return nil, err
 		}
 	}
 
@@ -1175,8 +1166,7 @@ func (s *DashboardService) getRiskDistribution(ctx context.Context, unitOID *bso
 }
 
 func (s *DashboardService) DashboardListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (*core_api.DashboardListClassesResp, error) {
-	// 提取用户Meta
-	userMeta, err := util.ExtraUserMeta(ctx)
+	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1186,22 +1176,20 @@ func (s *DashboardService) DashboardListClasses(ctx context.Context, req *core_a
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 	}
 
-	// 获取单位配置（用于计算年级）
 	pUnit, err := s.UnitMapper.FindOneById(ctx, unitOID)
 	if err != nil {
 		logs.Errorf("get unit error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"))
 	}
 
-	// 验证用户权限
-	if userMeta.HasUnitAdminAuth(req.GetUnitId()) {
-		// 单位管理员
+	// 单位管理员
+	if err := s.AuthDomain.VerifyUnitAdmin(meta, req.GetUnitId()); err == nil {
 		return s.listClassesUnit(ctx, unitOID, pUnit, req)
 	}
 
-	// 班主任
-	if userMeta.Role == enum.UserRoleClassTeacher {
-		return s.listClassesClassTeacher(ctx, userMeta.UserId, unitOID, pUnit, req)
+	// 班主任（精确匹配）
+	if meta.Role == enum.UserRoleClassTeacher {
+		return s.listClassesClassTeacher(ctx, meta.UserId, unitOID, pUnit, req)
 	}
 
 	return nil, errorx.New(errno.ErrInsufficientAuth)
@@ -1343,8 +1331,7 @@ func aggregateAndSort(mapperRes []*user.ClassStatResult, clsTeachers user.ClassT
 }
 
 func (s *DashboardService) DashboardListUsers(ctx context.Context, req *core_api.DashboardListUsersReq) (*core_api.DashboardListUsersResp, error) {
-	// 提取用户Meta
-	userMeta, err := util.ExtraUserMeta(ctx)
+	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1354,7 +1341,6 @@ func (s *DashboardService) DashboardListUsers(ctx context.Context, req *core_api
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 	}
 
-	// 获取单位配置（用于计算年级）
 	pUnit, err := s.UnitMapper.FindOneById(ctx, unitOID)
 	if err != nil {
 		logs.Errorf("get unit error: %s", errorx.ErrorWithoutStack(err))
@@ -1362,13 +1348,13 @@ func (s *DashboardService) DashboardListUsers(ctx context.Context, req *core_api
 	}
 
 	// 单位管理员
-	if userMeta.HasUnitAdminAuth(req.GetUnitId()) {
+	if err := s.AuthDomain.VerifyUnitAdmin(meta, req.GetUnitId()); err == nil {
 		return s.listUsersUnit(ctx, unitOID, req)
 	}
 
-	// 班主任
-	if userMeta.Role == enum.UserRoleClassTeacher {
-		return s.listUsersClassTeacher(ctx, userMeta.UserId, unitOID, pUnit, req)
+	// 班主任（精确匹配）
+	if meta.Role == enum.UserRoleClassTeacher {
+		return s.listUsersClassTeacher(ctx, meta.UserId, unitOID, pUnit, req)
 	}
 
 	return nil, errorx.New(errno.ErrInsufficientAuth)
@@ -1586,13 +1572,11 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 }
 
 func (s *DashboardService) DashboardCreateRemark(ctx context.Context, req *core_api.DashboardCreateRemarkReq) (*core_api.DashboardCreateRemarkResp, error) {
-	// 提取用户Meta
-	userMeta, err := util.ExtraUserMeta(ctx)
+	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// 验证用户是否属于这个单位
 	userOID, err := bson.ObjectIDFromHex(req.UserId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UserID"), errorx.KV("value", "用户ID"))
@@ -1602,14 +1586,15 @@ func (s *DashboardService) DashboardCreateRemark(ctx context.Context, req *core_
 		logs.Errorf("find user by id error: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}
-	// 1. 单位管理员权限
-	if userMeta.HasUnitAdminAuth(req.GetUnitId()) {
+
+	// 单位管理员
+	if err := s.AuthDomain.VerifyUnitAdmin(meta, req.GetUnitId()); err == nil {
 		return s.dashboardCreateRemarkUnit(ctx, userOID, req)
 	}
 
-	// 2. 班主任权限
-	if userMeta.Role == enum.UserRoleClassTeacher {
-		return s.dashboardCreateRemarkClassTeacher(ctx, userMeta.UserId, userOID, u, req)
+	// 班主任（精确匹配）
+	if meta.Role == enum.UserRoleClassTeacher {
+		return s.dashboardCreateRemarkClassTeacher(ctx, meta.UserId, userOID, u, req)
 	}
 
 	return nil, errorx.New(errno.ErrInsufficientAuth)
@@ -1645,8 +1630,7 @@ func (s *DashboardService) dashboardCreateRemarkClassTeacher(ctx context.Context
 }
 
 func (s *DashboardService) DashboardUserConvRecords(ctx context.Context, req *core_api.DashboardUserConvRecordsReq) (*core_api.DashboardUserConvRecordsResp, error) {
-	// 提取用户Meta
-	userMeta, err := util.ExtraUserMeta(ctx)
+	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1656,21 +1640,20 @@ func (s *DashboardService) DashboardUserConvRecords(ctx context.Context, req *co
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UserID"), errorx.KV("value", "用户ID"))
 	}
 
-	// 首先获取目标用户信息以检查权限
 	targetUser, err := s.UserMapper.FindOneById(ctx, userOID)
 	if err != nil {
 		logs.Errorf("get user info error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardGetUserInfo)
 	}
 
-	// 1. 单位管理员
-	if userMeta.HasUnitAdminAuth(targetUser.UnitID.Hex()) {
+	// 单位管理员
+	if err := s.AuthDomain.VerifyUnitAdmin(meta, targetUser.UnitID.Hex()); err == nil {
 		return s.dashboardUserConvRecordsUnit(ctx, userOID, targetUser, req)
 	}
 
-	// 2. 班主任
-	if userMeta.Role == enum.UserRoleClassTeacher {
-		return s.dashboardUserConvRecordsClassTeacher(ctx, userMeta.UserId, userOID, targetUser, req)
+	// 班主任（精确匹配）
+	if meta.Role == enum.UserRoleClassTeacher {
+		return s.dashboardUserConvRecordsClassTeacher(ctx, meta.UserId, userOID, targetUser, req)
 	}
 
 	return nil, errorx.New(errno.ErrInsufficientAuth)
@@ -1874,8 +1857,7 @@ func (s *DashboardService) getPagedUserConvs(ctx context.Context, userOID bson.O
 }
 
 func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error) {
-	// 提取用户Meta
-	userMeta, err := util.ExtraUserMeta(ctx)
+	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1885,7 +1867,6 @@ func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "ConversationId"), errorx.KV("value", "对话ID"))
 	}
 
-	// 获取对话信息和用户信息以检查权限
 	conv, err := s.ConversationMapper.FindOneById(ctx, convOID)
 	if err != nil {
 		logs.Errorf("get conversation error: %s", errorx.ErrorWithoutStack(err))
@@ -1897,14 +1878,14 @@ func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api
 		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "用户"))
 	}
 
-	// 1. 单位管理员
-	if userMeta.HasUnitAdminAuth(usr.UnitID.Hex()) {
+	// 单位管理员
+	if err := s.AuthDomain.VerifyUnitAdmin(meta, usr.UnitID.Hex()); err == nil {
 		return s.dashboardGetReportUnit(ctx, convOID, req)
 	}
 
-	// 2. 班主任
-	if userMeta.Role == enum.UserRoleClassTeacher {
-		return s.dashboardGetReportClassTeacher(ctx, userMeta.UserId, convOID, usr, req)
+	// 班主任（精确匹配）
+	if meta.Role == enum.UserRoleClassTeacher {
+		return s.dashboardGetReportClassTeacher(ctx, meta.UserId, convOID, usr, req)
 	}
 
 	return nil, errorx.New(errno.ErrInsufficientAuth)
@@ -1951,8 +1932,7 @@ func (s *DashboardService) dashboardGetReportClassTeacher(ctx context.Context, t
 }
 
 func (s *DashboardService) DashboardUnitConvRecords(ctx context.Context, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error) {
-	// 提取用户Meta
-	userMeta, err := util.ExtraUserMeta(ctx)
+	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1964,33 +1944,31 @@ func (s *DashboardService) DashboardUnitConvRecords(ctx context.Context, req *co
 			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位 ID"))
 		}
 
-		// 获取单位配置
 		pUnit, err := s.UnitMapper.FindOneById(ctx, unitOID)
 		if err != nil {
 			logs.Errorf("get unit error: %s", errorx.ErrorWithoutStack(err))
 			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"))
 		}
 
-		// 1. 单位管理员
-		if userMeta.HasUnitAdminAuth(unitIdStr) {
+		// 单位管理员
+		if err := s.AuthDomain.VerifyUnitAdmin(meta, unitIdStr); err == nil {
 			return s.getOneUnitConvs(ctx, req)
 		}
 
-		// 2. 班主任
-		if userMeta.Role == enum.UserRoleClassTeacher {
-			// 班主任必须属于该单位（如果 JWT 中有 unitId 则校验）
-			if userMeta.UnitId != "" && userMeta.UnitId != unitIdStr {
+		// 班主任（精确匹配）
+		if meta.Role == enum.UserRoleClassTeacher {
+			if meta.UnitId != "" && meta.UnitId != unitIdStr {
 				return nil, errorx.New(errno.ErrInsufficientAuth)
 			}
-			return s.getClassTeacherConvs(ctx, userMeta.UserId, unitOID, pUnit, req)
+			return s.getClassTeacherConvs(ctx, meta.UserId, unitOID, pUnit, req)
 		}
 
 		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
-	// 3. 管理端 (无 unitId) - 需要超级管理员权限
-	if !userMeta.HasSuperAdminAuth() {
-		return nil, errorx.New(errno.ErrInsufficientAuth)
+	// 管理端 (无 unitId) - 需要超管
+	if err := s.AuthDomain.VerifySuperAdmin(ctx, meta); err != nil {
+		return nil, err
 	}
 	return s.getAllUnitsConvs(ctx, req)
 }

@@ -7,10 +7,10 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
+	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/biz/infra/synapse"
-	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/enum"
@@ -30,6 +30,7 @@ type IUnitService interface {
 }
 
 type UnitService struct {
+	AuthDomain      auth.IAuthDomain
 	UnitMapper      unit.IMongoMapper
 	UserMapper      user.IMongoMapper
 	Synapse4bClient synapse.Client
@@ -61,7 +62,7 @@ func (u *UnitService) UnitGetInfo(ctx context.Context, req *core_api.UnitGetInfo
 	}
 
 	// 鉴权
-	m, err := util.ExtraUserMeta(ctx)
+	m, err := u.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +108,7 @@ func (u *UnitService) UnitUpdateInfo(ctx context.Context, req *core_api.UnitUpda
 	}
 
 	// 鉴权
-	m, err := util.ExtraUserMeta(ctx)
+	m, err := u.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +168,7 @@ func (u *UnitService) UnitCreate(ctx context.Context, req *core_api.CreateUnitRe
 	}
 
 	// 鉴权 必须是超管才能创建单位
-	m, err := util.ExtraUserMeta(ctx)
+	m, err := u.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	"github.com/xh-polaris/psych-core-api/biz/domain/usr"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/synapse"
@@ -43,6 +44,7 @@ type UserService struct {
 	UserMapper user.IMongoMapper
 	UnitMapper unit.IMongoMapper
 	Synp4bCli  synapse.Client
+	AuthDomain auth.IAuthDomain
 }
 
 var UserServiceSet = wire.NewSet(
@@ -218,7 +220,7 @@ func (u *UserService) UserUpdatePassword(ctx context.Context, req *core_api.User
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "新密码"))
 	}
 	// 检查是否是登录态修改密码
-	um, err := util.ExtraUserMeta(ctx)
+	um, err := u.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil && um != nil {
 		// 调用user域更新密码
 		err = u.UserDomain.UpdatePassword(ctx, um.UserId, req.NewPassword)
@@ -294,20 +296,12 @@ func (u *UserService) CreateUser(ctx context.Context, req *core_api.CreateUserRe
 	}
 
 	// 权限校验-需要超管权限
-	operator, err := util.ExtraUserMeta(ctx)
+	operator, err := u.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	oid, _ := bson.ObjectIDFromHex(operator.UserId)
-	operatorUser, err := u.UserMapper.FindOneById(ctx, oid)
-	if err != nil {
-		logs.Error("[user mapper] FindOneById failed")
-		return nil, errorx.WrapByCode(err, errno.ErrInternalError)
-	}
-
-	if !operator.HasSuperAdminAuth() || operatorUser.Role != enum.UserRoleSuperAdmin {
-		return nil, errorx.New(errno.ErrInsufficientAuth)
+	if err := u.AuthDomain.VerifySuperAdmin(ctx, operator); err != nil {
+		return nil, err
 	}
 
 	// 校验unit存在

@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/types/enum"
 
@@ -35,6 +36,7 @@ type IAlarmService interface {
 }
 
 type AlarmService struct {
+	AuthDomain         auth.IAuthDomain
 	AlarmMapper        alarm.IMongoMapper
 	UserMapper         user.IMongoMapper
 	UnitMapper         unit.IMongoMapper
@@ -48,13 +50,11 @@ var AlarmServiceSet = wire.NewSet(
 )
 
 func (s *AlarmService) Overview(ctx context.Context, req *core_api.DashboardGetAlarmOverviewReq) (resp *core_api.DashboardGetAlarmOverviewResp, err error) {
-	// 鉴权
-	userMeta, err := util.ExtraUserMeta(ctx)
+	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// 提取unitID
 	var unitOID bson.ObjectID
 	if req.UnitId != "" {
 		id, err := bson.ObjectIDFromHex(req.UnitId)
@@ -63,16 +63,18 @@ func (s *AlarmService) Overview(ctx context.Context, req *core_api.DashboardGetA
 		}
 		unitOID = id
 
-		// 检查权限：单位管理员或班主任
-		if userMeta.Role == enum.UserRoleClassTeacher {
-			return s.getAlarmOverviewClassTeacher(ctx, userMeta.UserId, unitOID)
-		} else if !userMeta.HasUnitAdminAuth(req.UnitId) {
-			return nil, errorx.New(errno.ErrInsufficientAuth)
+		// 班主任（精确匹配）
+		if meta.Role == enum.UserRoleClassTeacher {
+			return s.getAlarmOverviewClassTeacher(ctx, meta.UserId, unitOID)
+		}
+		// 单位管理员
+		if err := s.AuthDomain.VerifyUnitAdmin(meta, req.UnitId); err != nil {
+			return nil, err
 		}
 	} else {
-		// 管理端 - 需要超级管理员权限
-		if !userMeta.HasSuperAdminAuth() {
-			return nil, errorx.New(errno.ErrInsufficientAuth)
+		// 管理端 - 需要超管
+		if err := s.AuthDomain.VerifySuperAdmin(ctx, meta); err != nil {
+			return nil, err
 		}
 	}
 
@@ -97,13 +99,11 @@ func (s *AlarmService) Overview(ctx context.Context, req *core_api.DashboardGetA
 }
 
 func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardListAlarmRecordsReq) (resp *core_api.DashboardListAlarmRecordsResp, err error) {
-	// 鉴权
-	userMeta, err := util.ExtraUserMeta(ctx)
+	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// 提取unitID
 	var unitOID bson.ObjectID
 	if req.UnitId != "" {
 		id, err := bson.ObjectIDFromHex(req.UnitId)
@@ -112,21 +112,20 @@ func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardL
 		}
 		unitOID = id
 	} else {
-		// 管理端 - 需要超级管理员权限
-		if !userMeta.HasSuperAdminAuth() {
-			return nil, errorx.New(errno.ErrInsufficientAuth)
+		// 管理端 - 需要超管
+		if err := s.AuthDomain.VerifySuperAdmin(ctx, meta); err != nil {
+			return nil, err
 		}
 	}
 
-	// 构建筛选条件
 	filter := bson.M{
 		cst.UnitID: unitOID,
 	}
 
-	// 检查权限并添加班级筛选
 	if req.UnitId != "" {
-		if userMeta.Role == enum.UserRoleClassTeacher {
-			grades, classes, err := s.getClassTeacherGradesClasses(ctx, userMeta.UserId)
+		// 班主任（精确匹配）
+		if meta.Role == enum.UserRoleClassTeacher {
+			grades, classes, err := s.getClassTeacherGradesClasses(ctx, meta.UserId)
 			if err != nil {
 				return nil, err
 			}
@@ -134,8 +133,8 @@ func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardL
 				filter[cst.Grade] = bson.M{"$in": grades}
 				filter[cst.Class] = bson.M{"$in": classes}
 			}
-		} else if !userMeta.HasUnitAdminAuth(req.UnitId) {
-			return nil, errorx.New(errno.ErrInsufficientAuth)
+		} else if err := s.AuthDomain.VerifyUnitAdmin(meta, req.UnitId); err != nil {
+			return nil, err
 		}
 	}
 	if req.Emotion != nil {
@@ -286,32 +285,28 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 }
 
 func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardUpdateAlarmReq) (resp *core_api.DashboardUpdateAlarmResp, err error) {
-	userMeta, err := util.ExtraUserMeta(ctx)
+	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// 参数校验
 	if req.Alarm == nil {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "预警信息"))
 	}
 
-	// 解析预警ID
 	alarmId, err := bson.ObjectIDFromHex(req.Alarm.Id)
 	if err != nil {
 		logs.Errorf("parse alarm id error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "预警ID"))
 	}
 
-	// 鉴权：需要在同一unit下
 	oldAlarm, err := s.AlarmMapper.FindOneById(ctx, alarmId)
-	// optimize 查不到时考虑直接创建而非报错
 	if err != nil {
 		logs.Errorf("find alarm error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrNotFound)
 	}
-	if !userMeta.HasUnitAdminAuth(oldAlarm.UnitID.Hex()) {
-		return nil, errorx.New(errno.ErrInsufficientAuth)
+	if err := s.AuthDomain.VerifyUnitAdmin(meta, oldAlarm.UnitID.Hex()); err != nil {
+		return nil, err
 	}
 
 	// 构建更新字段
