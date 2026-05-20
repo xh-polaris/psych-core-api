@@ -516,7 +516,7 @@ func (s *DashboardService) dataTrend(ctx context.Context, unitOID *bson.ObjectID
 	}
 
 	// 各年级高风险用户数分布
-	convDistribution, err := s.convDurationDistrbByGrade(ctx, unitOID, startGrade)
+	riskDistribution, err := s.riskDistrbByGrade(ctx, unitOID, startGrade)
 	if err != nil {
 		return nil, err
 	}
@@ -525,7 +525,7 @@ func (s *DashboardService) dataTrend(ctx context.Context, unitOID *bson.ObjectID
 		ActivePoints:          activePoints,
 		ConversationPoints:    convPoints,
 		ConversationDurations: convDurations,
-		ConvDistribution:      convDistribution,
+		RiskDistribution:      riskDistribution,
 		Code:                  0,
 		Msg:                   "success",
 	}, nil
@@ -625,7 +625,7 @@ func (s *DashboardService) dataTrend4clsTch(ctx context.Context, userId string, 
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 	}
 
-	convDistribution := &core_api.ConvDistribution{
+	riskDistribution := &core_api.RiskDistributionByGrade{
 		Ratio: util.RiskDistributionCnt2Ratio(riskMap, total),
 		Total: total,
 	}
@@ -634,7 +634,7 @@ func (s *DashboardService) dataTrend4clsTch(ctx context.Context, userId string, 
 		ActivePoints:          activePoints,
 		ConversationPoints:    conversationPoints,
 		ConversationDurations: conversationDurations,
-		ConvDistribution:      convDistribution,
+		RiskDistribution:      riskDistribution,
 		Code:                  0,
 		Msg:                   "success",
 	}, nil
@@ -656,16 +656,16 @@ func (s *DashboardService) durationBuckets(ctx context.Context, unitOID *bson.Ob
 	return result, nil
 }
 
-// convDurationDistrbByGrade 各年级高风险用户数分布
-func (s *DashboardService) convDurationDistrbByGrade(ctx context.Context, unitOID *bson.ObjectID, startGrade int) (*core_api.ConvDistribution, error) {
+// riskDistrbByGrade 各年级高风险用户数分布
+func (s *DashboardService) riskDistrbByGrade(ctx context.Context, unitOID *bson.ObjectID, startGrade int) (*core_api.RiskDistributionByGrade, error) {
 	if unitOID == nil {
-		return &core_api.ConvDistribution{Ratio: make(map[int32]int32), Total: 0}, nil
+		return &core_api.RiskDistributionByGrade{Ratio: make(map[int32]int32), Total: 0}, nil
 	}
 	riskMap, total, err := s.UserMapper.CountHighRiskByGrade(ctx, *unitOID, startGrade)
 	if err != nil {
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 	}
-	return &core_api.ConvDistribution{Ratio: util.RiskDistributionCnt2Ratio(riskMap, total), Total: total}, nil
+	return &core_api.RiskDistributionByGrade{Ratio: util.RiskDistributionCnt2Ratio(riskMap, total), Total: total}, nil
 }
 
 // DashboardListUnits 超管端-所有单位列表
