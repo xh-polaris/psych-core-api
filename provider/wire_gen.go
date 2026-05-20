@@ -29,11 +29,12 @@ func NewProvider() (*Provider, error) {
 		return nil, err
 	}
 	iMongoMapper := user.NewUserMongoMapper(confConfig)
+	unitIMongoMapper := unit.NewUnitMongoMapper(confConfig)
 	authDomain := &auth.AuthDomain{
 		UserMapper: iMongoMapper,
+		UnitMapper: unitIMongoMapper,
 	}
 	alarmIMongoMapper := alarm.NewAlarmMongoMapper(confConfig)
-	unitIMongoMapper := unit.NewUnitMongoMapper(confConfig)
 	conversationIMongoMapper := conversation.NewConversationMongoMapper(confConfig)
 	reportIMongoMapper := report.NewReportMongoMapper(confConfig)
 	alarmService := service.AlarmService{

@@ -37,7 +37,7 @@ import (
 )
 
 type IDashboardService interface {
-	// 管理端
+	// 超管端-单位列表
 	DashboardListUnits(ctx context.Context, req *core_api.DashboardListUnitsReq) (*core_api.DashboardListUnitsResp, error)
 
 	// 数据看板
@@ -71,8 +71,10 @@ var DashboardServiceSet = wire.NewSet(
 	wire.Bind(new(IDashboardService), new(*DashboardService)),
 )
 
+// DashboardGetDataOverview 【指标总览】学生总数，活跃用户数，总对话数、平均对话时长、高风险用户数
 func (s *DashboardService) DashboardGetDataOverview(ctx context.Context, req *core_api.DashboardGetDataOverviewReq) (*core_api.DashboardGetDataOverviewResp, error) {
-	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
+	// 鉴权
+	meta, role, err := s.AuthDomain.IdentifyRole(ctx, req.GetUnitId())
 	if err != nil {
 		return nil, err
 	}
@@ -81,295 +83,209 @@ func (s *DashboardService) DashboardGetDataOverview(ctx context.Context, req *co
 	weekBefore := now.AddDate(0, 0, -7)
 	twoWeeksBefore := now.AddDate(0, 0, -14)
 
-	// 超管端（无 unitId）
-	if req.UnitId == nil || req.GetUnitId() == "" {
-		if err := s.AuthDomain.VerifySuperAdmin(ctx, meta); err != nil {
-			return nil, err
+	// 根据role返回不同结果
+	switch role {
+	case enum.UserRoleSuperAdmin:
+		return s.overview4Admin(ctx, twoWeeksBefore, weekBefore, now)
+
+	case enum.UserRoleUnitAdmin:
+		unitOID, _ := bson.ObjectIDFromHex(req.GetUnitId())
+		return s.overview4Unit(ctx, unitOID, twoWeeksBefore, weekBefore, now)
+
+	case enum.UserRoleClassTeacher:
+		unitOID, err := bson.ObjectIDFromHex(req.GetUnitId())
+		if err != nil {
+			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 		}
-		return s.dashboardOverviewAdmin(ctx, twoWeeksBefore, weekBefore, now)
+		pUnit, err := s.UnitMapper.FindOneById(ctx, unitOID)
+		if err != nil {
+			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"))
+		}
+		return s.overview4clsTch(ctx, meta.UserId, unitOID, pUnit, twoWeeksBefore, weekBefore, now)
 	}
 
-	// 单位端
-	unitOID, err := bson.ObjectIDFromHex(req.GetUnitId())
-	if err != nil {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
-	}
-
-	pUnit, err := s.UnitMapper.FindOneById(ctx, unitOID)
-	if err != nil {
-		logs.Errorf("get unit error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"))
-	}
-
-	// 单位管理员
-	if err := s.AuthDomain.VerifyUnitAdmin(meta, req.GetUnitId()); err == nil {
-		return s.dashboardOverviewUnit(ctx, unitOID, twoWeeksBefore, weekBefore, now)
-	}
-
-	// 班主任（精确匹配）
-	if meta.Role == enum.UserRoleClassTeacher {
-		return s.dashboardOverviewClassTeacher(ctx, meta.UserId, unitOID, pUnit, twoWeeksBefore, weekBefore, now)
-	}
-
-	return nil, errorx.New(errno.ErrInsufficientAuth)
+	// 不应到达这里
+	return nil, errorx.New(errno.ErrUnImplement)
 }
 
-// 管理端数据概览
-func (s *DashboardService) dashboardOverviewAdmin(ctx context.Context, twoWeeksBefore, weekBefore, now time.Time) (*core_api.DashboardGetDataOverviewResp, error) {
-	// 单位数量（累计）
-	totalUnits, err := s.UnitMapper.Count(ctx)
+// overview4Admin 超管版数据概览
+func (s *DashboardService) overview4Admin(ctx context.Context, twoWeeksBefore, weekBefore, now time.Time) (*core_api.DashboardGetDataOverviewResp, error) {
+	uid := bson.ObjectID{}
+
+	// 单位数
+	curUnits, err := s.UnitMapper.Count(ctx)
 	if err != nil {
-		logs.Errorf("count unit error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardUnitStat)
 	}
-	beforeUnits, err := s.UnitMapper.CountByPeriod(ctx, time.Time{}, weekBefore)
+	prevUnits, err := s.UnitMapper.CountByPeriod(ctx, time.Time{}, weekBefore)
 	if err != nil {
-		logs.Errorf("count unit by period error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardUnitStat)
 	}
-	weeklyIncreaseUnits := totalUnits - beforeUnits
-	var weeklyIncreaseUnitsRate float64
-	if beforeUnits > 0 {
-		weeklyIncreaseUnitsRate = float64(weeklyIncreaseUnits) / float64(beforeUnits)
-	}
+	units := util.Wow{Cur: curUnits, Prev: prevUnits}
 
-	// 学生数量（累计）
-	totalUsers, err := s.UserMapper.CountStudents(ctx, bson.ObjectID{})
+	// 用户数
+	curUsers, err := s.UserMapper.CountStudents(ctx, uid)
 	if err != nil {
-		logs.Errorf("count user error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardTotalUserStat)
 	}
-	beforeUsers, err := s.UserMapper.CountStudentsByPeriod(ctx, nil, time.Time{}, weekBefore)
+	prevUsers, err := s.UserMapper.CountStudentsByPeriod(ctx, nil, time.Time{}, weekBefore)
 	if err != nil {
-		logs.Errorf("count user by period error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardTotalUserStat)
 	}
-	weeklyIncreaseUsers := totalUsers - beforeUsers
-	var weeklyIncreaseUsersRate float64
-	if beforeUsers > 0 {
-		weeklyIncreaseUsersRate = float64(weeklyIncreaseUsers) / float64(beforeUsers)
-	}
+	users := util.Wow{Cur: curUsers, Prev: prevUsers}
 
-	// 活跃用户（过去 7 天内有对话的用户数）
-	activeThisWeek, err := s.ConversationMapper.CountActiveUsers(ctx, nil, weekBefore, now)
+	// 活跃用户数
+	curActive, err := s.ConversationMapper.CountActiveUsers(ctx, nil, weekBefore, now)
 	if err != nil {
-		logs.Errorf("count active users error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardActiveUserStat)
 	}
-	activeLastWeek, err := s.ConversationMapper.CountActiveUsers(ctx, nil, twoWeeksBefore, weekBefore)
+	prevActive, err := s.ConversationMapper.CountActiveUsers(ctx, nil, twoWeeksBefore, weekBefore)
 	if err != nil {
-		logs.Errorf("count active users last week error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardActiveUserStat)
 	}
-	weeklyIncreaseActiveUsers := activeThisWeek - activeLastWeek
-	var weeklyIncreaseActiveUsersRate float64
-	if activeLastWeek > 0 {
-		weeklyIncreaseActiveUsersRate = float64(weeklyIncreaseActiveUsers) / float64(activeLastWeek)
-	}
+	active := util.Wow{Cur: curActive, Prev: prevActive}
 
-	// 对话数量（总对话数 + 本周/上周新增）
-	totalConversations, err := s.ConversationMapper.CountByUnit(ctx, nil)
+	// 对话频率
+	curConv, err := s.ConversationMapper.CountUnitConvByPeriod(ctx, nil, weekBefore, now)
 	if err != nil {
-		logs.Errorf("count conversations error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 	}
-	conversationsThisWeek, err := s.ConversationMapper.CountUnitConvByPeriod(ctx, nil, weekBefore, now)
+	prevConv, err := s.ConversationMapper.CountUnitConvByPeriod(ctx, nil, twoWeeksBefore, weekBefore)
 	if err != nil {
-		logs.Errorf("count conversations this week error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 	}
-	conversationsLastWeek, err := s.ConversationMapper.CountUnitConvByPeriod(ctx, nil, twoWeeksBefore, weekBefore)
-	if err != nil {
-		logs.Errorf("count conversations last week error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
-	}
-	weeklyIncreaseConversations := conversationsThisWeek - conversationsLastWeek
-	var weeklyIncreaseConversationsRate float64
-	if conversationsLastWeek > 0 {
-		weeklyIncreaseConversationsRate = float64(weeklyIncreaseConversations) / float64(conversationsLastWeek)
-	}
+	conv := util.Wow{Cur: curConv, Prev: prevConv}
 
-	// 平均单次对话时长（分钟）：本周 vs 上周
-	avgThisWeek, err := s.ConversationMapper.AverageDurationByPeriod(ctx, nil, weekBefore, now)
+	// 对话时长
+	curAvg, err := s.ConversationMapper.AverageDurationByPeriod(ctx, nil, weekBefore, now)
 	if err != nil {
-		logs.Errorf("avg duration this week error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardAvgDurationStat)
 	}
-	avgLastWeek, err := s.ConversationMapper.AverageDurationByPeriod(ctx, nil, twoWeeksBefore, weekBefore)
+	prevAvg, err := s.ConversationMapper.AverageDurationByPeriod(ctx, nil, twoWeeksBefore, weekBefore)
 	if err != nil {
-		logs.Errorf("avg duration last week error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardAvgDurationStat)
 	}
-	// 四舍五入到小数点后两位，避免返回过长的小数
-	round2 := func(f float64) float64 { return math.Round(f*100) / 100 }
-	avgThisWeek = round2(avgThisWeek)
-	avgLastWeek = round2(avgLastWeek)
-	weeklyIncreaseAvgDuration := avgThisWeek - avgLastWeek
-	var weeklyIncreaseAvgDurationRate float64
-	if avgLastWeek > 0 {
-		weeklyIncreaseAvgDurationRate = weeklyIncreaseAvgDuration / avgLastWeek
-	}
+	curAvg = util.Round2(curAvg)
+	prevAvg = util.Round2(prevAvg)
 
-	// 高风险学生数（riskLevel == high），支持周环比
-	alarmUsersThisWeek, err := s.UserMapper.CountHighRiskStudents(ctx, nil, weekBefore, now)
+	// 高风险用户数
+	curAlarmUsers, err := s.UserMapper.CountHighRiskStudents(ctx, nil, weekBefore, now)
 	if err != nil {
-		logs.Errorf("count alarm users this week error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardAlarmUserStat)
 	}
-	alarmUsersLastWeek, err := s.UserMapper.CountHighRiskStudents(ctx, nil, twoWeeksBefore, weekBefore)
+	prevAlarmUsers, err := s.UserMapper.CountHighRiskStudents(ctx, nil, twoWeeksBefore, weekBefore)
 	if err != nil {
-		logs.Errorf("count alarm users last week error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardAlarmUserStat)
 	}
-	weeklyIncreaseAlarmUsers := alarmUsersThisWeek - alarmUsersLastWeek
-	var weeklyIncreaseAlarmUsersRate float64
-	if alarmUsersLastWeek > 0 {
-		weeklyIncreaseAlarmUsersRate = float64(weeklyIncreaseAlarmUsers) / float64(alarmUsersLastWeek)
-	}
+	alrm := util.Wow{Cur: curAlarmUsers, Prev: prevAlarmUsers}
 
 	return &core_api.DashboardGetDataOverviewResp{
-		TotalUnits:                                   &totalUnits,
-		WeeklyIncreaseUnits:                          &weeklyIncreaseUnits,
-		WeeklyIncreaseUnitsRate:                      &weeklyIncreaseUnitsRate,
-		TotalUsers:                                   totalUsers,
-		WeeklyIncreaseUsers:                          weeklyIncreaseUsers,
-		WeeklyIncreaseUsersRate:                      weeklyIncreaseUsersRate,
-		ActiveUsers:                                  &activeThisWeek,
-		WeeklyIncreaseActiveUsers:                    &weeklyIncreaseActiveUsers,
-		WeeklyIncreaseActiveUsersRate:                &weeklyIncreaseActiveUsersRate,
-		TotalConversations:                           totalConversations,
-		WeeklyIncreaseConversations:                  weeklyIncreaseConversations,
-		WeeklyIncreaseConversationsRate:              weeklyIncreaseConversationsRate,
-		AverageTimePerConversation:                   avgThisWeek,
-		WeeklyIncreaseAverageTimePerConversation:     weeklyIncreaseAvgDuration,
-		WeeklyIncreaseAverageTimePerConversationRate: weeklyIncreaseAvgDurationRate,
-		AlarmUsers:                                   alarmUsersThisWeek,
-		WeeklyIncreaseAlarmUsers:                     weeklyIncreaseAlarmUsers,
-		WeeklyIncreaseAlarmUsersRate:                 weeklyIncreaseAlarmUsersRate,
+		TotalUnits:                                   util.Int32Ptr(units.Cur),
+		WeeklyIncreaseUnits:                          util.Int32Ptr(units.Inc()),
+		WeeklyIncreaseUnitsRate:                      util.Float64Ptr(units.Rate()),
+		TotalUsers:                                   users.Cur,
+		WeeklyIncreaseUsers:                          users.Inc(),
+		WeeklyIncreaseUsersRate:                      users.Rate(),
+		ActiveUsers:                                  util.Int32Ptr(active.Cur),
+		WeeklyIncreaseActiveUsers:                    util.Int32Ptr(active.Inc()),
+		WeeklyIncreaseActiveUsersRate:                util.Float64Ptr(active.Rate()),
+		TotalConversations:                           conv.Cur,
+		WeeklyIncreaseConversations:                  conv.Inc(),
+		WeeklyIncreaseConversationsRate:              conv.Rate(),
+		AverageTimePerConversation:                   curAvg,
+		WeeklyIncreaseAverageTimePerConversation:     util.Round2(curAvg - prevAvg),
+		WeeklyIncreaseAverageTimePerConversationRate: util.Rate(int32(curAvg), int32(prevAvg)),
+		AlarmUsers:                                   alrm.Cur,
+		WeeklyIncreaseAlarmUsers:                     alrm.Inc(),
+		WeeklyIncreaseAlarmUsersRate:                 alrm.Rate(),
 		Code:                                         0,
 		Msg:                                          "success",
 	}, nil
 }
 
-// 单位端数据概览
-func (s *DashboardService) dashboardOverviewUnit(ctx context.Context, unitOID bson.ObjectID, twoWeeksBefore, weekBefore, now time.Time) (*core_api.DashboardGetDataOverviewResp, error) {
-	// 学生总数（当前单位）
-	totalUsers, err := s.UserMapper.CountStudents(ctx, unitOID)
+// overview4Unit 单位管理员版数据概览
+func (s *DashboardService) overview4Unit(ctx context.Context, unitOID bson.ObjectID, twoWeeksBefore, weekBefore, now time.Time) (*core_api.DashboardGetDataOverviewResp, error) {
+	u := &unitOID
+
+	// 用户数
+	curUsers, err := s.UserMapper.CountStudents(ctx, unitOID)
 	if err != nil {
-		logs.Errorf("count unit users error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardTotalUserStat)
 	}
-	beforeUsers, err := s.UserMapper.CountStudentsByPeriod(ctx, &unitOID, time.Time{}, weekBefore)
+	prevUsers, err := s.UserMapper.CountStudentsByPeriod(ctx, u, time.Time{}, weekBefore)
 	if err != nil {
-		logs.Errorf("count unit users by period error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardTotalUserStat)
 	}
-	weeklyIncreaseUsers := totalUsers - beforeUsers
-	var weeklyIncreaseUsersRate float64
-	if beforeUsers > 0 {
-		weeklyIncreaseUsersRate = float64(weeklyIncreaseUsers) / float64(beforeUsers)
-	}
+	users := util.Wow{Cur: curUsers, Prev: prevUsers}
 
-	// 活跃用户（当前单位，过去 7 天）
-	activeThisWeek, err := s.ConversationMapper.CountActiveUsers(ctx, &unitOID, weekBefore, now)
+	// 活跃用户数
+	curActive, err := s.ConversationMapper.CountActiveUsers(ctx, u, weekBefore, now)
 	if err != nil {
-		logs.Errorf("count unit active users error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardActiveUserStat)
 	}
-	activeLastWeek, err := s.ConversationMapper.CountActiveUsers(ctx, &unitOID, twoWeeksBefore, weekBefore)
+	prevActive, err := s.ConversationMapper.CountActiveUsers(ctx, u, twoWeeksBefore, weekBefore)
 	if err != nil {
-		logs.Errorf("count unit active users last week error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardActiveUserStat)
 	}
-	weeklyIncreaseActiveUsers := activeThisWeek - activeLastWeek
-	var weeklyIncreaseActiveUsersRate float64
-	if activeLastWeek > 0 {
-		weeklyIncreaseActiveUsersRate = float64(weeklyIncreaseActiveUsers) / float64(activeLastWeek)
-	}
+	active := util.Wow{Cur: curActive, Prev: prevActive}
 
-	// 对话数量（当前单位）
-	totalConversations, err := s.ConversationMapper.CountByUnit(ctx, &unitOID)
+	// 对话数
+	curConv, err := s.ConversationMapper.CountUnitConvByPeriod(ctx, u, weekBefore, now)
 	if err != nil {
-		logs.Errorf("count unit conversations error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 	}
-	conversationsThisWeek, err := s.ConversationMapper.CountUnitConvByPeriod(ctx, &unitOID, weekBefore, now)
+	prevConv, err := s.ConversationMapper.CountUnitConvByPeriod(ctx, u, twoWeeksBefore, weekBefore)
 	if err != nil {
-		logs.Errorf("count unit conversations this week error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 	}
-	conversationsLastWeek, err := s.ConversationMapper.CountUnitConvByPeriod(ctx, &unitOID, twoWeeksBefore, weekBefore)
-	if err != nil {
-		logs.Errorf("count unit conversations last week error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
-	}
-	weeklyIncreaseConversations := conversationsThisWeek - conversationsLastWeek
-	var weeklyIncreaseConversationsRate float64
-	if conversationsLastWeek > 0 {
-		weeklyIncreaseConversationsRate = float64(weeklyIncreaseConversations) / float64(conversationsLastWeek)
-	}
+	conv := util.Wow{Cur: curConv, Prev: prevConv}
 
-	// 平均单次对话时长（当前单位，本周 vs 上周）
-	avgThisWeek, err := s.ConversationMapper.AverageDurationByPeriod(ctx, &unitOID, weekBefore, now)
+	// 对话时长
+	curAvg, err := s.ConversationMapper.AverageDurationByPeriod(ctx, u, weekBefore, now)
 	if err != nil {
-		logs.Errorf("unit avg duration this week error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardAvgDurationStat)
 	}
-	avgLastWeek, err := s.ConversationMapper.AverageDurationByPeriod(ctx, &unitOID, twoWeeksBefore, weekBefore)
+	prevAvg, err := s.ConversationMapper.AverageDurationByPeriod(ctx, u, twoWeeksBefore, weekBefore)
 	if err != nil {
-		logs.Errorf("unit avg duration last week error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardAvgDurationStat)
 	}
-	// 四舍五入到小数点后两位
-	round2 := func(f float64) float64 { return math.Round(f*100) / 100 }
-	avgThisWeek = round2(avgThisWeek)
-	avgLastWeek = round2(avgLastWeek)
-	weeklyIncreaseAvgDuration := avgThisWeek - avgLastWeek
-	var weeklyIncreaseAvgDurationRate float64
-	if avgLastWeek > 0 {
-		weeklyIncreaseAvgDurationRate = weeklyIncreaseAvgDuration / avgLastWeek
-	}
+	curAvg = util.Round2(curAvg)
+	prevAvg = util.Round2(prevAvg)
 
-	// 高风险学生数（当前单位，支持周环比）
-	alarmUsersThisWeek, err := s.UserMapper.CountHighRiskStudents(ctx, &unitOID, weekBefore, now)
+	// 高风险用户数
+	curAlarmUsers, err := s.UserMapper.CountHighRiskStudents(ctx, u, weekBefore, now)
 	if err != nil {
-		logs.Errorf("count unit alarm users this week error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardAlarmUserStat)
 	}
-	alarmUsersLastWeek, err := s.UserMapper.CountHighRiskStudents(ctx, &unitOID, twoWeeksBefore, weekBefore)
+	prevAlarmUsers, err := s.UserMapper.CountHighRiskStudents(ctx, u, twoWeeksBefore, weekBefore)
 	if err != nil {
-		logs.Errorf("count unit alarm users last week error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardAlarmUserStat)
 	}
-	weeklyIncreaseAlarmUsers := alarmUsersThisWeek - alarmUsersLastWeek
-	var weeklyIncreaseAlarmUsersRate float64
-	if alarmUsersLastWeek > 0 {
-		weeklyIncreaseAlarmUsersRate = float64(weeklyIncreaseAlarmUsers) / float64(alarmUsersLastWeek)
-	}
+	alrm := util.Wow{Cur: curAlarmUsers, Prev: prevAlarmUsers}
 
 	return &core_api.DashboardGetDataOverviewResp{
-		TotalUsers:                                   totalUsers,
-		WeeklyIncreaseUsers:                          weeklyIncreaseUsers,
-		WeeklyIncreaseUsersRate:                      weeklyIncreaseUsersRate,
-		ActiveUsers:                                  &activeThisWeek,
-		WeeklyIncreaseActiveUsers:                    &weeklyIncreaseActiveUsers,
-		WeeklyIncreaseActiveUsersRate:                &weeklyIncreaseActiveUsersRate,
-		TotalConversations:                           totalConversations,
-		WeeklyIncreaseConversations:                  weeklyIncreaseConversations,
-		WeeklyIncreaseConversationsRate:              weeklyIncreaseConversationsRate,
-		AverageTimePerConversation:                   avgThisWeek,
-		WeeklyIncreaseAverageTimePerConversation:     weeklyIncreaseAvgDuration,
-		WeeklyIncreaseAverageTimePerConversationRate: weeklyIncreaseAvgDurationRate,
-		AlarmUsers:                                   alarmUsersThisWeek,
-		WeeklyIncreaseAlarmUsers:                     weeklyIncreaseAlarmUsers,
-		WeeklyIncreaseAlarmUsersRate:                 weeklyIncreaseAlarmUsersRate,
+		TotalUsers:                                   users.Cur,
+		WeeklyIncreaseUsers:                          users.Inc(),
+		WeeklyIncreaseUsersRate:                      users.Rate(),
+		ActiveUsers:                                  util.Int32Ptr(active.Cur),
+		WeeklyIncreaseActiveUsers:                    util.Int32Ptr(active.Inc()),
+		WeeklyIncreaseActiveUsersRate:                util.Float64Ptr(active.Rate()),
+		TotalConversations:                           conv.Cur,
+		WeeklyIncreaseConversations:                  conv.Inc(),
+		WeeklyIncreaseConversationsRate:              conv.Rate(),
+		AverageTimePerConversation:                   curAvg,
+		WeeklyIncreaseAverageTimePerConversation:     util.Round2(curAvg - prevAvg),
+		WeeklyIncreaseAverageTimePerConversationRate: util.Rate(int32(curAvg), int32(prevAvg)),
+		AlarmUsers:                                   alrm.Cur,
+		WeeklyIncreaseAlarmUsers:                     alrm.Inc(),
+		WeeklyIncreaseAlarmUsersRate:                 alrm.Rate(),
 		Code:                                         0,
 		Msg:                                          "success",
 	}, nil
 }
 
-// 班主任端数据概览
-func (s *DashboardService) dashboardOverviewClassTeacher(ctx context.Context, userId string, unitOID bson.ObjectID, pUnit *unit.Unit, twoWeeksBefore, weekBefore, now time.Time) (*core_api.DashboardGetDataOverviewResp, error) {
+// overview4clsTch 班主任版数据概览
+func (s *DashboardService) overview4clsTch(ctx context.Context, userId string, unitOID bson.ObjectID, pUnit *unit.Unit, twoWeeksBefore, weekBefore, now time.Time) (*core_api.DashboardGetDataOverviewResp, error) {
 	// 获取班主任绑定的班级
 	userOID, err := bson.ObjectIDFromHex(userId)
 	if err != nil {
@@ -383,11 +299,7 @@ func (s *DashboardService) dashboardOverviewClassTeacher(ctx context.Context, us
 	}
 
 	if len(boundClasses) == 0 {
-		return &core_api.DashboardGetDataOverviewResp{
-			TotalUsers: 0,
-			Code:       0,
-			Msg:        "success",
-		}, nil
+		return nil, errorx.New(errno.ErrNoBoundedClass, errorx.KV("id", userId), errorx.KV("role", enum.UserRoleI2S[enum.UserRoleClassTeacher]))
 	}
 
 	// 根据 EnrollYear 计算年级
@@ -399,23 +311,22 @@ func (s *DashboardService) dashboardOverviewClassTeacher(ctx context.Context, us
 		classes = append(classes, int32(bc.Class))
 	}
 
-	// 学生统计
-	totalUsers, err := s.UserMapper.CountStudentsByClassList(ctx, unitOID, grades, classes)
+	// 学生数统计
+	curUsers, err := s.UserMapper.CountStudentsByClassList(ctx, unitOID, grades, classes)
 	if err != nil {
 		logs.Errorf("count students by class list error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardTotalUserStat)
 	}
-
-	beforeUsers, err := s.UserMapper.CountStudentsByPeriodAndClassList(ctx, &unitOID, grades, classes, time.Time{}, weekBefore)
+	prevUsers, err := s.UserMapper.CountStudentsByPeriodAndClassList(ctx, &unitOID, grades, classes, time.Time{}, weekBefore)
 	if err != nil {
 		logs.Errorf("count students by period and class list error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardTotalUserStat)
 	}
 
-	weeklyIncreaseUsers := totalUsers - beforeUsers
-	var weeklyIncreaseUsersRate float64
-	if beforeUsers > 0 {
-		weeklyIncreaseUsersRate = float64(weeklyIncreaseUsers) / float64(beforeUsers)
+	usrIncre := curUsers - prevUsers
+	var usrIncreRate float64
+	if prevUsers > 0 {
+		usrIncreRate = float64(usrIncre) / float64(prevUsers)
 	}
 
 	// 活跃用户统计
@@ -431,35 +342,35 @@ func (s *DashboardService) dashboardOverviewClassTeacher(ctx context.Context, us
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardActiveUserStat)
 	}
 
-	weeklyIncreaseActiveUsers := activeThisWeek - activeLastWeek
-	var weeklyIncreaseActiveUsersRate float64
+	actIncre := activeThisWeek - activeLastWeek
+	var actIncreRate float64
 	if activeLastWeek > 0 {
-		weeklyIncreaseActiveUsersRate = float64(weeklyIncreaseActiveUsers) / float64(activeLastWeek)
+		actIncreRate = float64(actIncre) / float64(activeLastWeek)
 	}
 
 	// 对话统计
-	conversationsThisWeek, err := s.ConversationMapper.CountConversationsByClassList(ctx, grades, classes, weekBefore, now)
+	convThisWeek, err := s.ConversationMapper.CountConversationsByClassList(ctx, grades, classes, weekBefore, now)
 	if err != nil {
 		logs.Errorf("count conversations this week by class list error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 	}
 
-	conversationsLastWeek, err := s.ConversationMapper.CountConversationsByClassList(ctx, grades, classes, twoWeeksBefore, weekBefore)
+	convLastWeek, err := s.ConversationMapper.CountConversationsByClassList(ctx, grades, classes, twoWeeksBefore, weekBefore)
 	if err != nil {
 		logs.Errorf("count conversations last week by class list error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 	}
 
-	totalConversations, err := s.ConversationMapper.CountConversationsByClassList(ctx, grades, classes, time.Time{}, now)
+	totalConv, err := s.ConversationMapper.CountConversationsByClassList(ctx, grades, classes, time.Time{}, now)
 	if err != nil {
 		logs.Errorf("count conversations by class list error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 	}
 
-	weeklyIncreaseConversations := conversationsThisWeek - conversationsLastWeek
-	var weeklyIncreaseConversationsRate float64
-	if conversationsLastWeek > 0 {
-		weeklyIncreaseConversationsRate = float64(weeklyIncreaseConversations) / float64(conversationsLastWeek)
+	convIncre := convThisWeek - convLastWeek
+	var convIncreRate float64
+	if convLastWeek > 0 {
+		convIncreRate = float64(convIncre) / float64(convLastWeek)
 	}
 
 	// 平均对话时长
@@ -475,13 +386,12 @@ func (s *DashboardService) dashboardOverviewClassTeacher(ctx context.Context, us
 		avgLastWeek = 0
 	}
 
-	round2 := func(f float64) float64 { return math.Round(f*100) / 100 }
-	avgThisWeek = round2(avgThisWeek)
-	avgLastWeek = round2(avgLastWeek)
-	weeklyIncreaseAvgDuration := avgThisWeek - avgLastWeek
-	var weeklyIncreaseAvgDurationRate float64
+	avgThisWeek = util.Round2(avgThisWeek)
+	avgLastWeek = util.Round2(avgLastWeek)
+	avgIncre := avgThisWeek - avgLastWeek
+	var avgIncreRate float64
 	if avgLastWeek > 0 {
-		weeklyIncreaseAvgDurationRate = weeklyIncreaseAvgDuration / avgLastWeek
+		avgIncreRate = float64(avgIncre) / float64(avgLastWeek)
 	}
 
 	// 高风险学生数
@@ -497,35 +407,36 @@ func (s *DashboardService) dashboardOverviewClassTeacher(ctx context.Context, us
 		alarmUsersLastWeek = 0
 	}
 
-	weeklyIncreaseAlarmUsers := alarmUsersThisWeek - alarmUsersLastWeek
-	var weeklyIncreaseAlarmUsersRate float64
+	alarmUsersIncre := alarmUsersThisWeek - alarmUsersLastWeek
+	var alarmUsersIncreRate float64
 	if alarmUsersLastWeek > 0 {
-		weeklyIncreaseAlarmUsersRate = float64(weeklyIncreaseAlarmUsers) / float64(alarmUsersLastWeek)
+		alarmUsersIncreRate = float64(alarmUsersIncre) / float64(alarmUsersLastWeek)
 	}
 
 	return &core_api.DashboardGetDataOverviewResp{
-		TotalUsers:                                   totalUsers,
-		WeeklyIncreaseUsers:                          weeklyIncreaseUsers,
-		WeeklyIncreaseUsersRate:                      weeklyIncreaseUsersRate,
+		TotalUsers:                                   curUsers,
+		WeeklyIncreaseUsers:                          usrIncre,
+		WeeklyIncreaseUsersRate:                      usrIncreRate,
 		ActiveUsers:                                  &activeThisWeek,
-		WeeklyIncreaseActiveUsers:                    &weeklyIncreaseActiveUsers,
-		WeeklyIncreaseActiveUsersRate:                &weeklyIncreaseActiveUsersRate,
-		TotalConversations:                           totalConversations,
-		WeeklyIncreaseConversations:                  weeklyIncreaseConversations,
-		WeeklyIncreaseConversationsRate:              weeklyIncreaseConversationsRate,
+		WeeklyIncreaseActiveUsers:                    &actIncre,
+		WeeklyIncreaseActiveUsersRate:                &actIncreRate,
+		TotalConversations:                           totalConv,
+		WeeklyIncreaseConversations:                  convIncre,
+		WeeklyIncreaseConversationsRate:              convIncreRate,
 		AverageTimePerConversation:                   avgThisWeek,
-		WeeklyIncreaseAverageTimePerConversation:     weeklyIncreaseAvgDuration,
-		WeeklyIncreaseAverageTimePerConversationRate: weeklyIncreaseAvgDurationRate,
+		WeeklyIncreaseAverageTimePerConversation:     avgIncre,
+		WeeklyIncreaseAverageTimePerConversationRate: avgIncreRate,
 		AlarmUsers:                                   alarmUsersThisWeek,
-		WeeklyIncreaseAlarmUsers:                     weeklyIncreaseAlarmUsers,
-		WeeklyIncreaseAlarmUsersRate:                 weeklyIncreaseAlarmUsersRate,
+		WeeklyIncreaseAlarmUsers:                     alarmUsersIncre,
+		WeeklyIncreaseAlarmUsersRate:                 alarmUsersIncreRate,
 		Code:                                         0,
 		Msg:                                          "success",
 	}, nil
 }
 
+// DashboardGetDataTrend 获取近一周活跃用户数、每日对话频率、对话平均时长分布、各年级预警数占比
 func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_api.DashboardGetDataTrendReq) (*core_api.DashboardGetDataTrendResp, error) {
-	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
+	meta, role, err := s.AuthDomain.IdentifyRole(ctx, req.GetUnitId())
 	if err != nil {
 		return nil, err
 	}
@@ -541,149 +452,87 @@ func (s *DashboardService) DashboardGetDataTrend(ctx context.Context, req *core_
 		return wd
 	}
 
-	var unitOID *bson.ObjectID
-	var pUnit *unit.Unit
+	switch role {
+	case enum.UserRoleSuperAdmin:
+		return s.dataTrend4Admin(ctx, startDay, toWeek)
 
-	// 单位端
-	if req.UnitId != nil && req.GetUnitId() != "" {
-		id, err := bson.ObjectIDFromHex(req.GetUnitId())
-		if err != nil {
-			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
-		}
-		unitOID = &id
+	case enum.UserRoleUnitAdmin:
+		oid, _ := bson.ObjectIDFromHex(req.GetUnitId())
+		return s.dataTrend4Unit(ctx, oid, startDay, toWeek)
 
-		pUnit, err = s.UnitMapper.FindOneById(ctx, *unitOID)
-		if err != nil {
-			logs.Errorf("get unit error: %s", errorx.ErrorWithoutStack(err))
-			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"))
-		}
-
-		// 班主任（精确匹配，避免 UnitAdmin 误入）
-		if meta.Role == enum.UserRoleClassTeacher {
-			return s.getDataTrendClassTeacher(ctx, meta.UserId, *unitOID, pUnit, startDay, toWeek)
-		}
-
-		// 单位管理员
-		if err := s.AuthDomain.VerifyUnitAdmin(meta, req.GetUnitId()); err != nil {
-			return nil, err
-		}
-	} else {
-		// 管理端 - 需要超管
-		if err := s.AuthDomain.VerifySuperAdmin(ctx, meta); err != nil {
-			return nil, err
-		}
+	case enum.UserRoleClassTeacher:
+		oid, _ := bson.ObjectIDFromHex(req.GetUnitId())
+		pUnit, _ := s.UnitMapper.FindOneById(ctx, oid)
+		return s.dataTrend4clsTch(ctx, meta.UserId, oid, pUnit, startDay, toWeek)
 	}
+	return nil, errorx.New(errno.ErrUnImplement)
+}
 
+// dataTrend4Admin 超管版数据趋势（全局）
+func (s *DashboardService) dataTrend4Admin(ctx context.Context, startDay time.Time, toWeek func(time.Time) int32) (*core_api.DashboardGetDataTrendResp, error) {
+	return s.dataTrend(ctx, nil, 0, startDay, toWeek)
+}
+
+// dataTrend4Unit 单位管理员版数据趋势
+func (s *DashboardService) dataTrend4Unit(ctx context.Context, unitOID bson.ObjectID, startDay time.Time, toWeek func(time.Time) int32) (*core_api.DashboardGetDataTrendResp, error) {
+	pUnit, _ := s.UnitMapper.FindOneById(ctx, unitOID)
+	startGrade := 1
+	if pUnit != nil {
+		startGrade = pUnit.StartGrade
+	}
+	return s.dataTrend(ctx, &unitOID, startGrade, startDay, toWeek)
+}
+
+// dataTrend 超管/单位管理共用逻辑
+func (s *DashboardService) dataTrend(ctx context.Context, unitOID *bson.ObjectID, startGrade int, startDay time.Time, toWeek func(time.Time) int32) (*core_api.DashboardGetDataTrendResp, error) {
 	// 活跃趋势（按天）
 	activePoints := make([]*core_api.TrendPoint, 0, 7)
 	for i := 0; i < 7; i++ {
 		dayStart := startDay.AddDate(0, 0, i)
 		dayEnd := dayStart.AddDate(0, 0, 1)
-		var (
-			cnt int32
-			err error
-		)
-		if unitOID != nil {
-			cnt, err = s.ConversationMapper.CountActiveUsers(ctx, unitOID, dayStart, dayEnd)
-		} else {
-			cnt, err = s.ConversationMapper.CountActiveUsers(ctx, nil, dayStart, dayEnd)
-		}
+		cnt, err := s.ConversationMapper.CountActiveUsers(ctx, unitOID, dayStart, dayEnd)
 		if err != nil {
-			logs.Errorf("count active users trend error (day %d): %s", i, errorx.ErrorWithoutStack(err))
 			return nil, errorx.WrapByCode(err, errno.ErrDashboardActiveUserStat)
 		}
-		// week 字段：1=Mon ... 7=Sun
-		activePoints = append(activePoints, &core_api.TrendPoint{
-			Count: cnt,
-			Week:  toWeek(dayStart),
-			Hour:  0,
-		})
+		activePoints = append(activePoints, &core_api.TrendPoint{Count: cnt, Week: toWeek(dayStart)})
 	}
 
 	// 对话频率趋势（按天）
-	conversationPoints := make([]*core_api.TrendPoint, 0, 7)
+	convPoints := make([]*core_api.TrendPoint, 0, 7)
 	for i := 0; i < 7; i++ {
 		dayStart := startDay.AddDate(0, 0, i)
 		dayEnd := dayStart.AddDate(0, 0, 1)
-		var (
-			cnt int32
-			err error
-		)
-		if unitOID != nil {
-			cnt, err = s.ConversationMapper.CountUnitConvByPeriod(ctx, unitOID, dayStart, dayEnd)
-		} else {
-			cnt, err = s.ConversationMapper.CountUnitConvByPeriod(ctx, nil, dayStart, dayEnd)
-		}
+		cnt, err := s.ConversationMapper.CountUnitConvByPeriod(ctx, unitOID, dayStart, dayEnd)
 		if err != nil {
-			logs.Errorf("count conversations trend error (day %d): %s", i, errorx.ErrorWithoutStack(err))
 			return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 		}
-		conversationPoints = append(conversationPoints, &core_api.TrendPoint{
-			Count: cnt,
-			Week:  toWeek(dayStart),
-			Hour:  0,
-		})
+		convPoints = append(convPoints, &core_api.TrendPoint{Count: cnt, Week: toWeek(dayStart)})
 	}
 
-	// 对话时长分布（分钟分桶）：1: 0-5 min 2: 6-10 min 3: 11-20 min 4: 21-30 min 5: 31-60 min 6: 61-120 min 7: 120+ min
-	conversationDurations := make([]*core_api.ConversationDuration, 0, 7)
-	buckets := []struct {
-		min float64
-		max float64
-	}{
-		{0, 5},    // 1: 0-5 min
-		{6, 10},   // 2: 6-10 min
-		{11, 20},  // 3: 11-20 min
-		{21, 30},  // 4: 21-30 min
-		{31, 60},  // 5: 31-60 min
-		{61, 120}, // 6: 61-120 min
-		{121, -1}, // 7: 120+ min
-	}
-
-	for i, b := range buckets {
-		cnt, err := s.ConversationMapper.CountByDurationBucket(ctx, unitOID, b.min, b.max)
-		if err != nil {
-			logs.Errorf("count conversations for duration bucket error: %s", errorx.ErrorWithoutStack(err))
-			return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
-		}
-
-		conversationDurations = append(conversationDurations, &core_api.ConversationDuration{
-			Key:   int32(i + 1),
-			Count: cnt,
-		})
-	}
-
-	// 分年级的对话时长比例 定义年级从 1-12
-	gradeDurationMap, totalDuration, err := s.ConversationMapper.ConvDurationByGrade(ctx, unitOID)
+	// 对话时长分布
+	convDurations, err := s.durationBuckets(ctx, unitOID)
 	if err != nil {
-		logs.Errorf("conv duration by grade error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
+		return nil, err
 	}
 
-	ratioMap := make(map[int32]int32, 12)
-	if totalDuration > 0 {
-		for grade, duration := range gradeDurationMap {
-			ratioMap[grade] = (duration * 100) / totalDuration
-		}
-	}
-
-	convDistribution := &core_api.ConvDistribution{
-		Ratio: ratioMap,
-		Total: totalDuration,
+	// 各年级高风险用户数分布
+	convDistribution, err := s.convDurationDistrbByGrade(ctx, unitOID, startGrade)
+	if err != nil {
+		return nil, err
 	}
 
 	return &core_api.DashboardGetDataTrendResp{
 		ActivePoints:          activePoints,
-		ConversationPoints:    conversationPoints,
-		ConversationDurations: conversationDurations,
+		ConversationPoints:    convPoints,
+		ConversationDurations: convDurations,
 		ConvDistribution:      convDistribution,
 		Code:                  0,
 		Msg:                   "success",
 	}, nil
 }
 
-// getDataTrendClassTeacher 班主任版数据趋势
-func (s *DashboardService) getDataTrendClassTeacher(ctx context.Context, userId string, unitOID bson.ObjectID, pUnit *unit.Unit, startDay time.Time, toWeekFn func(time.Time) int32) (*core_api.DashboardGetDataTrendResp, error) {
+// dataTrend4clsTch 班主任版数据趋势
+func (s *DashboardService) dataTrend4clsTch(ctx context.Context, userId string, unitOID bson.ObjectID, pUnit *unit.Unit, startDay time.Time, toWeekFn func(time.Time) int32) (*core_api.DashboardGetDataTrendResp, error) {
 	userOID, err := bson.ObjectIDFromHex(userId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UserID"))
@@ -696,7 +545,7 @@ func (s *DashboardService) getDataTrendClassTeacher(ctx context.Context, userId 
 	}
 
 	if len(boundClasses) == 0 {
-		return emptyDataTrendResp(), nil
+		return nil, errorx.New(errno.ErrNoBoundedClass, errorx.KV("id", userId), errorx.KV("role", enum.UserRoleI2S[enum.UserRoleClassTeacher]))
 	}
 
 	grades := make([]int32, 0, len(boundClasses))
@@ -762,23 +611,23 @@ func (s *DashboardService) getDataTrendClassTeacher(ctx context.Context, userId 
 		})
 	}
 
-	// 分年级的对话时长比例
-	gradeDurationMap, totalDuration, err := s.ConversationMapper.ConvDurationByGradeByClassList(ctx, grades, classes)
+	// 各年级高风险用户数分布
+	enrollYears := make([]int32, 0, len(boundClasses))
+	classes = make([]int32, 0, len(boundClasses))
+	for _, bc := range boundClasses {
+		enrollYears = append(enrollYears, int32(bc.EnrollYear))
+		classes = append(classes, int32(bc.Class))
+	}
+
+	riskMap, total, err := s.UserMapper.CountHighRiskByGradeAndClasses(ctx, pUnit.StartGrade, enrollYears, classes)
 	if err != nil {
-		logs.Errorf("conv duration by grade by class list error: %s", errorx.ErrorWithoutStack(err))
+		logs.Errorf("count high risk by grade and classes error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 	}
 
-	ratioMap := make(map[int32]int32, 12)
-	if totalDuration > 0 {
-		for grade, duration := range gradeDurationMap {
-			ratioMap[grade] = (duration * 100) / totalDuration
-		}
-	}
-
 	convDistribution := &core_api.ConvDistribution{
-		Ratio: ratioMap,
-		Total: totalDuration,
+		Ratio: util.RiskDistributionCnt2Ratio(riskMap, total),
+		Total: total,
 	}
 
 	return &core_api.DashboardGetDataTrendResp{
@@ -791,24 +640,37 @@ func (s *DashboardService) getDataTrendClassTeacher(ctx context.Context, userId 
 	}, nil
 }
 
-func emptyDataTrendResp() *core_api.DashboardGetDataTrendResp {
-	return &core_api.DashboardGetDataTrendResp{
-		ActivePoints:          []*core_api.TrendPoint{},
-		ConversationPoints:    []*core_api.TrendPoint{},
-		ConversationDurations: []*core_api.ConversationDuration{},
-		ConvDistribution:      &core_api.ConvDistribution{Ratio: make(map[int32]int32), Total: 0},
-		Code:                  0,
-		Msg:                   "success",
+// durationBuckets 对话时长分桶统计
+func (s *DashboardService) durationBuckets(ctx context.Context, unitOID *bson.ObjectID) ([]*core_api.ConversationDuration, error) {
+	buckets := []struct{ min, max float64 }{
+		{0, 5}, {6, 10}, {11, 20}, {21, 30}, {31, 60}, {61, 120}, {121, -1},
 	}
+	result := make([]*core_api.ConversationDuration, 0, len(buckets))
+	for i, b := range buckets {
+		cnt, err := s.ConversationMapper.CountByDurationBucket(ctx, unitOID, b.min, b.max)
+		if err != nil {
+			return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
+		}
+		result = append(result, &core_api.ConversationDuration{Key: int32(i + 1), Count: cnt})
+	}
+	return result, nil
 }
 
-func (s *DashboardService) DashboardListUnits(ctx context.Context, req *core_api.DashboardListUnitsReq) (*core_api.DashboardListUnitsResp, error) {
-	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
-	if err != nil {
-		return nil, err
+// convDurationDistrbByGrade 各年级高风险用户数分布
+func (s *DashboardService) convDurationDistrbByGrade(ctx context.Context, unitOID *bson.ObjectID, startGrade int) (*core_api.ConvDistribution, error) {
+	if unitOID == nil {
+		return &core_api.ConvDistribution{Ratio: make(map[int32]int32), Total: 0}, nil
 	}
+	riskMap, total, err := s.UserMapper.CountHighRiskByGrade(ctx, *unitOID, startGrade)
+	if err != nil {
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
+	}
+	return &core_api.ConvDistribution{Ratio: util.RiskDistributionCnt2Ratio(riskMap, total), Total: total}, nil
+}
 
-	if err := s.AuthDomain.VerifySuperAdmin(ctx, meta); err != nil {
+// DashboardListUnits 超管端-所有单位列表
+func (s *DashboardService) DashboardListUnits(ctx context.Context, req *core_api.DashboardListUnitsReq) (*core_api.DashboardListUnitsResp, error) {
+	if _, _, err := s.AuthDomain.IdentifyRole(ctx, ""); err != nil {
 		return nil, err
 	}
 
@@ -868,85 +730,53 @@ func (s *DashboardService) DashboardListUnits(ctx context.Context, req *core_api
 	}, nil
 }
 
+// DashboardGetPsychTrend 情绪分布，风险性别分布，关键词词云
 func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core_api.DashboardGetPsychTrendReq) (*core_api.DashboardGetPsychTrendResp, error) {
-	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
+	meta, role, err := s.AuthDomain.IdentifyRole(ctx, req.GetUnitId())
 	if err != nil {
 		return nil, err
 	}
 
-	unitIdStr := req.GetUnitId()
-	var unitOID *bson.ObjectID
-	if unitIdStr != "" {
-		// 单位管理员或班主任
-		if err := s.AuthDomain.VerifyUnitAdmin(meta, unitIdStr); err != nil {
-			if meta.Role != enum.UserRoleClassTeacher {
-				return nil, err
-			}
-		}
-		id, err := bson.ObjectIDFromHex(unitIdStr)
-		if err != nil {
-			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
-		}
-		unitOID = &id
+	switch role {
+	case enum.UserRoleSuperAdmin:
+		return s.psychTrend4Admin(ctx)
 
-		pUnit, err := s.UnitMapper.FindOneById(ctx, *unitOID)
-		if err != nil {
-			logs.Errorf("get unit error: %s", errorx.ErrorWithoutStack(err))
-			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"))
-		}
+	case enum.UserRoleUnitAdmin:
+		oid, _ := bson.ObjectIDFromHex(req.GetUnitId())
+		return s.psychTrend4Unit(ctx, oid)
 
-		// 班主任
-		if meta.Role == enum.UserRoleClassTeacher {
-			return s.getPsychTrendClassTeacher(ctx, meta.UserId, *unitOID, pUnit)
-		}
-
-		// 单位管理员
-		userOID, err := bson.ObjectIDFromHex(meta.UserId)
-		if err != nil {
-			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UserID"))
-		}
-		boundClasses, err := s.UserMapper.GetClassTeacherBoundClasses(ctx, userOID)
-		if err != nil {
-			logs.Errorf("get class teacher bound classes error: %s", errorx.ErrorWithoutStack(err))
-			return nil, errorx.New(errno.ErrDashboardTotalUserStat)
-		}
-		if len(boundClasses) == 0 {
-			return &core_api.DashboardGetPsychTrendResp{
-				EmotionRatio: &core_api.EmotionRatio{Total: 0, Ratio: make(map[int32]int32)},
-				Risks:        make([]*core_api.RiskDistribution, 0),
-				Keywords:     &core_api.Keywords{},
-				Code:         0,
-				Msg:          "success",
-			}, nil
-		}
-	} else {
-		// 管理端 - 需要超管
-		if err := s.AuthDomain.VerifySuperAdmin(ctx, meta); err != nil {
-			return nil, err
-		}
+	case enum.UserRoleClassTeacher:
+		oid, _ := bson.ObjectIDFromHex(req.GetUnitId())
+		pUnit, _ := s.UnitMapper.FindOneById(ctx, oid)
+		return s.psychTrend4clsTch(ctx, meta.UserId, oid, pUnit)
 	}
+	return nil, errorx.New(errno.ErrUnImplement)
+}
 
-	// 风险等级分布
+// psychTrend4Admin 超管版心理趋势（全局）
+func (s *DashboardService) psychTrend4Admin(ctx context.Context) (*core_api.DashboardGetPsychTrendResp, error) {
+	return s.psychTrend(ctx, nil)
+}
+
+// psychTrend4Unit 单位管理员版心理趋势
+func (s *DashboardService) psychTrend4Unit(ctx context.Context, unitOID bson.ObjectID) (*core_api.DashboardGetPsychTrendResp, error) {
+	return s.psychTrend(ctx, &unitOID)
+}
+
+// psychTrend 超管/单位管理共用逻辑
+func (s *DashboardService) psychTrend(ctx context.Context, unitOID *bson.ObjectID) (*core_api.DashboardGetPsychTrendResp, error) {
 	rskDistrib, err := s.getRiskDistribution(ctx, unitOID)
 	if err != nil {
-		logs.Errorf("get risk distribution error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrDashboardRiskDistribution)
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardRiskDistribution)
 	}
-
-	// 关键词词云
 	keywords, err := s.getKeywords(ctx, unitOID)
 	if err != nil {
-		logs.Errorf("get keywords error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrDashboardGetUserKeywords)
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardGetUserKeywords)
 	}
-
-	// 情绪分布
 	emoRatio, err := s.getEmotionRatio(ctx, unitOID)
 	if err != nil {
-		logs.Errorf("get emotion distribution error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrDashboardAlarmUserStat)
+		return nil, errorx.WrapByCode(err, errno.ErrDashboardAlarmUserStat)
 	}
-
 	return &core_api.DashboardGetPsychTrendResp{
 		EmotionRatio: emoRatio,
 		Risks:        rskDistrib,
@@ -956,13 +786,10 @@ func (s *DashboardService) DashboardGetPsychTrend(ctx context.Context, req *core
 	}, nil
 }
 
-// getPsychTrendClassTeacher 班主任版心理趋势分析
-func (s *DashboardService) getPsychTrendClassTeacher(ctx context.Context, userId string, unitOID bson.ObjectID, pUnit *unit.Unit) (*core_api.DashboardGetPsychTrendResp, error) {
+// psychTrend4clsTch 班主任版心理趋势
+func (s *DashboardService) psychTrend4clsTch(ctx context.Context, userId string, unitOID bson.ObjectID, pUnit *unit.Unit) (*core_api.DashboardGetPsychTrendResp, error) {
 	// 获取班主任绑定的班级
-	userOID, err := bson.ObjectIDFromHex(userId)
-	if err != nil {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UserID"))
-	}
+	userOID, _ := bson.ObjectIDFromHex(userId)
 
 	boundClasses, err := s.UserMapper.GetClassTeacherBoundClasses(ctx, userOID)
 	if err != nil {
@@ -971,13 +798,7 @@ func (s *DashboardService) getPsychTrendClassTeacher(ctx context.Context, userId
 	}
 
 	if len(boundClasses) == 0 {
-		return &core_api.DashboardGetPsychTrendResp{
-			EmotionRatio: &core_api.EmotionRatio{Total: 0, Ratio: make(map[int32]int32)},
-			Risks:        make([]*core_api.RiskDistribution, 0),
-			Keywords:     &core_api.Keywords{},
-			Code:         0,
-			Msg:          "success",
-		}, nil
+		return nil, errorx.New(errno.ErrNoBoundedClass, errorx.KV("id", userId), errorx.KV("role", "classTeacher"))
 	}
 
 	// 计算班级列表
@@ -1165,8 +986,9 @@ func (s *DashboardService) getRiskDistribution(ctx context.Context, unitOID *bso
 	return res, nil
 }
 
+// DashboardListClasses 【用户管理】班级列表
 func (s *DashboardService) DashboardListClasses(ctx context.Context, req *core_api.DashboardListClassesReq) (*core_api.DashboardListClassesResp, error) {
-	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
+	meta, role, err := s.AuthDomain.IdentifyRole(ctx, req.GetUnitId())
 	if err != nil {
 		return nil, err
 	}
@@ -1176,27 +998,19 @@ func (s *DashboardService) DashboardListClasses(ctx context.Context, req *core_a
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 	}
 
-	pUnit, err := s.UnitMapper.FindOneById(ctx, unitOID)
-	if err != nil {
-		logs.Errorf("get unit error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"))
-	}
+	pUnit, _ := s.UnitMapper.FindOneById(ctx, unitOID)
 
-	// 单位管理员
-	if err := s.AuthDomain.VerifyUnitAdmin(meta, req.GetUnitId()); err == nil {
-		return s.listClassesUnit(ctx, unitOID, pUnit, req)
+	switch role {
+	case enum.UserRoleUnitAdmin:
+		return s.listCls4Unit(ctx, unitOID, pUnit, req)
+	case enum.UserRoleClassTeacher:
+		return s.listCls4ClsTch(ctx, meta.UserId, unitOID, pUnit, req)
 	}
-
-	// 班主任（精确匹配）
-	if meta.Role == enum.UserRoleClassTeacher {
-		return s.listClassesClassTeacher(ctx, meta.UserId, unitOID, pUnit, req)
-	}
-
-	return nil, errorx.New(errno.ErrInsufficientAuth)
+	return nil, errorx.New(errno.ErrInvalidRole)
 }
 
 // 单位端 - 列出班级
-func (s *DashboardService) listClassesUnit(ctx context.Context, unitOID bson.ObjectID, pUnit *unit.Unit, req *core_api.DashboardListClassesReq) (*core_api.DashboardListClassesResp, error) {
+func (s *DashboardService) listCls4Unit(ctx context.Context, unitOID bson.ObjectID, pUnit *unit.Unit, req *core_api.DashboardListClassesReq) (*core_api.DashboardListClassesResp, error) {
 	// 筛选参数
 	var grades, classes []int32
 	if req.Grade != nil {
@@ -1207,7 +1021,7 @@ func (s *DashboardService) listClassesUnit(ctx context.Context, unitOID bson.Obj
 	}
 
 	// 查询结果
-	clsStats, err := s.UserMapper.CountByClasses(ctx, unitOID, grades, classes)
+	clsStats, err := s.UserMapper.CountByClasses(ctx, unitOID, pUnit.StartGrade, grades, classes)
 	clsTeachers, err := s.UserMapper.FindUnitClassTeachers(ctx, unitOID, pUnit.StartGrade)
 	if err != nil {
 		return nil, errorx.New(errno.ErrCountUserByClasses)
@@ -1215,17 +1029,14 @@ func (s *DashboardService) listClassesUnit(ctx context.Context, unitOID bson.Obj
 
 	// 整理结果，构建响应
 	return &core_api.DashboardListClassesResp{
-		Grades: aggregateAndSort(clsStats, clsTeachers),
+		Grades: aggregateGradesAndClasses(clsStats, clsTeachers),
 	}, nil
 }
 
 // 班主任端 - 列出所带班级
-func (s *DashboardService) listClassesClassTeacher(ctx context.Context, userId string, unitOID bson.ObjectID, pUnit *unit.Unit, req *core_api.DashboardListClassesReq) (*core_api.DashboardListClassesResp, error) {
+func (s *DashboardService) listCls4ClsTch(ctx context.Context, userId string, unitOID bson.ObjectID, pUnit *unit.Unit, req *core_api.DashboardListClassesReq) (*core_api.DashboardListClassesResp, error) {
 	// 获取班主任绑定的班级
-	userOID, err := bson.ObjectIDFromHex(userId)
-	if err != nil {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UserID"))
-	}
+	userOID, _ := bson.ObjectIDFromHex(userId)
 
 	boundClasses, err := s.UserMapper.GetClassTeacherBoundClasses(ctx, userOID)
 	if err != nil {
@@ -1267,7 +1078,7 @@ func (s *DashboardService) listClassesClassTeacher(ctx context.Context, userId s
 	}
 
 	// 查询结果
-	clsStats, err := s.UserMapper.CountByClasses(ctx, unitOID, grades, classes)
+	clsStats, err := s.UserMapper.CountByClasses(ctx, unitOID, pUnit.StartGrade, grades, classes)
 	clsTeachers, err := s.UserMapper.FindUnitClassTeachers(ctx, unitOID, pUnit.StartGrade)
 	if err != nil {
 		return nil, errorx.New(errno.ErrCountUserByClasses)
@@ -1275,11 +1086,11 @@ func (s *DashboardService) listClassesClassTeacher(ctx context.Context, userId s
 
 	// 整理结果，构建响应
 	return &core_api.DashboardListClassesResp{
-		Grades: aggregateAndSort(clsStats, clsTeachers),
+		Grades: aggregateGradesAndClasses(clsStats, clsTeachers),
 	}, nil
 }
 
-func aggregateAndSort(mapperRes []*user.ClassStatResult, clsTeachers user.ClassTeachers) []*core_api.GradeInfo {
+func aggregateGradesAndClasses(mapperRes []*user.ClassStatResult, clsTeachers user.ClassTeachers) []*core_api.GradeInfo {
 	if len(mapperRes) == 0 {
 		return make([]*core_api.GradeInfo, 0)
 	}
@@ -1330,71 +1141,60 @@ func aggregateAndSort(mapperRes []*user.ClassStatResult, clsTeachers user.ClassT
 	return grades
 }
 
+// DashboardListUsers 【用户管理】列出某班级学生
 func (s *DashboardService) DashboardListUsers(ctx context.Context, req *core_api.DashboardListUsersReq) (*core_api.DashboardListUsersResp, error) {
-	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
+	meta, role, err := s.AuthDomain.IdentifyRole(ctx, req.GetUnitId())
 	if err != nil {
 		return nil, err
 	}
 
-	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
-	if err != nil {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
-	}
-
+	unitOID, _ := bson.ObjectIDFromHex(req.UnitId)
 	pUnit, err := s.UnitMapper.FindOneById(ctx, unitOID)
 	if err != nil {
 		logs.Errorf("get unit error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"))
 	}
 
-	// 单位管理员
-	if err := s.AuthDomain.VerifyUnitAdmin(meta, req.GetUnitId()); err == nil {
-		return s.listUsersUnit(ctx, unitOID, req)
+	switch role {
+	case enum.UserRoleUnitAdmin:
+		return s.listUsers4Unit(ctx, unitOID, pUnit, req)
+	case enum.UserRoleClassTeacher:
+		return s.listUsers4ClsTch(ctx, meta.UserId, unitOID, pUnit, req)
 	}
-
-	// 班主任（精确匹配）
-	if meta.Role == enum.UserRoleClassTeacher {
-		return s.listUsersClassTeacher(ctx, meta.UserId, unitOID, pUnit, req)
-	}
-
-	return nil, errorx.New(errno.ErrInsufficientAuth)
+	return nil, errorx.New(errno.ErrInvalidRole)
 }
 
 // 单位端 - 列出用户
-func (s *DashboardService) listUsersUnit(ctx context.Context, unitOID bson.ObjectID, req *core_api.DashboardListUsersReq) (*core_api.DashboardListUsersResp, error) {
-	// 查找所有用户并按风险高→低排序
-	var dbUsers []*user.User
-	var err error
-	if req.Grade != nil || req.Class != nil {
-		// 有班级筛选条件
-		dbUsers, err = s.UserMapper.FindManyByUnitIDWithFilter(ctx, unitOID, req.Grade, req.Class)
-	} else {
-		// 无班级筛选条件
-		dbUsers, err = s.UserMapper.FindAllByUnitID(ctx, unitOID)
+func (s *DashboardService) listUsers4Unit(ctx context.Context, unitOID bson.ObjectID, pUnit *unit.Unit, req *core_api.DashboardListUsersReq) (*core_api.DashboardListUsersResp, error) {
+	// 创建搜索配置
+	opts := &user.ListUserOptions{
+		UnitID:     unitOID,
+		StartGrade: pUnit.StartGrade,
+		Grade:      req.Grade,
+		Class:      req.Class,
+		Level:      req.Level,
+		Gender:     req.Gender,
+		Keyword:    req.Keyword,
+		Page:       req.PaginationOptions.GetPage(),
+		Limit:      req.PaginationOptions.GetLimit(),
 	}
+
+	dbUsers, total, err := s.UserMapper.ListUsers(ctx, opts)
 	if err != nil {
-		return nil, errorx.New(errno.ErrNotFound)
+		return nil, errorx.New(errno.ErrUserNotFound)
 	}
-	sort.Slice(dbUsers, func(i, j int) bool {
-		return dbUsers[i].RiskLevel < dbUsers[j].RiskLevel
-	})
 
-	// 分页结果
-	pg := util.PaginationRes(int32(len(dbUsers)), req.PaginationOptions)
+	pg := util.PaginationRes(int32(total), req.PaginationOptions)
+	riskUsers, err := s.completeRiskUser(ctx, dbUsers, unitOID)
 
-	// 补全响应中的riskUser
-	riskUsers, err2 := s.completeRiskUser(ctx, pg, dbUsers, unitOID)
-
-	// 返回响应
 	return &core_api.DashboardListUsersResp{
 		RiskUsers:  riskUsers,
 		Pagination: pg,
-	}, err2
+	}, err
 }
 
 // 班主任端 - 列出所带班级的学生
-func (s *DashboardService) listUsersClassTeacher(ctx context.Context, userId string, unitOID bson.ObjectID, pUnit *unit.Unit, req *core_api.DashboardListUsersReq) (*core_api.DashboardListUsersResp, error) {
-	// 获取班主任绑定的班级
+func (s *DashboardService) listUsers4ClsTch(ctx context.Context, userId string, unitOID bson.ObjectID, pUnit *unit.Unit, req *core_api.DashboardListUsersReq) (*core_api.DashboardListUsersResp, error) {
 	userOID, err := bson.ObjectIDFromHex(userId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UserID"))
@@ -1453,42 +1253,55 @@ func (s *DashboardService) listUsersClassTeacher(ctx context.Context, userId str
 		classes = filteredClasses
 	}
 
-	// 查询学生列表
-	var users []*user.User
-	if len(grades) > 0 || len(classes) > 0 {
-		users, err = s.UserMapper.FindManyByClassList(ctx, unitOID, grades, classes)
-	} else {
-		users = make([]*user.User, 0)
+	if len(grades) == 0 {
+		page := int64(1)
+		if req.PaginationOptions.Page != nil {
+			page = *req.PaginationOptions.Page
+		}
+		limit := int64(20)
+		if req.PaginationOptions.Limit != nil {
+			limit = *req.PaginationOptions.Limit
+		}
+		return &core_api.DashboardListUsersResp{
+			RiskUsers: make([]*core_api.RiskUser, 0),
+			Pagination: &basic.Pagination{
+				Total:   0,
+				Page:    page,
+				Limit:   limit,
+				HasNext: false,
+			},
+		}, nil
 	}
+
+	opts := &user.ListUserOptions{
+		UnitID:     unitOID,
+		StartGrade: pUnit.StartGrade,
+		Grades:     grades,
+		Classes:    classes,
+		Level:      req.Level,
+		Gender:     req.Gender,
+		Keyword:    req.Keyword,
+		Page:       req.PaginationOptions.GetPage(),
+		Limit:      req.PaginationOptions.GetLimit(),
+	}
+
+	dbUsers, total, err := s.UserMapper.ListUsers(ctx, opts)
 	if err != nil {
 		return nil, errorx.New(errno.ErrNotFound)
 	}
-	sort.Slice(users, func(i, j int) bool {
-		return users[i].RiskLevel < users[j].RiskLevel
-	})
 
-	// 分页结果
-	pg := util.PaginationRes(int32(len(users)), req.PaginationOptions)
+	pg := util.PaginationRes(int32(total), req.PaginationOptions)
+	riskUsers, err := s.completeRiskUser(ctx, dbUsers, unitOID)
 
-	// 补全响应中的 riskUser
-	riskUsers, err2 := s.completeRiskUser(ctx, pg, users, unitOID)
-
-	// 返回响应
 	return &core_api.DashboardListUsersResp{
 		RiskUsers:  riskUsers,
 		Pagination: pg,
-	}, err2
+	}, err
 }
 
-func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagination, dbUsers []*user.User, unitID bson.ObjectID) ([]*core_api.RiskUser, error) {
-	if pg.Total == 0 {
+func (s *DashboardService) completeRiskUser(ctx context.Context, dbUsers []*user.User, unitID bson.ObjectID) ([]*core_api.RiskUser, error) {
+	if len(dbUsers) == 0 {
 		return make([]*core_api.RiskUser, 0), nil
-	}
-
-	start := (pg.GetPage() - 1) * pg.GetLimit()
-	end := min(start+pg.GetLimit()-1, pg.Total-1)
-	if start > end || end > pg.Total-1 {
-		return make([]*core_api.RiskUser, 0), errorx.New(errno.ErrInternalError)
 	}
 
 	unitDAO, err := s.UnitMapper.FindOneById(ctx, unitID)
@@ -1496,14 +1309,11 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 		return nil, errorx.WrapByCode(err, errno.ErrInternalError)
 	}
 
-	// 提取分页所需的dbUser切片和uid切片
-	targetUsers := dbUsers[start : end+1]
-	uids := make([]bson.ObjectID, end-start+1)
-	for i, dbUser := range targetUsers {
+	uids := make([]bson.ObjectID, len(dbUsers))
+	for i, dbUser := range dbUsers {
 		uids[i] = dbUser.ID
 	}
 
-	// 补全dbUser相关信息
 	var msgStats map[bson.ObjectID]*conversation.ConvStats
 	var keyWords map[bson.ObjectID][]string
 	var msgErr, kwErr error
@@ -1511,7 +1321,6 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	// 获取对话统计信息
 	go func() {
 		defer wg.Done()
 		msgStats, msgErr = s.ConversationMapper.BatchConvStats(ctx, uids)
@@ -1520,7 +1329,6 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 		}
 	}()
 
-	// 获取keywords
 	go func() {
 		defer wg.Done()
 		keyWords, kwErr = s.ReportMapper.BatchGetUserKeyWords(ctx, uids)
@@ -1538,9 +1346,8 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 		return nil, errorx.New(errno.ErrDashboardGetUserConversationStatic)
 	}
 
-	// 构建响应列表
-	riskUsers := make([]*core_api.RiskUser, end-start+1)
-	for i, dbUser := range targetUsers {
+	riskUsers := make([]*core_api.RiskUser, len(dbUsers))
+	for i, dbUser := range dbUsers {
 		remark := &core_api.Remark{
 			Time:    dbUser.Remark.CreateTime.Unix(),
 			Content: dbUser.Remark.Content,
@@ -1571,8 +1378,9 @@ func (s *DashboardService) completeRiskUser(ctx context.Context, pg *basic.Pagin
 	return riskUsers, nil
 }
 
+// DashboardCreateRemark 添加备注
 func (s *DashboardService) DashboardCreateRemark(ctx context.Context, req *core_api.DashboardCreateRemarkReq) (*core_api.DashboardCreateRemarkResp, error) {
-	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
+	meta, role, err := s.AuthDomain.IdentifyRole(ctx, req.GetUnitId())
 	if err != nil {
 		return nil, err
 	}
@@ -1587,20 +1395,16 @@ func (s *DashboardService) DashboardCreateRemark(ctx context.Context, req *core_
 		return nil, err
 	}
 
-	// 单位管理员
-	if err := s.AuthDomain.VerifyUnitAdmin(meta, req.GetUnitId()); err == nil {
-		return s.dashboardCreateRemarkUnit(ctx, userOID, req)
+	switch role {
+	case enum.UserRoleUnitAdmin:
+		return s.remarkFromUnit(ctx, userOID, req)
+	case enum.UserRoleClassTeacher:
+		return s.remarkFromClsTch(ctx, meta.UserId, userOID, u, req)
 	}
-
-	// 班主任（精确匹配）
-	if meta.Role == enum.UserRoleClassTeacher {
-		return s.dashboardCreateRemarkClassTeacher(ctx, meta.UserId, userOID, u, req)
-	}
-
 	return nil, errorx.New(errno.ErrInsufficientAuth)
 }
 
-func (s *DashboardService) dashboardCreateRemarkUnit(ctx context.Context, userOID bson.ObjectID, req *core_api.DashboardCreateRemarkReq) (*core_api.DashboardCreateRemarkResp, error) {
+func (s *DashboardService) remarkFromUnit(ctx context.Context, userOID bson.ObjectID, req *core_api.DashboardCreateRemarkReq) (*core_api.DashboardCreateRemarkResp, error) {
 	update := bson.M{
 		cst.Remark: &user.Remark{
 			Content:    req.GetRemark(),
@@ -1618,7 +1422,7 @@ func (s *DashboardService) dashboardCreateRemarkUnit(ctx context.Context, userOI
 	}, nil
 }
 
-func (s *DashboardService) dashboardCreateRemarkClassTeacher(ctx context.Context, teacherId string, userOID bson.ObjectID, targetUser *user.User, req *core_api.DashboardCreateRemarkReq) (*core_api.DashboardCreateRemarkResp, error) {
+func (s *DashboardService) remarkFromClsTch(ctx context.Context, teacherId string, userOID bson.ObjectID, targetUser *user.User, req *core_api.DashboardCreateRemarkReq) (*core_api.DashboardCreateRemarkResp, error) {
 	// 校验归属
 	teacherOID, _ := bson.ObjectIDFromHex(teacherId)
 	authorized, err := s.isStudentInTeacherClasses(ctx, teacherOID, targetUser)
@@ -1626,15 +1430,11 @@ func (s *DashboardService) dashboardCreateRemarkClassTeacher(ctx context.Context
 		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
-	return s.dashboardCreateRemarkUnit(ctx, userOID, req)
+	return s.remarkFromUnit(ctx, userOID, req)
 }
 
+// DashboardUserConvRecords 获取某用户对话记录
 func (s *DashboardService) DashboardUserConvRecords(ctx context.Context, req *core_api.DashboardUserConvRecordsReq) (*core_api.DashboardUserConvRecordsResp, error) {
-	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	userOID, err := bson.ObjectIDFromHex(req.UserId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UserID"), errorx.KV("value", "用户ID"))
@@ -1646,16 +1446,17 @@ func (s *DashboardService) DashboardUserConvRecords(ctx context.Context, req *co
 		return nil, errorx.New(errno.ErrDashboardGetUserInfo)
 	}
 
-	// 单位管理员
-	if err := s.AuthDomain.VerifyUnitAdmin(meta, targetUser.UnitID.Hex()); err == nil {
-		return s.dashboardUserConvRecordsUnit(ctx, userOID, targetUser, req)
+	meta, role, err := s.AuthDomain.IdentifyRole(ctx, targetUser.UnitID.Hex())
+	if err != nil {
+		return nil, err
 	}
 
-	// 班主任（精确匹配）
-	if meta.Role == enum.UserRoleClassTeacher {
+	switch role {
+	case enum.UserRoleUnitAdmin:
+		return s.dashboardUserConvRecordsUnit(ctx, userOID, targetUser, req)
+	case enum.UserRoleClassTeacher:
 		return s.dashboardUserConvRecordsClassTeacher(ctx, meta.UserId, userOID, targetUser, req)
 	}
-
 	return nil, errorx.New(errno.ErrInsufficientAuth)
 }
 
@@ -1857,11 +1658,6 @@ func (s *DashboardService) getPagedUserConvs(ctx context.Context, userOID bson.O
 }
 
 func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error) {
-	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	convOID, err := bson.ObjectIDFromHex(req.ConversationId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "ConversationId"), errorx.KV("value", "对话ID"))
@@ -1878,16 +1674,17 @@ func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api
 		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "用户"))
 	}
 
-	// 单位管理员
-	if err := s.AuthDomain.VerifyUnitAdmin(meta, usr.UnitID.Hex()); err == nil {
-		return s.dashboardGetReportUnit(ctx, convOID, req)
+	meta, role, err := s.AuthDomain.IdentifyRole(ctx, usr.UnitID.Hex())
+	if err != nil {
+		return nil, err
 	}
 
-	// 班主任（精确匹配）
-	if meta.Role == enum.UserRoleClassTeacher {
+	switch role {
+	case enum.UserRoleUnitAdmin:
+		return s.dashboardGetReportUnit(ctx, convOID, req)
+	case enum.UserRoleClassTeacher:
 		return s.dashboardGetReportClassTeacher(ctx, meta.UserId, convOID, usr, req)
 	}
-
 	return nil, errorx.New(errno.ErrInsufficientAuth)
 }
 
@@ -1932,45 +1729,35 @@ func (s *DashboardService) dashboardGetReportClassTeacher(ctx context.Context, t
 }
 
 func (s *DashboardService) DashboardUnitConvRecords(ctx context.Context, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error) {
-	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
+	meta, role, err := s.AuthDomain.IdentifyRole(ctx, req.GetUnitId())
 	if err != nil {
 		return nil, err
 	}
 
-	unitIdStr := req.GetUnitId()
-	if unitIdStr != "" {
+	switch role {
+	case enum.UserRoleSuperAdmin:
+		return s.getAllUnitsConvs(ctx, req)
+
+	case enum.UserRoleUnitAdmin:
+		return s.getOneUnitConvs(ctx, req)
+
+	case enum.UserRoleClassTeacher:
+		unitIdStr := req.GetUnitId()
 		unitOID, err := bson.ObjectIDFromHex(unitIdStr)
 		if err != nil {
 			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位 ID"))
 		}
-
 		pUnit, err := s.UnitMapper.FindOneById(ctx, unitOID)
 		if err != nil {
 			logs.Errorf("get unit error: %s", errorx.ErrorWithoutStack(err))
 			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"))
 		}
-
-		// 单位管理员
-		if err := s.AuthDomain.VerifyUnitAdmin(meta, unitIdStr); err == nil {
-			return s.getOneUnitConvs(ctx, req)
+		if meta.UnitId != "" && meta.UnitId != unitIdStr {
+			return nil, errorx.New(errno.ErrInsufficientAuth)
 		}
-
-		// 班主任（精确匹配）
-		if meta.Role == enum.UserRoleClassTeacher {
-			if meta.UnitId != "" && meta.UnitId != unitIdStr {
-				return nil, errorx.New(errno.ErrInsufficientAuth)
-			}
-			return s.getClassTeacherConvs(ctx, meta.UserId, unitOID, pUnit, req)
-		}
-
-		return nil, errorx.New(errno.ErrInsufficientAuth)
+		return s.getClassTeacherConvs(ctx, meta.UserId, unitOID, pUnit, req)
 	}
-
-	// 管理端 (无 unitId) - 需要超管
-	if err := s.AuthDomain.VerifySuperAdmin(ctx, meta); err != nil {
-		return nil, err
-	}
-	return s.getAllUnitsConvs(ctx, req)
+	return nil, errorx.New(errno.ErrInsufficientAuth)
 }
 
 func (s *DashboardService) isStudentInTeacherClasses(ctx context.Context, teacherOID bson.ObjectID, targetUser *user.User) (bool, error) {

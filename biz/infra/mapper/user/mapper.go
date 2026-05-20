@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/conf"
@@ -39,11 +40,13 @@ type IMongoMapper interface {
 	FindAllByUnitID(ctx context.Context, unitId bson.ObjectID) ([]*User, error)
 	FindManyByUnitIDWithFilter(ctx context.Context, unitId bson.ObjectID, grade, class *int32) ([]*User, error)
 	BatchFindByIDs(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*User, error)
-	CountByClasses(ctx context.Context, unitId bson.ObjectID, grade, class []int32) ([]*ClassStatResult, error)
+	CountByClasses(ctx context.Context, unitId bson.ObjectID, startGrade int, grade, class []int32) ([]*ClassStatResult, error)
 	RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID) ([]*RiskStat, error)
 	FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID, startGrade int) (ClassTeachers, error)
 	ExistsClassTeacher(ctx context.Context, unitId bson.ObjectID, grade, class int) (bool, error)
 	ExistsByCode(ctx context.Context, code string) (bool, error)
+	CountHighRiskByGrade(ctx context.Context, unitId bson.ObjectID, startGrade int) (map[int32]int32, int32, error)
+	CountHighRiskByGradeAndClasses(ctx context.Context, startGrade int, enrollYears, classes []int32) (map[int32]int32, int32, error)
 
 	GetClassTeacherBoundClasses(ctx context.Context, userId bson.ObjectID) ([]ClassInfo, error)
 	CountStudentsByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) (int32, error)
@@ -51,6 +54,22 @@ type IMongoMapper interface {
 	CountHighRiskStudentsByClassList(ctx context.Context, grades, classes []int32, start, end time.Time) (int32, error)
 	FindManyByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) ([]*User, error)
 	GetRiskDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) ([]*RiskStat, error)
+	ListUsers(ctx context.Context, opts *ListUserOptions) ([]*User, int64, error)
+}
+
+// ListUserOptions 用户列表查询选项
+type ListUserOptions struct {
+	UnitID     bson.ObjectID
+	StartGrade int     // unit.StartGrade, 用于动态计算 grade
+	Grade      *int32  // 单值精确匹配
+	Class      *int32  // 单值精确匹配
+	Grades     []int32 // 多值 $in 匹配（班主任端）
+	Classes    []int32 // 多值 $in 匹配（班主任端）
+	Level      *int32
+	Gender     *int32
+	Keyword    *string // 模糊匹配 name / code / report keywords
+	Page       int64
+	Limit      int64
 }
 
 type mongoMapper struct {
@@ -231,46 +250,57 @@ type ClassStatResult struct {
 }
 
 // CountByClasses 统计各班级学生人数
-func (m *mongoMapper) CountByClasses(ctx context.Context, unitId bson.ObjectID, grade, class []int32) ([]*ClassStatResult, error) {
+func (m *mongoMapper) CountByClasses(ctx context.Context, unitId bson.ObjectID, startGrade int, grade, class []int32) ([]*ClassStatResult, error) {
 	match := bson.M{
 		cst.UnitID: unitId,
 		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
 		cst.Role:   enum.UserRoleStudent,
 	}
-	// 添加筛选条件
-	if len(grade) > 0 {
-		match[cst.Grade] = bson.M{"$in": grade}
-	}
-	if len(class) > 0 {
-		match[cst.Class] = bson.M{"$in": class}
-	}
 
 	// 聚合管道
 	pipeline := []bson.M{
-		// match
+		// 先匹配 unit 级别条件
 		{"$match": match},
-		// group
-		{
+		// 从 enroll_year 动态计算 grade
+		{"$addFields": bson.M{
+			cst.Grade: util.GradeExpr(startGrade),
+		}},
+	}
+
+	// 在计算字段后再添加 grade/class 筛选
+	computedMatch := bson.M{}
+	if len(grade) > 0 {
+		computedMatch[cst.Grade] = bson.M{"$in": grade}
+	}
+	if len(class) > 0 {
+		computedMatch[cst.Class] = bson.M{"$in": class}
+	}
+	if len(computedMatch) > 0 {
+		pipeline = append(pipeline, bson.M{"$match": computedMatch})
+	}
+
+	// group + sort
+	pipeline = append(pipeline,
+		bson.M{
 			"$group": bson.M{
 				cst.ID:    bson.M{cst.Grade: "$" + cst.Grade, cst.Class: "$" + cst.Class},
-				"userNum": bson.M{"$sum": 1}, // 总人数
-				"alarmNum": bson.M{ // 风险人数
+				"userNum": bson.M{"$sum": 1},
+				"alarmNum": bson.M{
 					"$sum": bson.M{
 						"$cond": bson.M{
 							"if": bson.M{"$in": bson.A{
 								"$" + cst.RiskLevel,
 								bson.A{enum.UserRiskLevelHigh, enum.UserRiskLevelMedium, enum.UserRiskLevelLow},
 							}},
-							"then": 1, // RiskLevel ≠ "normal"则认为是风险用户 计数+1
+							"then": 1,
 							"else": 0,
 						},
 					},
 				},
 			},
 		},
-		// sort
-		{"$sort": bson.M{"_id.grade": 1, "_id.class": 1}},
-	}
+		bson.M{"$sort": bson.M{"_id.grade": 1, "_id.class": 1}},
+	)
 
 	var results []*ClassStatResult
 	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
@@ -281,7 +311,104 @@ func (m *mongoMapper) CountByClasses(ctx context.Context, unitId bson.ObjectID, 
 	return results, nil
 }
 
-// RiskStat “风险等级和性别->数量”的映射
+// CountHighRiskByGrade 统计各年级高风险用户数
+func (m *mongoMapper) CountHighRiskByGrade(ctx context.Context, unitId bson.ObjectID, startGrade int) (map[int32]int32, int32, error) {
+	pipeline := []bson.M{
+		{"$match": bson.M{
+			cst.UnitID: unitId,
+			cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+			cst.Role:   enum.UserRoleStudent,
+		}},
+		{"$addFields": bson.M{
+			cst.Grade: util.GradeExpr(startGrade),
+		}},
+		{"$match": bson.M{
+			cst.RiskLevel: bson.M{cst.In: bson.A{
+				enum.UserRiskLevelHigh, enum.UserRiskLevelMedium, enum.UserRiskLevelLow,
+			}},
+		}},
+		{"$group": bson.M{
+			"_id":   "$" + cst.Grade,
+			"count": bson.M{"$sum": 1},
+		}},
+	}
+
+	var results []struct {
+		Grade int32 `bson:"_id"`
+		Count int32 `bson:"count"`
+	}
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
+		logs.Errorf("[user mapper] count high risk by grade err:%s", errorx.ErrorWithoutStack(err))
+		return nil, 0, err
+	}
+
+	dist := make(map[int32]int32, len(results))
+	var total int32
+	for _, r := range results {
+		dist[r.Grade] = r.Count
+		total += r.Count
+	}
+	return dist, total, nil
+}
+
+// CountHighRiskByGradeAndClasses 按班级列表统计各年级高风险用户数
+func (m *mongoMapper) CountHighRiskByGradeAndClasses(ctx context.Context, startGrade int, enrollYears, classes []int32) (map[int32]int32, int32, error) {
+	if len(enrollYears) == 0 && len(classes) == 0 {
+		return make(map[int32]int32), 0, nil
+	}
+
+	// 构建 enroll_year + class 的 or 条件
+	orFilters := make([]bson.M, 0, len(enrollYears))
+	for _, ey := range enrollYears {
+		orFilters = append(orFilters, bson.M{cst.EnrollYear: int(ey)})
+	}
+
+	userFilter := bson.M{
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+		cst.Role:   enum.UserRoleStudent,
+	}
+	if len(orFilters) > 0 {
+		userFilter[cst.Or] = orFilters
+	}
+	if len(classes) > 0 {
+		userFilter[cst.Class] = bson.M{cst.In: classes}
+	}
+
+	pipeline := []bson.M{
+		{"$match": userFilter},
+		{"$addFields": bson.M{
+			cst.Grade: util.GradeExpr(startGrade),
+		}},
+		{"$match": bson.M{
+			cst.RiskLevel: bson.M{cst.In: bson.A{
+				enum.UserRiskLevelHigh, enum.UserRiskLevelMedium, enum.UserRiskLevelLow,
+			}},
+		}},
+		{"$group": bson.M{
+			"_id":   "$" + cst.Grade,
+			"count": bson.M{"$sum": 1},
+		}},
+	}
+
+	var results []struct {
+		Grade int32 `bson:"_id"`
+		Count int32 `bson:"count"`
+	}
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
+		logs.Errorf("[user mapper] count high risk by grade and classes err:%s", errorx.ErrorWithoutStack(err))
+		return nil, 0, err
+	}
+
+	dist := make(map[int32]int32, len(results))
+	var total int32
+	for _, r := range results {
+		dist[r.Grade] = r.Count
+		total += r.Count
+	}
+	return dist, total, nil
+}
+
+// RiskStat "风险等级和性别->数量"的映射
 type RiskStat struct {
 	Level  int32 `bson:"level" json:"level"`
 	Gender int32 `bson:"gender" json:"gender"`
@@ -573,4 +700,177 @@ func (m *mongoMapper) GetRiskDistributionByClassList(ctx context.Context, unitId
 	}
 
 	return results, nil
+}
+
+// listUserResult 聚合查询结果，嵌入 User 并携带计算字段
+type listUserResult struct {
+	User            `bson:",inline"`
+	CalculatedGrade int                `bson:"calculatedGrade"`
+	LatestKeywords  map[string]float64 `bson:"latestKeywords"`
+}
+
+// ListUsers 带筛选/排序/分页的用户列表查询（聚合管道）
+func (m *mongoMapper) ListUsers(ctx context.Context, opts *ListUserOptions) ([]*User, int64, error) {
+	page := opts.Page
+	if page < 1 {
+		page = 1
+	}
+	limit := opts.Limit
+	if limit < 1 {
+		limit = 10
+	}
+
+	// ----- $match: 基础过滤 -----
+	match := bson.M{
+		cst.UnitID: opts.UnitID,
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+		cst.Role:   enum.UserRoleStudent,
+	}
+	if opts.Level != nil {
+		match[cst.RiskLevel] = *opts.Level
+	}
+	if opts.Gender != nil {
+		match[cst.Gender] = *opts.Gender
+	}
+
+	// ----- $addFields: 动态计算 grade -----
+	addFieldsStage := bson.M{
+		"$addFields": bson.M{
+			"calculatedGrade": util.GradeExpr(opts.StartGrade),
+		},
+	}
+
+	// ----- $match: grade / class 筛选（基于计算字段或原始字段） -----
+	gradeClassMatch := bson.M{}
+	if opts.Grade != nil {
+		gradeClassMatch["calculatedGrade"] = *opts.Grade
+	}
+	if opts.Class != nil {
+		gradeClassMatch[cst.Class] = *opts.Class
+	}
+	if len(opts.Grades) > 0 {
+		gradeClassMatch["calculatedGrade"] = bson.M{cst.In: opts.Grades}
+	}
+	if len(opts.Classes) > 0 {
+		gradeClassMatch[cst.Class] = bson.M{cst.In: opts.Classes}
+	}
+
+	// ----- $lookup: 关联 report 集合（只查成功的 report） -----
+	lookupStage := bson.M{
+		"$lookup": bson.M{
+			"from": "report",
+			"let":  bson.M{"uid": "$" + cst.ID},
+			"pipeline": []bson.M{
+				{"$match": bson.M{
+					"$expr":  bson.M{"$eq": bson.A{"$" + cst.UserID, "$$uid"}},
+					"status": 2, // ReportStatusSuccess
+				}},
+				{"$sort": bson.M{"end": -1}},
+				{"$limit": 1},
+				{"$project": bson.M{cst.Keywords: 1}},
+			},
+			"as": "latestReport",
+		},
+	}
+
+	// ----- $set: 提取 keywords -----
+	setStage := bson.M{
+		"$set": bson.M{
+			"latestKeywords": bson.M{
+				"$ifNull": bson.A{
+					bson.M{"$first": "$latestReport." + cst.Keywords},
+					bson.M{},
+				},
+			},
+		},
+	}
+
+	// ----- $match: keyword 模糊搜索 -----
+	var keywordMatch bson.M
+	if opts.Keyword != nil && *opts.Keyword != "" {
+		escaped := escapeRegex(*opts.Keyword)
+		keywordMatch = bson.M{"$match": bson.M{
+			"$expr": bson.M{"$or": []bson.M{
+				{"$regexMatch": bson.M{"input": "$" + cst.Name, "regex": escaped, "options": "i"}},
+				{"$regexMatch": bson.M{"input": "$" + cst.Code, "regex": escaped, "options": "i"}},
+				{"$gt": bson.A{
+					bson.M{"$size": bson.M{
+						"$filter": bson.M{
+							"input": bson.M{"$objectToArray": "$latestKeywords"},
+							"as":    "kw",
+							"cond":  bson.M{"$regexMatch": bson.M{"input": "$$kw.k", "regex": escaped, "options": "i"}},
+						},
+					}},
+					0,
+				}},
+			}},
+		}}
+	}
+
+	// ----- $facet: data + count -----
+	skip := (page - 1) * limit
+	sortStage := bson.M{"$sort": bson.M{cst.RiskLevel: 1, cst.CreateTime: -1}}
+	facetData := []bson.M{sortStage, {"$skip": skip}, {"$limit": limit}}
+	facetCount := []bson.M{{"$count": "total"}}
+
+	// ----- 组装完整 pipeline -----
+	pipeline := []bson.M{
+		{"$match": match},
+		addFieldsStage,
+	}
+	if len(gradeClassMatch) > 0 {
+		pipeline = append(pipeline, bson.M{"$match": gradeClassMatch})
+	}
+	pipeline = append(pipeline, lookupStage, setStage)
+	if keywordMatch != nil {
+		pipeline = append(pipeline, keywordMatch)
+	}
+	// 清理临时字段
+	pipeline = append(pipeline, bson.M{"$project": bson.M{"latestReport": 0, "latestKeywords": 0}})
+	pipeline = append(pipeline, bson.M{"$facet": bson.M{
+		"data":  facetData,
+		"count": facetCount,
+	}})
+
+	var aggResult []struct {
+		Data  []*listUserResult `bson:"data"`
+		Count []struct {
+			Total int64 `bson:"total"`
+		} `bson:"count"`
+	}
+	if err := m.conn.Aggregate(ctx, &aggResult, pipeline); err != nil {
+		logs.Errorf("[user mapper] ListUsers aggregate err: %s", errorx.ErrorWithoutStack(err))
+		return nil, 0, err
+	}
+	if len(aggResult) == 0 {
+		return make([]*User, 0), 0, nil
+	}
+
+	result := aggResult[0]
+	var total int64
+	if len(result.Count) > 0 {
+		total = result.Count[0].Total
+	}
+
+	users := make([]*User, len(result.Data))
+	for i, r := range result.Data {
+		u := r.User
+		users[i] = &u
+	}
+
+	return users, total, nil
+}
+
+// escapeRegex 转义 MongoDB regex 特殊字符，基础防注入
+func escapeRegex(s string) string {
+	var b strings.Builder
+	b.Grow(len(s) * 2)
+	for _, c := range s {
+		switch c {
+		case '\\', '.', '*', '+', '?', '^', '$', '{', '}', '(', ')', '|', '[', ']', '-':
+			b.WriteByte('\\')
+		}
+		b.WriteRune(c)
+	}
+	return b.String()
 }

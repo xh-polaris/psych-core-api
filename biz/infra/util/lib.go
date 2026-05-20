@@ -6,7 +6,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"runtime"
+	"sort"
 )
 
 func Convert[T any](in any) (out T, ok bool) {
@@ -74,15 +76,15 @@ func CallerInfo(skip int) string {
 	return fmt.Sprintf("%s:%d %s", file, line, fn.Name())
 }
 
-// CalculateChange 计算统计数据变化率
+// CalculateChange 计算统计数据变化率（保留2位小数）
 func CalculateChange(current, lastWeek float64) float64 {
 	if lastWeek == 0 {
 		if current == 0 {
 			return 0
 		}
-		return 100.0 // 上周为0，本周有数据，增长100%
+		return 100.00 // 上周为0，本周有数据，增长100%
 	}
-	return ((current - lastWeek) / lastWeek) * 100
+	return Round2(((current - lastWeek) / lastWeek) * 100)
 }
 
 // KeywordsMap2Slice 转换得到关键词列表
@@ -92,4 +94,55 @@ func KeywordsMap2Slice[V any](m map[string]V) []string {
 		s = append(s, k)
 	}
 	return s
+}
+
+// Wow 周环比辅助，cur 为本期值，prev 为上期值
+type Wow struct{ Cur, Prev int32 }
+
+func (w Wow) Inc() int32    { return w.Cur - w.Prev }
+func (w Wow) Rate() float64 { return Rate(w.Cur, w.Prev) }
+
+// Rate 计算增长率 (cur - prev) / prev
+func Rate(cur, prev int32) float64 {
+	if prev > 0 {
+		return Round2(float64(cur-prev) / float64(prev))
+	}
+	return 0
+}
+
+// Round2 四舍五入到小数点后两位
+func Round2(f float64) float64 { return math.Round(f*100) / 100 }
+
+// Int32Ptr 返回 int32 指针
+func Int32Ptr(v int32) *int32 { return &v }
+
+// Float64Ptr 返回 float64 指针
+func Float64Ptr(v float64) *float64 { return &v }
+
+// RiskDistributionCnt2Ratio 将各年级风险用户数转为百分比（凑整，最后一项用 100-sum 保证总和为 100）
+func RiskDistributionCnt2Ratio(cntMap map[int32]int32, total int32) map[int32]int32 {
+	if total <= 0 || len(cntMap) == 0 {
+		return make(map[int32]int32, len(cntMap))
+	}
+
+	// 按 key 排序保证最后一项确定
+	keys := make([]int32, 0, len(cntMap))
+	for k := range cntMap {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+
+	ratio := make(map[int32]int32, len(cntMap))
+	var sum int32
+	last := keys[len(keys)-1]
+	for _, k := range keys {
+		if k == last {
+			ratio[k] = 100 - sum
+		} else {
+			r := (cntMap[k] * 100) / total
+			ratio[k] = r
+			sum += r
+		}
+	}
+	return ratio
 }

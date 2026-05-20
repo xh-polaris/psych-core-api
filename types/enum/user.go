@@ -23,6 +23,14 @@ const (
 	UserRoleSuperAdmin   = 5
 )
 
+var UserRoleI2S = map[int32]string{
+	UserRoleStudent:      "Student",
+	UserRoleTeacher:      "Teacher",
+	UserRoleClassTeacher: "ClassTeacher",
+	UserRoleUnitAdmin:    "UnitAdmin",
+	UserRoleSuperAdmin:   "SuperAdmin",
+}
+
 // UserRiskLevel
 const (
 	UserRiskLevelHigh   = 1

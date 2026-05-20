@@ -50,7 +50,7 @@ var AlarmServiceSet = wire.NewSet(
 )
 
 func (s *AlarmService) Overview(ctx context.Context, req *core_api.DashboardGetAlarmOverviewReq) (resp *core_api.DashboardGetAlarmOverviewResp, err error) {
-	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
+	meta, role, err := s.AuthDomain.IdentifyRole(ctx, req.UnitId)
 	if err != nil {
 		return nil, err
 	}
@@ -62,20 +62,11 @@ func (s *AlarmService) Overview(ctx context.Context, req *core_api.DashboardGetA
 			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 		}
 		unitOID = id
+	}
 
-		// 班主任（精确匹配）
-		if meta.Role == enum.UserRoleClassTeacher {
-			return s.getAlarmOverviewClassTeacher(ctx, meta.UserId, unitOID)
-		}
-		// 单位管理员
-		if err := s.AuthDomain.VerifyUnitAdmin(meta, req.UnitId); err != nil {
-			return nil, err
-		}
-	} else {
-		// 管理端 - 需要超管
-		if err := s.AuthDomain.VerifySuperAdmin(ctx, meta); err != nil {
-			return nil, err
-		}
+	// 班主任提前返回
+	if role == enum.UserRoleClassTeacher {
+		return s.getAlarmOverviewClassTeacher(ctx, meta.UserId, unitOID)
 	}
 
 	st, err := s.AlarmMapper.AggregateStats(ctx, unitOID, time.Time{}, time.Time{})
@@ -99,7 +90,7 @@ func (s *AlarmService) Overview(ctx context.Context, req *core_api.DashboardGetA
 }
 
 func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardListAlarmRecordsReq) (resp *core_api.DashboardListAlarmRecordsResp, err error) {
-	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
+	meta, role, err := s.AuthDomain.IdentifyRole(ctx, req.UnitId)
 	if err != nil {
 		return nil, err
 	}
@@ -111,30 +102,21 @@ func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardL
 			return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 		}
 		unitOID = id
-	} else {
-		// 管理端 - 需要超管
-		if err := s.AuthDomain.VerifySuperAdmin(ctx, meta); err != nil {
-			return nil, err
-		}
 	}
 
 	filter := bson.M{
 		cst.UnitID: unitOID,
 	}
 
-	if req.UnitId != "" {
-		// 班主任（精确匹配）
-		if meta.Role == enum.UserRoleClassTeacher {
-			grades, classes, err := s.getClassTeacherGradesClasses(ctx, meta.UserId)
-			if err != nil {
-				return nil, err
-			}
-			if len(grades) > 0 {
-				filter[cst.Grade] = bson.M{"$in": grades}
-				filter[cst.Class] = bson.M{"$in": classes}
-			}
-		} else if err := s.AuthDomain.VerifyUnitAdmin(meta, req.UnitId); err != nil {
+	// 班主任添加班级筛选
+	if req.UnitId != "" && role == enum.UserRoleClassTeacher {
+		grades, classes, err := s.getClassTeacherGradesClasses(ctx, meta.UserId)
+		if err != nil {
 			return nil, err
+		}
+		if len(grades) > 0 {
+			filter[cst.Grade] = bson.M{"$in": grades}
+			filter[cst.Class] = bson.M{"$in": classes}
 		}
 	}
 	if req.Emotion != nil {
@@ -285,11 +267,6 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 }
 
 func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardUpdateAlarmReq) (resp *core_api.DashboardUpdateAlarmResp, err error) {
-	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	if req.Alarm == nil {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "预警信息"))
 	}
@@ -305,7 +282,8 @@ func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardU
 		logs.Errorf("find alarm error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrNotFound)
 	}
-	if err := s.AuthDomain.VerifyUnitAdmin(meta, oldAlarm.UnitID.Hex()); err != nil {
+
+	if _, _, err := s.AuthDomain.IdentifyRole(ctx, oldAlarm.UnitID.Hex()); err != nil {
 		return nil, err
 	}
 

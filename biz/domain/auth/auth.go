@@ -5,10 +5,12 @@ import (
 
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/httpx"
+	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/enum"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -16,44 +18,30 @@ import (
 
 var _ IAuthDomain = (*AuthDomain)(nil)
 
-// IAuthDomain 鉴权领域接口
+// IAuthDomain 鉴权域
+// 返回的错误直接透传
 type IAuthDomain interface {
 	// ExtraUserMeta 从 ctx 提取 JWT 中的用户信息
 	ExtraUserMeta(ctx context.Context) (*Meta, error)
+
+	// IdentifyRole 根据请求上下文确定操作者角色，返回 enum.UserRole 值
+	// - unitId 为空：要求超管（JWT + DB 双重校验）
+	// - unitId 非空：返回 UserRoleUnitAdmin 或 UserRoleClassTeacher
+	IdentifyRole(ctx context.Context, unitId string) (*Meta, int, error)
+
 	// VerifySuperAdmin 校验超管权限（JWT role + DB role 双重校验）
 	VerifySuperAdmin(ctx context.Context, meta *Meta) error
+
 	// VerifyUnitAdmin 校验单位管理员权限（含超管）
 	VerifyUnitAdmin(meta *Meta, unitId string) error
+
 	// VerifyClassTeacher 校验班主任权限
 	VerifyClassTeacher(meta *Meta) error
 }
 
-// Meta 是jwt的claim负载，包含用户基础信息和权限等级
-type Meta struct {
-	UserId string `json:"userId"`
-	UnitId string `json:"unitId;omitempty"`
-	Code   string `json:"code;omitempty"`
-	Role   int    `json:"role"` // 权限等级 (学生用户、老师、班主任、单位管理、超管)
-}
-
-func (m *Meta) HasUnitAdminAuth(unitId string) bool {
-	return m.Role >= enum.UserRoleSuperAdmin || (m.Role == enum.UserRoleUnitAdmin && m.UnitId == unitId)
-}
-
-func (m *Meta) HasSuperAdminAuth() bool {
-	return m.Role >= enum.UserRoleSuperAdmin
-}
-
-func (m *Meta) HasClassTeacherAuth() bool {
-	return m.Role >= enum.UserRoleClassTeacher
-}
-
-func (m *Meta) HasTeacherAuth() bool {
-	return m.Role >= enum.UserRoleTeacher
-}
-
 type AuthDomain struct {
 	UserMapper user.IMongoMapper
+	UnitMapper unit.IMongoMapper
 }
 
 var AuthDomainSet = wire.NewSet(
@@ -77,6 +65,44 @@ func (a *AuthDomain) ExtraUserMeta(ctx context.Context) (*Meta, error) {
 	meta.Code = claims[cst.JsonCode].(string)
 	meta.Role = int(claims[cst.JsonRole].(float64))
 	return &meta, nil
+}
+
+// IdentifyRole 根据请求上下文确定操作者角色 返回UserMeta和Role
+// 若角色与操作要求不符则返回ErrInsufficientAuth
+func (a *AuthDomain) IdentifyRole(ctx context.Context, unitId string) (*Meta, int, error) {
+	usrMeta, err := a.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// 无unitId：超管
+	if unitId == "" {
+		if err = a.VerifySuperAdmin(ctx, usrMeta); err != nil {
+			return nil, 0, err
+		}
+		return usrMeta, enum.UserRoleSuperAdmin, nil
+	}
+	// 有unitId：单位管理员或班主任
+	// 校验unit存在
+	IDs, err := util.ObjectIDsFromHex(usrMeta.UserId, unitId)
+	if err != nil {
+		return nil, 0, errorx.WrapByCode(err, errno.ErrNotFound)
+	}
+	_, err = a.UnitMapper.FindOneById(ctx, IDs[1])
+	if err != nil {
+		logs.Errorf("get unit error: %s", errorx.ErrorWithoutStack(err))
+		return nil, 0, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "鉴权时UnitID"))
+	}
+
+	// 判断用户权限
+	if usrMeta.IsUnitAdmin(unitId) {
+		return usrMeta, enum.UserRoleUnitAdmin, nil
+	}
+	if usrMeta.IsClassTeacher(unitId) {
+		return usrMeta, enum.UserRoleClassTeacher, nil
+	}
+
+	return nil, 0, errorx.New(errno.ErrInsufficientAuth)
 }
 
 // VerifySuperAdmin 校验超管权限：JWT role >= SuperAdmin 且 DB role == SuperAdmin

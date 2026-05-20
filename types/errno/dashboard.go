@@ -23,6 +23,8 @@ const (
 	ErrDashboardAlarmOverview             = 5017
 	ErrDashboardListAlarms                = 5018 // 获取风险记录失败
 	ErrDashboardRiskDistribution          = 5019 // 统计风险分布失败
+	ErrNoBoundedClass                     = 5020 // 未绑定班级
+	ErrInvalidRole                        = 5021 // 无效角色
 )
 
 func init() {
@@ -114,6 +116,16 @@ func init() {
 	code.Register(
 		ErrDashboardRiskDistribution,
 		"风险等级分布统计失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrNoBoundedClass,
+		"用户{id}（{role}）未绑定班级",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		ErrInvalidRole,
+		"用户角色无效",
 		code.WithAffectStability(false),
 	)
 }
