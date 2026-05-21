@@ -7,15 +7,17 @@ import (
 )
 
 type Unit struct {
-	ID         bson.ObjectID `json:"id" bson:"_id"`
-	Name       string        `json:"name" bson:"name"`
-	Address    string        `json:"address" bson:"address"`
-	Contact    string        `json:"contact" bson:"contact"`
-	Level      int           `json:"level" bson:"level"`
-	Status     int           `json:"status" bson:"status"` // 1-2: Active | Deleted
-	URI        string        `json:"uri" bson:"uri"`
-	StartGrade int           `json:"startGrade" bson:"start_grade"`
-	CreateTime time.Time     `json:"createTime" bson:"create_time"`
-	UpdateTime time.Time     `json:"updateTime" bson:"update_time"`
-	DeleteTime time.Time     `json:"deleteTime" bson:"delete_time"`
+	ID           bson.ObjectID `json:"id" bson:"_id"`
+	Name         string        `json:"name" bson:"name"`
+	Address      string        `json:"address" bson:"address"`
+	Scene        string        `json:"scene" bson:"scene"`
+	TeacherImage string        `json:"teacherImage" bson:"teacher_image"`
+	Contact      string        `json:"contact" bson:"contact"`
+	Level        int           `json:"level" bson:"level"`
+	Status       int           `json:"status" bson:"status"` // 1-2: Active | Deleted
+	URI          string        `json:"uri" bson:"uri"`
+	StartGrade   int           `json:"startGrade" bson:"start_grade"`
+	CreateTime   time.Time     `json:"createTime" bson:"create_time"`
+	UpdateTime   time.Time     `json:"updateTime" bson:"update_time"`
+	DeleteTime   time.Time     `json:"deleteTime" bson:"delete_time"`
 }
