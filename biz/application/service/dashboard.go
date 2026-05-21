@@ -899,7 +899,7 @@ func (s *DashboardService) getEmotionRatioByClassList(ctx context.Context, unitO
 
 	return &core_api.EmotionRatio{
 		Total: total,
-		Ratio: ratio,
+		Ratio: util.RiskDistributionCnt2Ratio(ratio, total),
 	}, nil
 }
 
@@ -942,7 +942,7 @@ func (s *DashboardService) getEmotionRatio(ctx context.Context, unitOID *bson.Ob
 	ratio[enum.AlarmEmotionNormal] = total - abnormalSum
 
 	return &core_api.EmotionRatio{
-		Ratio: ratio,
+		Ratio: util.RiskDistributionCnt2Ratio(ratio, total),
 		Total: total,
 	}, nil
 }
