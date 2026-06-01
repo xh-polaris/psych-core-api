@@ -1,7 +1,10 @@
 replicaCount: 1
 image:
-  repository: harbor.harbor/innospark/psych-core-api
+  repository: harbor.harbor/psych-test/psych-core-api
 volumeMounts:
   - name: config
     mountPath: /app/etc/config.yaml
     subPath: config.yaml
+  - name: stopwords
+    mountPath: /app/stopwords_full.txt
+    subPath: stopwords_full.txt
