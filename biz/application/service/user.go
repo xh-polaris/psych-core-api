@@ -291,7 +291,7 @@ func (u *UserService) CreateUser(ctx context.Context, req *core_api.CreateUserRe
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "验证码/手机号/邮箱不能全为空"))
 	}
 
-	if req.Password == "" {
+	if req.Phone == nil && req.Password == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "密码"))
 	}
 
