@@ -1,6 +1,6 @@
 replicaCount: 1
 image:
-  repository: harbor.harbor/psych-test/psych-core-api
+  repository: harbor.harbor/psych/psych-core-api
 volumeMounts:
   - name: config
     mountPath: /app/etc/config.yaml
