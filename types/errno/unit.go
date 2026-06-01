@@ -8,6 +8,7 @@ const (
 	ErrUnitCreateClassTeacher = 2001
 	ErrUnitFindByURI          = 2002
 	ErrUnitCreate             = 2003
+	Err
 )
 
 func init() {

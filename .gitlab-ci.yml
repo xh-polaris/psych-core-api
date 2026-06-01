@@ -1,0 +1,4 @@
+include:
+  - project: "devops/ci-templates"
+    file:
+      - "templates/go-app-template.yaml"

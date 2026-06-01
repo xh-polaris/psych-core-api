@@ -7,6 +7,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
+	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
@@ -29,6 +30,7 @@ type IConfigService interface {
 }
 
 type ConfigService struct {
+	AuthDomain   auth.IAuthDomain
 	ConfigMapper config.IMongoMapper
 }
 
@@ -45,7 +47,7 @@ func (c *ConfigService) ConfigCreate(ctx context.Context, req *core_api.ConfigCr
 	}
 
 	// 鉴权
-	usrMeta, err := util.ExtraUserMeta(ctx)
+	usrMeta, err := c.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +106,7 @@ func (c *ConfigService) ConfigUpdateInfo(ctx context.Context, req *core_api.Conf
 	}
 
 	// 鉴权
-	usrMeta, err := util.ExtraUserMeta(ctx)
+	usrMeta, err := c.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}

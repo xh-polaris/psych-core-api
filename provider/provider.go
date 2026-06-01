@@ -4,6 +4,7 @@ import (
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-core-api/biz/application/service"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
+	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	"github.com/xh-polaris/psych-core-api/biz/domain/usr"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
@@ -56,6 +57,7 @@ var ApplicationSet = wire.NewSet(
 
 var DomainSet = wire.NewSet(
 	usr.UserDomainSet,
+	auth.AuthDomainSet,
 )
 
 var InfrastructureSet = wire.NewSet(
