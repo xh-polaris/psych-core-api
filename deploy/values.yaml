@@ -5,6 +5,3 @@ volumeMounts:
   - name: config
     mountPath: /app/etc/config.yaml
     subPath: config.yaml
-  - name: stopwords
-    mountPath: /app/stopwords_full.txt
-    subPath: stopwords_full.txt
