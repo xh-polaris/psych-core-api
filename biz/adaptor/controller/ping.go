@@ -4,6 +4,8 @@ package controller
 
 import (
 	"context"
+	"os"
+	"runtime"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/common/utils"
@@ -14,5 +16,32 @@ import (
 func Ping(ctx context.Context, c *app.RequestContext) {
 	c.JSON(consts.StatusOK, utils.H{
 		"message": "pong",
+	})
+}
+
+func Healthz(ctx context.Context, c *app.RequestContext) {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	c.JSON(consts.StatusOK, map[string]interface{}{
+		"status":  "ok",
+		"message": "healthz",
+		"pid":     os.Getpid(),
+		// Go runtime
+		"go_version": runtime.Version(),
+		"gomaxprocs": runtime.GOMAXPROCS(0),
+		"goroutines": runtime.NumGoroutine(),
+		"num_cpu":    runtime.NumCPU(),
+		"memory": map[string]interface{}{
+			"alloc":        m.Alloc,      // 当前使用
+			"total_alloc":  m.TotalAlloc, // 累计分配
+			"sys":          m.Sys,        // 系统占用
+			"heap_alloc":   m.HeapAlloc,
+			"heap_sys":     m.HeapSys,
+			"heap_idle":    m.HeapIdle,
+			"heap_inuse":   m.HeapInuse,
+			"heap_objects": m.HeapObjects,
+			"gc_num":       m.NumGC,
+			"gc_pause_ns":  m.PauseTotalNs,
+		},
 	})
 }
