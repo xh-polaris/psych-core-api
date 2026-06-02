@@ -12,4 +12,5 @@ func customizedRegister(r *server.Hertz) {
 	r.GET("/ping", handler.Ping)
 	r.GET("/chat", handler.Chat)
 	// your code ...
+	r.GET("healthz", handler.Healthz)
 }
