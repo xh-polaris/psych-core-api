@@ -45,7 +45,7 @@ func ConfigUpdateInfo(ctx context.Context, c *app.RequestContext) {
 
 	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
-	resp, err := p.ConfigService.ConfigUpdateInfo(ctx, &req)
+	resp, err := p.ConfigService.ConfigUpdate(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
@@ -69,28 +69,11 @@ func ConfigGetByUnitID(ctx context.Context, c *app.RequestContext) {
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
-// ConfigUpdateModelAndBgImage .
-// @router /config/update_model_and_bg_image [POST]
-func ConfigUpdateModelAndBgImage(ctx context.Context, c *app.RequestContext) {
+// ConfigGetCharacter .
+// @router /config/get_character [GET]
+func ConfigGetCharacter(ctx context.Context, c *app.RequestContext) {
 	var err error
-	var req core_api.ConfigUpdateModelAndBgImageReq
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		c.String(consts.StatusBadRequest, err.Error())
-		return
-	}
-
-	middleware.StoreToken(ctx, c, &req)
-	p := provider.Get()
-	resp, err := p.ConfigService.ConfigUpdateModelAndBgImage(ctx, &req)
-	httpx.PostProcess(ctx, c, &req, resp, err)
-}
-
-// ConfigGetModelAndBgImage .
-// @router /config/get_model_and_bg_image [GET]
-func ConfigGetModelAndBgImage(ctx context.Context, c *app.RequestContext) {
-	var err error
-	var req core_api.ConfigGetModelAndBgImageReq
+	var req core_api.ConfigGetCharacterReq
 	err = c.BindAndValidate(&req)
 	if err != nil {
 		c.String(consts.StatusBadRequest, err.Error())
@@ -98,6 +81,6 @@ func ConfigGetModelAndBgImage(ctx context.Context, c *app.RequestContext) {
 	}
 
 	p := provider.Get()
-	resp, err := p.ConfigService.ConfigGetModelAndBgImage(ctx, &req)
+	resp, err := p.ConfigService.ConfigGetCharacters(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }

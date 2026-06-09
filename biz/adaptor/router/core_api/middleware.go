@@ -255,3 +255,8 @@ func _superadminsigninMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _configgetcharacterMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

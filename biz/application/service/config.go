@@ -23,10 +23,9 @@ var _ IConfigService = (*ConfigService)(nil)
 
 type IConfigService interface {
 	ConfigCreate(ctx context.Context, req *core_api.ConfigCreateOrUpdateReq) (resp *basic.Response, err error)
-	ConfigUpdateInfo(ctx context.Context, req *core_api.ConfigCreateOrUpdateReq) (resp *basic.Response, err error)
+	ConfigUpdate(ctx context.Context, req *core_api.ConfigCreateOrUpdateReq) (resp *basic.Response, err error)
 	ConfigGetByUnitID(ctx context.Context, req *core_api.ConfigGetByUnitIdReq) (resp *core_api.ConfigGetByUnitIdResp, err error)
-	ConfigUpdateModelAndBgImage(ctx context.Context, req *core_api.ConfigUpdateModelAndBgImageReq) (resp *basic.Response, err error)
-	ConfigGetModelAndBgImage(ctx context.Context, req *core_api.ConfigGetModelAndBgImageReq) (resp *core_api.ConfigGetModelAndBgImageResp, err error)
+	ConfigGetCharacters(ctx context.Context, req *core_api.ConfigGetCharacterReq) (resp *core_api.ConfigGetCharacterResp, err error)
 }
 
 type ConfigService struct {
@@ -58,11 +57,12 @@ func (c *ConfigService) ConfigCreate(ctx context.Context, req *core_api.ConfigCr
 	// 构造并插入数据库
 	now := time.Now()
 	confDAO := &config.Config{
-		ID:            bson.NewObjectID(),
-		Type:          int(req.Config.Type),
-		UnitID:        unitOID,
-		ModelView:     req.Config.ModelView,
-		BackgroundImg: req.Config.BackgroundImage,
+		ID:         bson.NewObjectID(),
+		Type:       int(req.Config.Type),
+		UnitID:     unitOID,
+		Characters: characterReq2DB(req.Config.Characters),
+		Scene:      req.Config.Scene,
+		AlertPhone: req.Config.AlertPhone,
 		Chat: &config.Chat{
 			Name:        req.Config.Chat.Name,
 			Description: req.Config.Chat.Description,
@@ -98,7 +98,8 @@ func (c *ConfigService) ConfigCreate(ctx context.Context, req *core_api.ConfigCr
 	}, nil
 }
 
-func (c *ConfigService) ConfigUpdateInfo(ctx context.Context, req *core_api.ConfigCreateOrUpdateReq) (resp *basic.Response, err error) {
+// ConfigUpdate 更改单位配置
+func (c *ConfigService) ConfigUpdate(ctx context.Context, req *core_api.ConfigCreateOrUpdateReq) (resp *basic.Response, err error) {
 	// 参数校验
 	unitOid, err := bson.ObjectIDFromHex(req.Config.UnitId)
 	if err != nil {
@@ -157,36 +158,34 @@ func (c *ConfigService) ConfigGetByUnitID(ctx context.Context, req *core_api.Con
 
 	util.DPrint("configDAO: %+v\n", configDAO.Chat)
 	return &core_api.ConfigGetByUnitIdResp{
-		Config: dtoConfig(configDAO),
+		Config: configDB2VO(configDAO),
 		Code:   0,
 		Msg:    "success",
 	}, nil
-
 }
 
-func (c *ConfigService) ConfigUpdateModelAndBgImage(ctx context.Context, req *core_api.ConfigUpdateModelAndBgImageReq) (resp *basic.Response, err error) {
-	newReq := &core_api.ConfigCreateOrUpdateReq{
-		Config: &core_api.ConfigVO{
-			UnitId:          req.UnitId,
-			ModelView:       req.ModelView,
-			BackgroundImage: req.BackgroundImage,
-		},
+// ConfigGetCharacters 获取心理老师虚拟形象
+func (c *ConfigService) ConfigGetCharacters(ctx context.Context, req *core_api.ConfigGetCharacterReq) (resp *core_api.ConfigGetCharacterResp, err error) {
+	if req.UnitId == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
 	}
-	return c.ConfigUpdateInfo(ctx, newReq)
-}
 
-func (c *ConfigService) ConfigGetModelAndBgImage(ctx context.Context, req *core_api.ConfigGetModelAndBgImageReq) (resp *core_api.ConfigGetModelAndBgImageResp, err error) {
-	newReq := &core_api.ConfigGetByUnitIdReq{
-		UnitId: req.UnitId,
-	}
-	newResp, err := c.ConfigGetByUnitID(ctx, newReq)
+	unitOid, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
-		return nil, err
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "单位ID"))
 	}
 
-	return &core_api.ConfigGetModelAndBgImageResp{
-		ModelView:       newResp.Config.ModelView,
-		BackgroundImage: newResp.Config.BackgroundImage,
+	uConf, err := c.ConfigMapper.FindOneByUnitID(ctx, unitOid)
+	if err != nil {
+		logs.Errorf("find config error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.WrapByCode(err, errno.ErrConfigNotFound, errorx.KV("unitId", req.UnitId))
+	}
+
+	return &core_api.ConfigGetCharacterResp{
+		Characters: characterDB2Resp(uConf.Characters),
+		Scene:      uConf.Scene,
+		Code:       0,
+		Msg:        "success",
 	}, nil
 }
 
@@ -265,13 +264,6 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 	if conf.Status == enum.ConfigStatusActive || conf.Status == enum.ConfigStatusDeleted {
 		setUpdate[cst.Status] = conf.Status
 	}
-	if conf.ModelView != "" {
-		setUpdate[cst.ModelView] = conf.ModelView
-	}
-	if conf.BackgroundImage != "" {
-		setUpdate[cst.BackgroundImage] = conf.BackgroundImage
-	}
-
 	// chat配置
 	if chat := conf.GetChat(); chat != nil {
 		if chat.GetName() != "" {
@@ -287,6 +279,17 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 			setUpdate["chat.app_id"] = chat.GetAppId()
 		}
 		setUpdate["chat.update_time"] = now
+	}
+
+	// characters配置
+	if chars := conf.GetCharacters(); len(chars) > 0 {
+		setUpdate["character"] = characterReq2DB(chars)
+	}
+	if scene := conf.GetScene(); len(scene) > 0 {
+		setUpdate["scene"] = scene
+	}
+	if alertPhone := conf.GetAlertPhone(); len(alertPhone) > 0 {
+		setUpdate["alert_phone"] = alertPhone
 	}
 
 	// tts配置
@@ -333,12 +336,13 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 }
 
 // 将数据库Config对象字段转化为DTO对象
-func dtoConfig(configDAO *config.Config) *core_api.ConfigVO {
+func configDB2VO(configDAO *config.Config) *core_api.ConfigVO {
 	return &core_api.ConfigVO{
-		UnitId:          configDAO.UnitID.Hex(),
-		Type:            int32(configDAO.Type),
-		ModelView:       configDAO.ModelView,
-		BackgroundImage: configDAO.BackgroundImg,
+		UnitId:     configDAO.UnitID.Hex(),
+		Type:       int32(configDAO.Type),
+		Characters: characterDB2Resp(configDAO.Characters),
+		Scene:      configDAO.Scene,
+		AlertPhone: configDAO.AlertPhone,
 		Chat: &core_api.ChatApp{
 			Name:        configDAO.Chat.Name,
 			Description: configDAO.Chat.Description,
@@ -379,4 +383,36 @@ func MaskConfig(conf *core_api.ConfigVO) *core_api.ConfigVO {
 		conf.Report.AppId = ""
 	}
 	return conf
+}
+
+func characterDB2Resp(in []*config.Character) []*core_api.Character {
+	if in == nil {
+		return nil
+	}
+	out := make([]*core_api.Character, len(in))
+	for i, c := range in {
+		out[i] = &core_api.Character{
+			Name:   c.Name,
+			Voice:  c.Voice,
+			Image:  c.Image,
+			Status: int32(c.Status),
+		}
+	}
+	return out
+}
+
+func characterReq2DB(in []*core_api.Character) []*config.Character {
+	if in == nil {
+		return nil
+	}
+	out := make([]*config.Character, len(in))
+	for i, c := range in {
+		out[i] = &config.Character{
+			Name:   c.Name,
+			Voice:  c.Voice,
+			Image:  c.Image,
+			Status: int(c.Status),
+		}
+	}
+	return out
 }

@@ -69,13 +69,7 @@ const (
 	Keywords = "keywords"
 	Digest   = "digest"
 
-	// 单位配置相关
-	BackgroundImage = "background_image"
-	ModelView       = "model_view"
-)
-
-// 原profile 前端字段相关
-const (
+	// 原profile 前端字段相关
 	QueryUnitID = "unitId"
 	QueryUserID = "userId"
 )
