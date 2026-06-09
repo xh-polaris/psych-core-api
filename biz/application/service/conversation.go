@@ -144,13 +144,12 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 		if !dateSet[convDate] {
 			continue
 		}
-		dateTs, _ := util.DateToTimestampUTC8(convDate)
 		result = append(result, &core_api.ConversationVO{
 			ConversationId: conv.ID.Hex(),
 			Brief:          conv.Title,
 			CreateTime:     conv.CreateTime.Unix(),
 			UpdateTime:     conv.UpdateTime.Unix(),
-			Date:           dateTs,
+			Date:           convDate,
 		})
 	}
 

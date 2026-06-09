@@ -8,11 +8,8 @@ MODEL_DIR := biz/application/dto
 ROUTER_DIR := biz/adaptor/router
 
 IDL_DIR ?= ../psych-idl
-# 提取最后一个部分（如 "psych.core_api" → "core_api"）
 MAIN_IDL_BASE := $(subst -,_,$(shell echo $(SERVICE_NAME) | awk -F '.' '{print $$NF}'))
-# 组合成最终路径（如 "$(IDL_DIR)/core_api/core_api.proto"）
 FULL_MAIN_IDL_PATH := $(IDL_DIR)/$(MAIN_IDL_BASE)/$(MAIN_IDL_BASE).proto
-# 这里由于 idl 中未直接放置 google 相关文件，所以必须把这个文件放置到下面这个文件夹中
 IDL_OPTIONS := -I $(IDL_DIR) --idl $(FULL_MAIN_IDL_PATH)
 OUTPUT_OPTIONS := --handler_dir $(HANDLER_DIR) --model_dir $(MODEL_DIR) --router_dir $(ROUTER_DIR)
 EXTRA_OPTIONS := --pb_camel_json_tag=true --unset_omitempty=true
@@ -33,19 +30,24 @@ restore-annotations:
 	@cd $(IDL_DIR) && git checkout -- $(MAIN_IDL_BASE)/$(MAIN_IDL_BASE).proto 2>/dev/null || echo "Warning: Could not restore proto file from git"
 fix-imports:
 	@echo "Fixing invalid imports..."
-	@# 删除所有对 http 的导入（http.proto 只是注解定义，不需要在生成的代码中引用）
-	@find $(MODEL_DIR) -name "*.pb.go" -type f -exec sed -i '' '/_ "github.com\/xh-polaris\/psych-core-api\/biz\/application\/dto\/http"/d' {} \; 2>/dev/null || \
-		find $(MODEL_DIR) -name "*.pb.go" -type f -exec sed -i '/_ "github.com\/xh-polaris\/psych-core-api\/biz\/application\/dto\/http"/d' {} \; 2>/dev/null || true
-	@# 删除不必要的 http 目录（http.proto 只是注解定义，不需要生成代码）
+	@# 删除 dto/*.pb.go 中不存在的 http 包引用
+	@sed -i.bak '\#_ "github.com/xh-polaris/psych-core-api/biz/application/dto/http"#d' $(MODEL_DIR)/*/*.pb.go $(MODEL_DIR)/*.pb.go 2>/dev/null || true
+	@find $(MODEL_DIR) -name "*.pb.go.bak" -delete 2>/dev/null || true
+	@# 删除 controller 中未使用的 basic 包引用
+	@for f in $(HANDLER_DIR)/core_api/*.go $(HANDLER_DIR)/*.go; do \
+		[ -f "$$f" ] || continue; \
+		grep -q 'basic\.' "$$f" 2>/dev/null && continue; \
+		sed -i.bak '/basic "github.com\/xh-polaris\/psych-core-api\/biz\/application\/dto\/basic"/d' "$$f" 2>/dev/null || true; \
+	done
+	@find $(HANDLER_DIR) -name "*.go.bak" -delete 2>/dev/null || true
+	@# 删除不必要的生成目录
 	@rm -rf $(MODEL_DIR)/http
-	@# 删除 google.golang.org 目录（这是外部依赖，不需要生成）
 	@rm -rf $(MODEL_DIR)/google.golang.org
 update: convert-annotations
 	hz --verbose update $(IDL_OPTIONS) --mod $(MODULE_NAME) $(EXTRA_OPTIONS)
-	@files=$$(find biz/application/dto -type f); \
-	for file in $$files; do \
-  	  sed -i  -e 's/func init\(\).*//' $$file; \
-  	done
+	@# 删除 dto 中自动生成的 init 函数
+	@sed -i.bak 's/func init().*//' $$(find $(MODEL_DIR) -name "*.pb.go" -type f) 2>/dev/null || true
+	@find $(MODEL_DIR) -name "*.pb.go.bak" -delete 2>/dev/null || true
 	@make fix-imports
 	@make restore-annotations
 update-macos: convert-annotations
