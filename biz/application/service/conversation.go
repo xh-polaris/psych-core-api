@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
-	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	"github.com/xh-polaris/psych-core-api/biz/domain/his"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
@@ -21,7 +20,8 @@ import (
 type IConversationService interface {
 	CreateConversation(ctx context.Context, req *core_api.CreateConversationReq) (resp *core_api.CreateConversationResp, err error)
 	ListConversations(ctx context.Context, req *core_api.ListConversationsReq) (resp *core_api.ListConversationsResp, err error)
-	GetConversation(ctx context.Context, req *core_api.GetConversationReq) (resp *core_api.GetConversationResp, err error)
+	GetSingleConv(ctx context.Context, req *core_api.GetSingleConvReq) (resp *core_api.GetSingleConvResp, err error)
+	GetConvByDate(ctx context.Context, req *core_api.GetConvByDateReq) (resp *core_api.GetConvByDateResp, err error)
 	FinishConversation(ctx context.Context)
 }
 
@@ -75,12 +75,38 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams)
 	}
-	total, err := c.ConversationMapper.CountByUser(ctx, userId)
+
+	endDate := req.EndDate
+	if endDate == "" {
+		endDate = util.FormatDateUTC8(time.Now())
+	}
+	startDate := req.StartDate
+	if startDate == "" {
+		end, _, _ := util.DayToUTCRange(endDate)
+		startDate = util.FormatDateUTC8(end.Add(-30 * 24 * time.Hour))
+	}
+	// 默认一次显示5天对话
+	limit := int(5)
+	if req.PaginationOptions != nil && req.PaginationOptions.Limit != nil {
+		limit = int(*req.PaginationOptions.Limit)
+	}
+	page := int(1)
+	if req.PaginationOptions != nil && req.PaginationOptions.Page != nil {
+		page = int(*req.PaginationOptions.Page)
+	}
+
+	// 限定起止时间，默认为30天内
+	start, end, err := util.ParseDayRange(startDate, endDate)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams)
+	}
+
+	dates, err := c.ConversationMapper.FindDistinctDatesByUserId(ctx, userId, start, end)
 	if err != nil {
 		return nil, errorx.New(errno.ErrListConversation)
 	}
 
-	if total == 0 {
+	if len(dates) == 0 {
 		return &core_api.ListConversationsResp{
 			Pagination: util.PaginationRes(0, req.PaginationOptions),
 			Code:       0,
@@ -88,39 +114,106 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 		}, nil
 	}
 
-	findOpt := util.PagedFindOpt(req.PaginationOptions).SetSort(bson.D{{cst.UpdateTime, -1}})
-	dbConvs, err := c.ConversationMapper.FindManyByUserId(ctx, userId, findOpt)
+	startIdx := (page - 1) * limit
+	if startIdx >= len(dates) {
+		return &core_api.ListConversationsResp{
+			Pagination: util.PaginationRes(int32(len(dates)), req.PaginationOptions),
+			Code:       0,
+			Msg:        "success",
+		}, nil
+	}
+	endIdx := startIdx + limit
+	if endIdx > len(dates) {
+		endIdx = len(dates)
+	}
+	pageDates := dates[startIdx:endIdx]
+
+	dateSet := make(map[string]bool, len(pageDates))
+	for _, d := range pageDates {
+		dateSet[d] = true
+	}
+
+	convs, err := c.ConversationMapper.FindByUserIdAndTimeRange(ctx, userId, start, end)
 	if err != nil {
 		return nil, errorx.New(errno.ErrListConversation)
 	}
 
-	convs := make([]*core_api.ConversationVO, 0, len(dbConvs))
-	for _, dbConv := range dbConvs {
-		conv := &core_api.ConversationVO{
-			ConversationId: dbConv.ID.Hex(),
-			Brief:          dbConv.Title,
-			CreateTime:     dbConv.CreateTime.Unix(),
-			UpdateTime:     dbConv.UpdateTime.Unix(),
+	result := make([]*core_api.ConversationVO, 0)
+	for _, conv := range convs {
+		convDate := util.FormatDateUTC8(conv.CreateTime)
+		if !dateSet[convDate] {
+			continue
 		}
-		convs = append(convs, conv)
+		dateTs, _ := util.DateToTimestampUTC8(convDate)
+		result = append(result, &core_api.ConversationVO{
+			ConversationId: conv.ID.Hex(),
+			Brief:          conv.Title,
+			CreateTime:     conv.CreateTime.Unix(),
+			UpdateTime:     conv.UpdateTime.Unix(),
+			Date:           dateTs,
+		})
 	}
 
 	return &core_api.ListConversationsResp{
-		Pagination:       util.PaginationRes(total, req.PaginationOptions),
-		ConversationList: convs,
+		Pagination:       util.PaginationRes(int32(len(dates)), req.PaginationOptions),
+		ConversationList: result,
 		Code:             0,
 		Msg:              "success",
 	}, nil
 }
 
-func (c *ConversationService) GetConversation(ctx context.Context, req *core_api.GetConversationReq) (resp *core_api.GetConversationResp, err error) {
+// GetConvByDate 返回用户指定日期的对话消息
+func (c *ConversationService) GetConvByDate(ctx context.Context, req *core_api.GetConvByDateReq) (resp *core_api.GetConvByDateResp, err error) {
+	userMeta, err := c.AuthDomain.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	userId := userMeta.UserId
+	if req.UserId != "" && req.UserId != userId {
+		if userMeta.Role < enum.UserRoleUnitAdmin {
+			return nil, errorx.New(errno.ErrInsufficientAuth)
+		}
+		userId = req.UserId
+	}
+
+	if req.Date == "" {
+		req.Date = util.FormatDateUTC8(time.Now())
+	}
+
+	msgs, err := his.Mgr.GetUserDailyMessages(ctx, userId, req.Date)
+	if err != nil {
+		return nil, errorx.New(errno.ErrFetchMessages)
+	}
+
+	total := int32(len(msgs))
+	startIdx, endIdx := util.PagedIndex(total, req.PaginationOptions)
+
+	result := make([]*core_api.ConvByDateMessage, 0, endIdx-startIdx)
+	for i, msg := range msgs[startIdx:endIdx] {
+		result = append(result, &core_api.ConvByDateMessage{
+			ConversationId: msg.ConversationId.Hex(),
+			Content:        msg.Content,
+			Role:           int32(msg.Role),
+			Index:          int32(startIdx + i),
+			CreateTime:     msg.CreateTime.Unix(),
+		})
+	}
+
+	return &core_api.GetConvByDateResp{
+		Pagination:  util.PaginationRes(total, req.PaginationOptions),
+		MessageList: result,
+		Code:        0,
+		Msg:         "success",
+	}, nil
+}
+
+func (c *ConversationService) GetSingleConv(ctx context.Context, req *core_api.GetSingleConvReq) (resp *core_api.GetSingleConvResp, err error) {
 	_, err = c.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// RetrieveMessage仅返回意外异常 消息搜索结果为空时返回空切片，和nil err
-	// 非空时，返回index倒序的列表
 	rawMsgs, err := his.Mgr.RetrieveMessage(ctx, req.ConversationId, -1)
 	if err != nil {
 		return nil, errorx.New(errno.ErrFetchMessages)
@@ -138,7 +231,7 @@ func (c *ConversationService) GetConversation(ctx context.Context, req *core_api
 		})
 	}
 
-	return &core_api.GetConversationResp{
+	return &core_api.GetSingleConvResp{
 		Pagination:  util.PaginationRes(total, req.PaginationOptions),
 		MessageList: msgs,
 		Code:        0,

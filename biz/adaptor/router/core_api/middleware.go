@@ -260,3 +260,18 @@ func _configgetcharacterMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _getdailymessagesMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _getconvbydateMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _getsingleconvMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

@@ -47,11 +47,11 @@ func ListConversations(ctx context.Context, c *app.RequestContext) {
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
-// GetConversation .
-// @router /conversation/get [POST]
-func GetConversation(ctx context.Context, c *app.RequestContext) {
+// GetSingleConv .
+// @router /conversation/get_single [POST]
+func GetSingleConv(ctx context.Context, c *app.RequestContext) {
 	var err error
-	var req core_api.GetConversationReq
+	var req core_api.GetSingleConvReq
 	err = c.BindAndValidate(&req)
 	if err != nil {
 		c.String(consts.StatusBadRequest, err.Error())
@@ -60,6 +60,23 @@ func GetConversation(ctx context.Context, c *app.RequestContext) {
 
 	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
-	resp, err := p.ConversationService.GetConversation(ctx, &req)
+	resp, err := p.ConversationService.GetSingleConv(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// GetConvByDate .
+// @router /conversation/get_by_date [POST]
+func GetConvByDate(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.GetConvByDateReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	middleware.StoreToken(ctx, c, &req)
+	p := provider.Get()
+	resp, err := p.ConversationService.GetConvByDate(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }

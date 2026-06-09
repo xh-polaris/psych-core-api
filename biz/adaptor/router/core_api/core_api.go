@@ -27,7 +27,8 @@ func Register(r *server.Hertz) {
 	{
 		_conversation := root.Group("/conversation", _conversationMw()...)
 		_conversation.POST("/create", append(_createconversationMw(), core_api.CreateConversation)...)
-		_conversation.POST("/get", append(_getconversationMw(), core_api.GetConversation)...)
+		_conversation.POST("/get_by_date", append(_getconvbydateMw(), core_api.GetConvByDate)...)
+		_conversation.POST("/get_single", append(_getsingleconvMw(), core_api.GetSingleConv)...)
 		_conversation.POST("/list", append(_listconversationsMw(), core_api.ListConversations)...)
 	}
 	{

@@ -22,26 +22,26 @@ import (
 
 // execLLM 调用大模型 [engine]
 func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
-	// 查询历史记录
-	mMsgs, err := his.Mgr.RetrieveMessage(ctx, e.uSession, 0)
+	userId := e.info[cst.JsonUserID].(string)
+	todayDate := util.FormatDateUTC8(time.Now())
+
+	mMsgs, err := his.Mgr.GetUserDailyMessages(ctx, userId, todayDate)
 	if err != nil {
 		return errorx.WrapByCode(err, errno.RetrieveHisErr)
 	}
 
-	// 增加当前会话产生的对话轮数
 	e.count++
 
-	// 创建用户消息
-	oids, err := util.ObjectIDsFromHex(e.uSession, e.info[cst.JsonUserID].(string))
+	oids, err := util.ObjectIDsFromHex(e.uSession, userId)
 	if err != nil {
 		return errorx.WrapByCode(err, errno.RetrieveHisErr)
 	}
 	var index int
 	if len(mMsgs) > 0 {
-		index = int(mMsgs[0].Index) + 1
+		index = int(mMsgs[len(mMsgs)-1].Index) + 1
 	}
 	usrMsg := convert.UserMMsg(oids[0], oids[1], cmd.Content.(string), index)
-	if err = his.Mgr.AddMessage(ctx, e.uSession, usrMsg); err != nil {
+	if err = his.Mgr.AddMessage(ctx, userId, todayDate, usrMsg); err != nil {
 		return errorx.WrapByCode(err, errno.AddUserMsgErr)
 	}
 	mMsgs = append([]*message.Message{usrMsg}, mMsgs...)
@@ -76,11 +76,13 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 	defer e.llmWg.Done()
 	defer stream.Close()
 	var collect strings.Builder
-	defer func(collect *strings.Builder, astMsg *message.Message) { // 存储模型消息
+	defer func(collect *strings.Builder, astMsg *message.Message) {
 		astMsg.Usage = e.usage.LLMUsage
 		now := time.Now()
 		astMsg.CreateTime, astMsg.UpdateTime, astMsg.Content = now, now, collect.String()
-		if err := his.Mgr.AddMessage(context.Background(), e.uSession, astMsg); err != nil {
+		userId := e.info[cst.JsonUserID].(string)
+		todayDate := util.FormatDateUTC8(now)
+		if err := his.Mgr.AddMessage(context.Background(), userId, todayDate, astMsg); err != nil {
 			e.unexpected(err, "llm response save err")
 		}
 	}(&collect, astMsg)
