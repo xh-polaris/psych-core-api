@@ -75,7 +75,7 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams)
 	}
-
+	// 起止时间，默认今日-30天前
 	endDate := req.EndDate
 	if endDate == "" {
 		endDate = util.FormatDateUTC8(time.Now())
@@ -194,7 +194,7 @@ func (c *ConversationService) GetConvByDate(ctx context.Context, req *core_api.G
 			ConversationId: msg.ConversationId.Hex(),
 			Content:        msg.Content,
 			Role:           int32(msg.Role),
-			Index:          int32(startIdx + i),
+			Index:          int32(total) - 1 - int32(startIdx+i),
 			CreateTime:     msg.CreateTime.Unix(),
 		})
 	}

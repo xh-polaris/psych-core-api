@@ -82,7 +82,7 @@ func (h *HistoryManager) GetUserDailyMessages(ctx context.Context, userId, date 
 		convIds[i] = conv.ID
 	}
 
-	msgs, err := h.msgMapper.FindByConversationIds(ctx, convIds, options.Find().SetSort(bson.M{"create_time": 1}))
+	msgs, err := h.msgMapper.FindByConversationIds(ctx, convIds, options.Find().SetSort(bson.M{"create_time": -1}))
 	if err != nil {
 		return nil, err
 	}
@@ -90,8 +90,8 @@ func (h *HistoryManager) GetUserDailyMessages(ctx context.Context, userId, date 
 	if len(msgs) > 0 {
 		_ = h.CacheDailyMessages(ctx, userId, date, msgs)
 	}
-
-	sort.Slice(msgs, func(i, j int) bool { return msgs[i].CreateTime.Before(msgs[j].CreateTime) })
+	// 按时间倒序，越新的在前
+	sort.Slice(msgs, func(i, j int) bool { return msgs[i].CreateTime.After(msgs[j].CreateTime) })
 	return msgs, nil
 }
 
@@ -147,7 +147,7 @@ func (h *HistoryManager) RetrieveMessageFromCache(ctx context.Context, key strin
 		msgs = append(msgs, &msg)
 	}
 	if len(msgs) > 0 {
-		sort.Slice(msgs, func(i, j int) bool { return msgs[i].CreateTime.Before(msgs[j].CreateTime) })
+		sort.Slice(msgs, func(i, j int) bool { return msgs[i].CreateTime.After(msgs[j].CreateTime) })
 	}
 	return msgs, nil
 }

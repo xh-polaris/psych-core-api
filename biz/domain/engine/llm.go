@@ -38,7 +38,7 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	}
 	var index int
 	if len(mMsgs) > 0 {
-		index = int(mMsgs[len(mMsgs)-1].Index) + 1
+		index = int(mMsgs[0].Index) + 1
 	}
 	usrMsg := convert.UserMMsg(oids[0], oids[1], cmd.Content.(string), index)
 	if err = his.Mgr.AddMessage(ctx, userId, todayDate, usrMsg); err != nil {
