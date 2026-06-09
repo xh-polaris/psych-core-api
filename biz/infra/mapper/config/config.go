@@ -30,10 +30,11 @@ type Report struct {
 
 // Character 心理老师虚拟形象
 type Character struct {
-	Name   string `json:"name,omitempty" bson:"name,omitempty"`     // 教师名称
-	Voice  string `json:"voice,omitempty" bson:"voice,omitempty"`   // 音色配置，参考火山引擎提供的音色
-	Image  string `json:"image,omitempty" bson:"image,omitempty"`   // 形象图片url
-	Status int    `json:"status,omitempty" bson:"status,omitempty"` // 是否删除
+	ID     bson.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`        // 角色ID
+	Name   string        `json:"name,omitempty" bson:"name,omitempty"`     // 教师名称
+	Voice  string        `json:"voice,omitempty" bson:"voice,omitempty"`   // 音色配置，参考火山引擎提供的音色
+	Image  string        `json:"image,omitempty" bson:"image,omitempty"`   // 形象图片url
+	Status int           `json:"status,omitempty" bson:"status,omitempty"` // 是否删除
 }
 
 type Config struct {

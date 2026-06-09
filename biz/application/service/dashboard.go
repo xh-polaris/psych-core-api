@@ -1709,6 +1709,12 @@ func (s *DashboardService) dashboardGetReportUnit(ctx context.Context, convOID b
 		Code:           0,
 		Msg:            "success",
 	}
+	if rpt.Character != nil {
+		resp.CharacterId = rpt.Character.ID.Hex()
+		resp.CharacterName = rpt.Character.Name
+		resp.CharacterVoice = rpt.Character.Voice
+		resp.CharacterImage = rpt.Character.Image
+	}
 
 	if rpt.Status != enum.ReportStatusSuccess {
 		resp.Code = errno.ErrReportNotReady

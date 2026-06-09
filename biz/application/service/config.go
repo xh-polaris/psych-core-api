@@ -392,6 +392,7 @@ func characterDB2Resp(in []*config.Character) []*core_api.Character {
 	out := make([]*core_api.Character, len(in))
 	for i, c := range in {
 		out[i] = &core_api.Character{
+			Id:     c.ID.Hex(),
 			Name:   c.Name,
 			Voice:  c.Voice,
 			Image:  c.Image,
@@ -407,7 +408,13 @@ func characterReq2DB(in []*core_api.Character) []*config.Character {
 	}
 	out := make([]*config.Character, len(in))
 	for i, c := range in {
+		id := c.Id
+		if id == "" {
+			id = bson.NewObjectID().Hex()
+		}
+		oid, _ := bson.ObjectIDFromHex(id)
 		out[i] = &config.Character{
+			ID:     oid,
 			Name:   c.Name,
 			Voice:  c.Voice,
 			Image:  c.Image,
