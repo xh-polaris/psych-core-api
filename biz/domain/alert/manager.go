@@ -44,7 +44,7 @@ func New(c cache.Cmdable, userMapper user.IMongoMapper, configMapper config.IMon
 // 返回 true 表示未超限可发送，false 表示今日已发。
 func (m *AlertManager) CheckAndSetLimit(ctx context.Context, userId string) (bool, error) {
 	date := util.FormatDateUTC8(time.Now())
-	key := fmt.Sprintf("%s:%s:%s", cst.AlertSmsLimitPrefix, date, userId)
+	key := fmt.Sprintf("psych:%s:%s:%s", cst.AlertSmsLimitPrefix, date, userId)
 
 	ok, err := m.cache.SetNX(ctx, key, "1", 24*time.Hour).Result()
 	if err == nil {
@@ -135,7 +135,7 @@ func (m *AlertManager) Send(ctx context.Context, unitId, userId, convId bson.Obj
 		return nil
 	}
 
-	params := []string{student.Name, gradeStr, classStr}
+	params := []string{gradeStr, classStr, student.Name}
 
 	var sendErr error
 	var successPhones []string
