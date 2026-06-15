@@ -10,6 +10,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/core"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
+	"github.com/xh-polaris/psych-core-api/types/enum"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 )
 
@@ -35,6 +36,8 @@ func (e *Engine) config() error {
 		logs.Error("[workflow] [config] build config err: %v", err)
 		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "llm"))
 	}
+	// 提取心理老师形象: 前端指定名称则匹配, 否则取第一个活跃的
+	e.Character = e.pickCharacter(configResp.Config.Characters)
 	// 构造llm
 	if e.llm, err = app.NewChatApp(e.ctx, e.uSession, wfc.ChatConfig); err != nil {
 		logs.Error("[workflow] [config] new chatApp err: %v", err)
@@ -84,4 +87,29 @@ func (e *Engine) buildConfig(resp *core_api.ConfigGetByUnitIdResp) (c *core.Conf
 		ReportConfig: core.ReportConfig{},
 	}
 	return
+}
+
+func (e *Engine) pickCharacter(characters []*core_api.Character) *core.CharacterInfo {
+	if len(characters) == 0 {
+		return nil
+	}
+	characterId, _ := e.info["characterId"].(string)
+	for _, ch := range characters {
+		if int(ch.Status) != enum.ConfigStatusActive {
+			continue
+		}
+		if characterId != "" && ch.Id != characterId {
+			continue
+		}
+		return &core.CharacterInfo{Id: ch.Id, Name: ch.Name, Voice: ch.Voice, Image: ch.Image}
+	}
+	if characterId == "" {
+		return nil
+	}
+	for _, ch := range characters {
+		if ch.Id == characterId {
+			return &core.CharacterInfo{Id: ch.Id, Name: ch.Name, Voice: ch.Voice, Image: ch.Image}
+		}
+	}
+	return nil
 }

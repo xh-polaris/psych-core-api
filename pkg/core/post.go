@@ -5,14 +5,23 @@ package core
 type (
 	// PostNotify 提交给post服务的通知
 	PostNotify struct {
-		Session string         `json:"session"` // 对话标识
-		UserId  string         `json:"userId"`  // 用户id
-		UnitId  string         `json:"unitId"`  // 单位id
-		Usage   *Usage         `json:"usage"`   // 用量
-		Info    map[string]any `json:"info"`    // 额外信息
-		Start   int64          `json:"start"`   // 对话开始时间戳(s)
-		End     int64          `json:"end"`     // 对话结束时间戳(s)
-		Config  *Config        `json:"config"`  // 对话配置
+		Session   string         `json:"session"`   // 对话标识
+		UserId    string         `json:"userId"`    // 用户id
+		UnitId    string         `json:"unitId"`    // 单位id
+		Usage     *Usage         `json:"usage"`     // 用量
+		Info      map[string]any `json:"info"`      // 额外信息
+		Start     int64          `json:"start"`     // 对话开始时间戳(s)
+		End       int64          `json:"end"`       // 对话结束时间戳(s)
+		Config    *Config        `json:"config"`    // 对话配置
+		Date      string         `json:"date"`      // UTC+8 日期字符串 "2024-06-09"
+		Character *CharacterInfo `json:"character"` // 心理老师形象
+	}
+
+	CharacterInfo struct {
+		Id    string `json:"id"`
+		Name  string `json:"name"`
+		Voice string `json:"voice"`
+		Image string `json:"image"`
 	}
 
 	Usage struct {

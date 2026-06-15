@@ -69,13 +69,7 @@ const (
 	Keywords = "keywords"
 	Digest   = "digest"
 
-	// 单位配置相关
-	BackgroundImage = "background_image"
-	ModelView       = "model_view"
-)
-
-// 原profile 前端字段相关
-const (
+	// 原profile 前端字段相关
 	QueryUnitID = "unitId"
 	QueryUserID = "userId"
 )
@@ -122,4 +116,12 @@ const (
 	AuthTypeCodePassword  = "code-password"
 	AuthTypeEmailPassword = "email-password"
 	AuthTypeEmailVerify   = "email-verify"
+)
+
+// SMS告警相关常量
+const (
+	//AlertSmsMarker      = "\uE000$$\uE000"                 // LLM 流中检测到此串时触发 SMS 告警
+	AlertSmsMarker      = "alert-test"
+	AlertSmsLimitPrefix = "alert:sms"                      // 限流 Redis key 前缀: alert:sms:{date}:{userId}
+	AdminURL            = "https://psych-admin.aiecnu.net" // 管理端网址
 )

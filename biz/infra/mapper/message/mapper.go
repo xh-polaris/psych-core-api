@@ -28,6 +28,7 @@ const (
 type IMongoMapper interface {
 	mapper.IMongoMapper[Message]
 	RetrieveMessage(ctx context.Context, conversation string, size int) ([]*Message, error)
+	FindByConversationIds(ctx context.Context, convIds []bson.ObjectID, opts options.Lister[options.FindOptions]) ([]*Message, error)
 	BatchMessageStats(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*MsgStats, error)
 }
 
@@ -62,6 +63,16 @@ func (m *mongoMapper) RetrieveMessage(ctx context.Context, conversation string, 
 type MsgStats struct {
 	Rounds     int32
 	LatestTime int64
+}
+
+func (m *mongoMapper) FindByConversationIds(ctx context.Context, convIds []bson.ObjectID, opts options.Lister[options.FindOptions]) ([]*Message, error) {
+	if len(convIds) == 0 {
+		return []*Message{}, nil
+	}
+	return m.FindManyWithOption(ctx, bson.M{
+		cst.ConversationID: bson.M{cst.In: convIds},
+		cst.Status:         bson.M{cst.NE: -1},
+	}, opts)
 }
 
 func (m *mongoMapper) BatchMessageStats(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*MsgStats, error) {

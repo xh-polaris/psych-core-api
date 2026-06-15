@@ -16,6 +16,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/sms_alert"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/biz/infra/synapse"
@@ -84,6 +85,7 @@ func NewProvider() (*Provider, error) {
 		MessageMapper:      messageIMongoMapper,
 		ConversationMapper: conversationIMongoMapper,
 	}
+	sms_alertIMongoMapper := sms_alert.NewSmsAlertMongoMapper(confConfig)
 	providerProvider := &Provider{
 		Config:              confConfig,
 		AlarmService:        alarmService,
@@ -95,6 +97,10 @@ func NewProvider() (*Provider, error) {
 		MessageMapper:       messageIMongoMapper,
 		ConversationMapper:  conversationIMongoMapper,
 		ReportMapper:        reportIMongoMapper,
+		UserMapper:          iMongoMapper,
+		ConfigMapper:        configIMongoMapper,
+		UnitMapper:          unitIMongoMapper,
+		SmsAlertMapper:      sms_alertIMongoMapper,
 	}
 	return providerProvider, nil
 }

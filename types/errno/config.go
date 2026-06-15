@@ -4,13 +4,13 @@ import "github.com/xh-polaris/psych-core-api/pkg/errorx/code"
 
 // Config 错误码 4000 开始
 const (
-	ErrNotAdmin = 4000
+	ErrConfigNotFound = 4000
 )
 
 func init() {
 	code.Register(
-		ErrNotAdmin,
-		"无管理员权限",
+		ErrConfigNotFound,
+		"单位(id={unitId})配置查询失败",
 		code.WithAffectStability(false),
 	)
 }

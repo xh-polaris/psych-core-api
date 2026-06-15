@@ -23,6 +23,7 @@ type Report struct {
 	End            time.Time              `bson:"end" json:"end"`                                            // 对话结束时间
 	Config         *config.Report         `bson:"config" json:"config,omitempty"`                            // 对话配置
 	Info           map[string]interface{} `bson:"info" json:"info,omitempty"`                                // 额外信息
+	Character      *config.Character      `bson:"character,omitempty" json:"character,omitempty"`            // 心理老师形象
 	Status         int                    `bson:"status" json:"status"`                                      // 报表状态 处理中/已完成/已删除
 
 	// 报表结果

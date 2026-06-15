@@ -20,7 +20,10 @@ const (
 
 	ConfigErr = 999_004_000
 
-	ExistConn = 999_005_000
+	ExistConn    = 999_005_000
+	AlertSms     = 999_006_001
+	AlertSmsSend = 999_006_002
+	AlertResolve = 999_006_003
 )
 
 func init() {
@@ -89,4 +92,19 @@ func init() {
 		ExistConn,
 		"用户连接数已满, 请先关闭先前的连接",
 		code.WithAffectStability(true))
+	code.Register(
+		AlertSms,
+		"SMS告警发送已达每日上限",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		AlertSmsSend,
+		"SMS告警短信发送失败",
+		code.WithAffectStability(false),
+	)
+	code.Register(
+		AlertResolve,
+		"SMS告警接收人解析失败",
+		code.WithAffectStability(false),
+	)
 }

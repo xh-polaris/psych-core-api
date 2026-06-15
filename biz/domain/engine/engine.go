@@ -67,6 +67,7 @@ type Engine struct {
 	uSession     string         // uSession 对话ID
 	usage        *core.Usage    // 用量
 	conf         *core.Config
+	Character    *core.CharacterInfo // 心理老师形象, 由前端指定或取config默认
 
 	usrSvc     *service.UserService
 	cfgSvc     *service.ConfigService
@@ -252,7 +253,9 @@ func (e *Engine) Close() (err error) {
 			}
 
 			// 再次查询最新的消息总数以确定是否有变化
-			latestMsgs, _ := his.Mgr.RetrieveMessage(pCtx, e.uSession, 0)
+			userId := e.info[cst.JsonUserID].(string)
+			todayDate := util.FormatDateUTC8(time.Now())
+			latestMsgs, _ := his.Mgr.GetUserDailyMessages(pCtx, userId, todayDate)
 			currentTotal := len(latestMsgs)
 
 			// 只有消息数增加了，才执行更新和 MQ
@@ -287,11 +290,13 @@ func (e *Engine) buildPostNotify(end time.Time) *core.PostNotify {
 	return &core.PostNotify{
 		Session: e.uSession,
 		// 根层级的 UserId 和 UnitId 留空，因为它们已经存在于 Info 字典中了
-		Usage:  e.usage,
-		Info:   e.info,
-		Start:  e.start.Unix(),
-		End:    end.Unix(),
-		Config: e.conf,
+		Usage:     e.usage,
+		Info:      e.info,
+		Start:     e.start.Unix(),
+		End:       end.Unix(),
+		Config:    e.conf,
+		Date:      util.FormatDateUTC8(end),
+		Character: e.Character,
 	}
 }
 

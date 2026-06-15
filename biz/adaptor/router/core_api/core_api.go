@@ -21,14 +21,14 @@ func Register(r *server.Hertz) {
 		_config := root.Group("/config", _configMw()...)
 		_config.POST("/create", append(_configcreateMw(), core_api.ConfigCreate)...)
 		_config.GET("/get_by_unit_id", append(_configgetbyunitidMw(), core_api.ConfigGetByUnitID)...)
-		_config.GET("/get_model_and_bg_image", append(_configgetmodelandbgimageMw(), core_api.ConfigGetModelAndBgImage)...)
+		_config.GET("/get_character", append(_configgetcharacterMw(), core_api.ConfigGetCharacter)...)
 		_config.POST("/update_info", append(_configupdateinfoMw(), core_api.ConfigUpdateInfo)...)
-		_config.POST("/update_model_and_bg_image", append(_configupdatemodelandbgimageMw(), core_api.ConfigUpdateModelAndBgImage)...)
 	}
 	{
 		_conversation := root.Group("/conversation", _conversationMw()...)
 		_conversation.POST("/create", append(_createconversationMw(), core_api.CreateConversation)...)
-		_conversation.POST("/get", append(_getconversationMw(), core_api.GetConversation)...)
+		_conversation.POST("/get_by_date", append(_getconvbydateMw(), core_api.GetConvByDate)...)
+		_conversation.POST("/get_single", append(_getsingleconvMw(), core_api.GetSingleConv)...)
 		_conversation.POST("/list", append(_listconversationsMw(), core_api.ListConversations)...)
 	}
 	{
