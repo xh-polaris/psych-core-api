@@ -50,6 +50,7 @@ type Config struct {
 	Mongo       *Mongo
 	ModelConfig *ModelConfig
 	Synapse     *Synapse
+	SMS         *SMS
 }
 
 func NewConfig() (*Config, error) {

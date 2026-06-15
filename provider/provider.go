@@ -11,6 +11,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/sms_alert"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/biz/infra/synapse"
@@ -38,6 +39,10 @@ type Provider struct {
 	MessageMapper       message.IMongoMapper
 	ConversationMapper  conversation.IMongoMapper
 	ReportMapper        report.IMongoMapper
+	UserMapper          user.IMongoMapper
+	ConfigMapper        config.IMongoMapper
+	UnitMapper          unit.IMongoMapper
+	SmsAlertMapper      sms_alert.IMongoMapper
 }
 
 func Get() *Provider {
@@ -69,6 +74,7 @@ var InfrastructureSet = wire.NewSet(
 	conversation.NewConversationMongoMapper,
 	alarm.NewAlarmMongoMapper,
 	report.NewReportMongoMapper,
+	sms_alert.NewSmsAlertMongoMapper,
 	RpcSet,
 	synapse.New4b,
 )

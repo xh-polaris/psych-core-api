@@ -55,6 +55,7 @@ type IMongoMapper interface {
 	FindManyByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) ([]*User, error)
 	GetRiskDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) ([]*RiskStat, error)
 	ListUsers(ctx context.Context, opts *ListUserOptions) ([]*User, int64, error)
+	FindClassTeacherOfStudent(ctx context.Context, unitId bson.ObjectID, enrollYear, class int) (*User, error)
 }
 
 // ListUserOptions 用户列表查询选项
@@ -859,6 +860,20 @@ func (m *mongoMapper) ListUsers(ctx context.Context, opts *ListUserOptions) ([]*
 	}
 
 	return users, total, nil
+}
+
+func (m *mongoMapper) FindClassTeacherOfStudent(ctx context.Context, unitId bson.ObjectID, enrollYear, class int) (*User, error) {
+	filter := bson.M{
+		cst.UnitID: unitId,
+		cst.Role:   enum.UserRoleClassTeacher,
+		"bind_classes": bson.M{
+			"$elemMatch": bson.M{
+				cst.EnrollYear: enrollYear,
+				cst.Class:      class,
+			},
+		},
+	}
+	return m.FindOneByFields(ctx, filter)
 }
 
 // escapeRegex 转义 MongoDB regex 特殊字符，基础防注入
