@@ -75,6 +75,7 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams)
 	}
+
 	// 起止时间，默认今日-30天前
 	endDate := req.EndDate
 	if endDate == "" {
@@ -85,15 +86,6 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 		end, _, _ := util.DayToUTCRange(endDate)
 		startDate = util.FormatDateUTC8(end.Add(-30 * 24 * time.Hour))
 	}
-	// 默认一次显示5天对话
-	limit := int(5)
-	if req.PaginationOptions != nil && req.PaginationOptions.Limit != nil {
-		limit = int(*req.PaginationOptions.Limit)
-	}
-	page := int(1)
-	if req.PaginationOptions != nil && req.PaginationOptions.Page != nil {
-		page = int(*req.PaginationOptions.Page)
-	}
 
 	// 限定起止时间，默认为30天内
 	start, end, err := util.ParseDayRange(startDate, endDate)
@@ -101,31 +93,23 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 		return nil, errorx.New(errno.ErrInvalidParams)
 	}
 
+	pg := util.EnsurePaginationOptions(req.PaginationOptions)
+
 	dates, err := c.ConversationMapper.FindDistinctDatesByUserId(ctx, userId, start, end)
 	if err != nil {
 		return nil, errorx.New(errno.ErrListConversation)
 	}
 
-	if len(dates) == 0 {
+	total := int32(len(dates))
+	if total == 0 {
 		return &core_api.ListConversationsResp{
-			Pagination: util.PaginationRes(0, req.PaginationOptions),
+			Pagination: util.PaginationRes(0, pg),
 			Code:       0,
 			Msg:        "success",
 		}, nil
 	}
 
-	startIdx := (page - 1) * limit
-	if startIdx >= len(dates) {
-		return &core_api.ListConversationsResp{
-			Pagination: util.PaginationRes(int32(len(dates)), req.PaginationOptions),
-			Code:       0,
-			Msg:        "success",
-		}, nil
-	}
-	endIdx := startIdx + limit
-	if endIdx > len(dates) {
-		endIdx = len(dates)
-	}
+	startIdx, endIdx := util.PagedIndex(total, pg)
 	pageDates := dates[startIdx:endIdx]
 
 	dateSet := make(map[string]bool, len(pageDates))
@@ -138,10 +122,21 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 		return nil, errorx.New(errno.ErrListConversation)
 	}
 
-	result := make([]*core_api.ConversationVO, 0)
+	dateLatestConv := make(map[string]*conversation.Conversation, len(pageDates))
 	for _, conv := range convs {
 		convDate := util.FormatDateUTC8(conv.CreateTime)
 		if !dateSet[convDate] {
+			continue
+		}
+		if existing, ok := dateLatestConv[convDate]; !ok || conv.UpdateTime.After(existing.UpdateTime) {
+			dateLatestConv[convDate] = conv
+		}
+	}
+
+	result := make([]*core_api.ConversationVO, 0, len(pageDates))
+	for _, date := range pageDates {
+		conv, ok := dateLatestConv[date]
+		if !ok {
 			continue
 		}
 		result = append(result, &core_api.ConversationVO{
@@ -149,12 +144,12 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 			Brief:          conv.Title,
 			CreateTime:     conv.CreateTime.Unix(),
 			UpdateTime:     conv.UpdateTime.Unix(),
-			Date:           convDate,
+			Date:           date,
 		})
 	}
 
 	return &core_api.ListConversationsResp{
-		Pagination:       util.PaginationRes(int32(len(dates)), req.PaginationOptions),
+		Pagination:       util.PaginationRes(total, pg),
 		ConversationList: result,
 		Code:             0,
 		Msg:              "success",
@@ -163,12 +158,14 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 
 // GetConvByDate 返回用户指定日期的对话消息
 func (c *ConversationService) GetConvByDate(ctx context.Context, req *core_api.GetConvByDateReq) (resp *core_api.GetConvByDateResp, err error) {
+	// 提取当前用户userId
 	userMeta, err := c.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
-
 	userId := userMeta.UserId
+
+	// 传入其他userId的场景：管理员查看学生的对话内容
 	if req.UserId != "" && req.UserId != userId {
 		if userMeta.Role < enum.UserRoleUnitAdmin {
 			return nil, errorx.New(errno.ErrInsufficientAuth)
@@ -176,15 +173,18 @@ func (c *ConversationService) GetConvByDate(ctx context.Context, req *core_api.G
 		userId = req.UserId
 	}
 
+	// 日期默认为当天
 	if req.Date == "" {
 		req.Date = util.FormatDateUTC8(time.Now())
 	}
 
+	// 获取当日消息
 	msgs, err := his.Mgr.GetUserDailyMessages(ctx, userId, req.Date)
 	if err != nil {
 		return nil, errorx.New(errno.ErrFetchMessages)
 	}
 
+	// 分页并重新排序
 	total := int32(len(msgs))
 	startIdx, endIdx := util.PagedIndex(total, req.PaginationOptions)
 

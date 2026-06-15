@@ -71,14 +71,15 @@ func (m *AlertManager) CheckAndSetLimit(ctx context.Context, userId string) (boo
 // ResolveRecipients 解析告警短信接收人手机号列表。
 func (m *AlertManager) ResolveRecipients(ctx context.Context, unitId bson.ObjectID, student *user.User) []string {
 	var phones []string
-
+	// 单位配置的告警接收手机号
 	cfg, err := m.configMapper.FindOneByUnitID(ctx, unitId)
 	if err == nil && cfg != nil && len(cfg.AlertPhone) > 0 {
-		phones = append(phones, cfg.AlertPhone[0])
+		phones = append(phones, cfg.AlertPhone...)
 	} else if err != nil {
 		logs.Warnf("[alert] resolve config AlertPhone err: %v", err)
 	}
 
+	// 学生班主任
 	ct, err := m.userMapper.FindClassTeacherOfStudent(ctx, unitId, student.EnrollYear, student.Class)
 	if err == nil && ct != nil && ct.CodeType == enum.UserCodeTypePhone {
 		phones = append(phones, ct.Code)
@@ -86,6 +87,7 @@ func (m *AlertManager) ResolveRecipients(ctx context.Context, unitId bson.Object
 		logs.Warnf("[alert] resolve class teacher err: %v", err)
 	}
 
+	// 去重
 	seen := make(map[string]struct{}, len(phones))
 	deduped := make([]string, 0, len(phones))
 	for _, p := range phones {
@@ -151,7 +153,7 @@ func (m *AlertManager) Send(ctx context.Context, unitId, userId, convId bson.Obj
 			ID:         bson.NewObjectID(),
 			UnitID:     unitId,
 			UserID:     userId,
-			RecvPhone:  successPhones,
+			Recipients: successPhones,
 			ConvID:     convId,
 			CreateTime: time.Now(),
 		}

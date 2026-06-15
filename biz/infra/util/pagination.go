@@ -5,6 +5,13 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
+func EnsurePaginationOptions(pg *basic.PaginationOptions) *basic.PaginationOptions {
+	if pg == nil {
+		return &basic.PaginationOptions{}
+	}
+	return pg
+}
+
 func PagedFindOpt(pg *basic.PaginationOptions) *options.FindOptionsBuilder {
 	page := pg.GetPage()
 	if page < 1 {
@@ -32,8 +39,8 @@ func PagedIndex(total int32, pg *basic.PaginationOptions) (int, int) {
 		startIdx = 0
 	}
 	endIdx := startIdx + size
-	if startIdx >= int(total) {
-		startIdx = 0
+	if startIdx > int(total) {
+		startIdx = int(total)
 	}
 	if endIdx > int(total) {
 		endIdx = int(total)

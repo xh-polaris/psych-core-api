@@ -1185,7 +1185,7 @@ func (m *mongoMapper) FindDistinctDatesByUserId(ctx context.Context, userId bson
 			},
 		}},
 		{"$group": bson.M{cst.ID: "$localDate"}},
-		{"$sort": bson.M{cst.ID: 1}},
+		{"$sort": bson.M{cst.ID: -1}},
 	}
 
 	var results []struct {
