@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/cache"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
@@ -124,11 +123,6 @@ func (m *AlertManager) Send(ctx context.Context, unitId, userId, convId bson.Obj
 		return nil
 	}
 
-	templateId := conf.GetConfig().SMS.Extra["AlertTemplateId"]
-	if templateId == "" {
-		return errorx.New(errno.AlertSmsSend, errorx.KV("field", "AlertTemplateId"))
-	}
-
 	ok, err := m.CheckAndSetLimit(ctx, userIdHex)
 	if err != nil {
 		logs.Errorf("[alert] check limit err: %v", err)
@@ -139,15 +133,12 @@ func (m *AlertManager) Send(ctx context.Context, unitId, userId, convId bson.Obj
 		return nil
 	}
 
-	param := &sms.Param{
-		TemplateId: templateId,
-		Params:     []string{student.Name, gradeStr, classStr},
-	}
+	params := []string{student.Name, gradeStr, classStr}
 
 	var sendErr error
 	var successPhones []string
 	for _, phone := range phones {
-		if e := sms.Mgr.Send(ctx, phone, param); e != nil {
+		if e := sms.Mgr.Send(ctx, "alert", phone, params); e != nil {
 			logs.Errorf("[alert] send sms to %s err: %v", phone, e)
 			sendErr = e
 		} else {
