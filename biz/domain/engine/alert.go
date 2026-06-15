@@ -14,7 +14,7 @@ import (
 )
 
 type smsAlertTracker struct {
-	builder strings.Builder
+	pending strings.Builder
 	once    sync.Once
 	marker  string
 	ctx     context.Context
@@ -25,9 +25,10 @@ type smsAlertTracker struct {
 }
 
 func (t *smsAlertTracker) check(text string) string {
-	t.builder.WriteString(text)
-	content := t.builder.String()
-	if strings.Contains(content, t.marker) && !t.convId.IsZero() {
+	combined := t.pending.String() + text
+	t.pending.Reset()
+
+	if strings.Contains(combined, t.marker) && !t.convId.IsZero() {
 		t.once.Do(func() {
 			logs.Infof("[engine] alert marker detected, dispatching alert for user %s", t.userId.Hex())
 			t.wg.Add(1)
@@ -42,7 +43,26 @@ func (t *smsAlertTracker) check(text string) string {
 			}()
 		})
 	}
-	return strings.ReplaceAll(text, t.marker, "")
+
+	cleaned := strings.ReplaceAll(combined, t.marker, "")
+
+	keep := len(t.marker) - 1
+	if keep < 0 {
+		keep = 0
+	}
+	if len(cleaned) > keep {
+		result := cleaned[:len(cleaned)-keep]
+		t.pending.WriteString(cleaned[len(cleaned)-keep:])
+		return result
+	}
+	t.pending.WriteString(cleaned)
+	return ""
+}
+
+func (t *smsAlertTracker) flush() string {
+	result := t.pending.String()
+	t.pending.Reset()
+	return result
 }
 
 func (e *Engine) filterAlertSms(ctx context.Context, input *schema.StreamReader[*schema.Message]) *schema.StreamReader[*schema.Message] {
@@ -78,6 +98,9 @@ func (e *Engine) filterAlertSms(ctx context.Context, input *schema.StreamReader[
 
 			msg, err := input.Recv()
 			if err != nil {
+				if flushed := tracker.flush(); flushed != "" {
+					writer.Send(&schema.Message{Content: flushed}, nil)
+				}
 				writer.Send(nil, err)
 				return
 			}
