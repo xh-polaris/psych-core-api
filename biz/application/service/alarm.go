@@ -64,12 +64,16 @@ func (s *AlarmService) Overview(ctx context.Context, req *core_api.DashboardGetA
 		unitOID = id
 	}
 
-	// 班主任提前返回
+	endTime := parseEndTime(req.GetEndTime())
+	startTime := parseStartTime(req.GetStartTime(), endTime)
+	prevEndTime := startTime
+	prevStartTime := prevEndTime.AddDate(0, 0, -7)
+
 	if role == enum.UserRoleClassTeacher {
-		return s.getAlarmOverviewClassTeacher(ctx, meta.UserId, unitOID)
+		return s.getAlarmOverviewClassTeacher(ctx, meta.UserId, unitOID, startTime, endTime, prevStartTime, prevEndTime)
 	}
 
-	st, err := s.AlarmMapper.AggregateStats(ctx, unitOID, time.Time{}, time.Time{})
+	st, err := s.AlarmMapper.AggregateStats(ctx, unitOID, startTime, endTime, prevStartTime, prevEndTime)
 	if err != nil {
 		logs.Errorf("aggregate alarm error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardAlarmUserStat)
@@ -320,7 +324,7 @@ func (s *AlarmService) UpdateAlarm(ctx context.Context, req *core_api.DashboardU
 }
 
 // getAlarmOverviewClassTeacher 班主任版预警概览
-func (s *AlarmService) getAlarmOverviewClassTeacher(ctx context.Context, userId string, unitOID bson.ObjectID) (*core_api.DashboardGetAlarmOverviewResp, error) {
+func (s *AlarmService) getAlarmOverviewClassTeacher(ctx context.Context, userId string, unitOID bson.ObjectID, curStart, curEnd, prevStart, prevEnd time.Time) (*core_api.DashboardGetAlarmOverviewResp, error) {
 	userOID, err := bson.ObjectIDFromHex(userId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UserID"))
@@ -351,7 +355,7 @@ func (s *AlarmService) getAlarmOverviewClassTeacher(ctx context.Context, userId 
 		classes = append(classes, int32(bc.Class))
 	}
 
-	st, err := s.AlarmMapper.AggregateStatsByClassList(ctx, unitOID, grades, classes, time.Time{}, time.Time{})
+	st, err := s.AlarmMapper.AggregateStatsByClassList(ctx, unitOID, grades, classes, curStart, curEnd, prevStart, prevEnd)
 	if err != nil {
 		logs.Errorf("aggregate alarm by class list error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardAlarmUserStat)

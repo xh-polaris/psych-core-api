@@ -41,7 +41,7 @@ type IMongoMapper interface {
 	FindManyByUnitIDWithFilter(ctx context.Context, unitId bson.ObjectID, grade, class *int32) ([]*User, error)
 	BatchFindByIDs(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*User, error)
 	CountByClasses(ctx context.Context, unitId bson.ObjectID, startGrade int, grade, class []int32) ([]*ClassStatResult, error)
-	RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID) ([]*RiskStat, error)
+	RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) ([]*RiskStat, error)
 	FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID, startGrade int) (ClassTeachers, error)
 	ExistsClassTeacher(ctx context.Context, unitId bson.ObjectID, grade, class int) (bool, error)
 	ExistsByCode(ctx context.Context, code string) (bool, error)
@@ -53,7 +53,7 @@ type IMongoMapper interface {
 	CountStudentsByPeriodAndClassList(ctx context.Context, unitId *bson.ObjectID, grades, classes []int32, start, end time.Time) (int32, error)
 	CountHighRiskStudentsByClassList(ctx context.Context, grades, classes []int32, start, end time.Time) (int32, error)
 	FindManyByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) ([]*User, error)
-	GetRiskDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) ([]*RiskStat, error)
+	GetRiskDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32, start, end time.Time) ([]*RiskStat, error)
 	ListUsers(ctx context.Context, opts *ListUserOptions) ([]*User, int64, error)
 	FindClassTeacherOfStudent(ctx context.Context, unitId bson.ObjectID, enrollYear, class int) (*User, error)
 }
@@ -418,13 +418,23 @@ type RiskStat struct {
 
 // RiskDistributionStats 按风险等级和性别统计，预期返回长为8的切片（4种level*2种gender）
 // unitId传空值则统计所有单位的用户风险分布
-func (m *mongoMapper) RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID) ([]*RiskStat, error) {
+func (m *mongoMapper) RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) ([]*RiskStat, error) {
 	match := bson.M{
 		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
 		cst.Role:   enum.UserRoleStudent,
 	}
 	if unitId != nil {
 		match[cst.UnitID] = *unitId
+	}
+	if !start.IsZero() || !end.IsZero() {
+		tf := bson.M{}
+		if !start.IsZero() {
+			tf["$gte"] = start
+		}
+		if !end.IsZero() {
+			tf["$lte"] = end
+		}
+		match[cst.UpdateTime] = tf
 	}
 
 	pipeline := []bson.M{
@@ -653,11 +663,21 @@ func (m *mongoMapper) FindManyByClassList(ctx context.Context, unitId bson.Objec
 }
 
 // GetRiskDistributionByClassList 按班级列表获取风险分布统计（按风险等级和性别分组）
-func (m *mongoMapper) GetRiskDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) ([]*RiskStat, error) {
+func (m *mongoMapper) GetRiskDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32, start, end time.Time) ([]*RiskStat, error) {
 	match := bson.M{
 		cst.UnitID: unitId,
 		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
 		cst.Role:   enum.UserRoleStudent,
+	}
+	if !start.IsZero() || !end.IsZero() {
+		tf := bson.M{}
+		if !start.IsZero() {
+			tf["$gte"] = start
+		}
+		if !end.IsZero() {
+			tf["$lte"] = end
+		}
+		match[cst.UpdateTime] = tf
 	}
 
 	if len(grades) > 0 || len(classes) > 0 {

@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 	"unicode/utf8"
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
@@ -239,8 +240,8 @@ func isValidWord(word string) bool {
 	return true
 }
 
-func (wce *WordCloudExtractor) FromUnitKWs(ctx context.Context, unitId bson.ObjectID) (*core_api.Keywords, error) {
-	kws, err := wce.rptMapper.GetUnitKW(ctx, unitId)
+func (wce *WordCloudExtractor) FromUnitKWs(ctx context.Context, unitId bson.ObjectID, start, end time.Time) (*core_api.Keywords, error) {
+	kws, err := wce.rptMapper.GetUnitKW(ctx, unitId, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -253,8 +254,8 @@ func (wce *WordCloudExtractor) FromUnitKWs(ctx context.Context, unitId bson.Obje
 	}, nil
 }
 
-func (wce *WordCloudExtractor) FromAllUnitsKWs(ctx context.Context) (*core_api.Keywords, error) {
-	kws, err := wce.rptMapper.GetAllUnitsKW(ctx)
+func (wce *WordCloudExtractor) FromAllUnitsKWs(ctx context.Context, start, end time.Time) (*core_api.Keywords, error) {
+	kws, err := wce.rptMapper.GetAllUnitsKW(ctx, start, end)
 	if err != nil {
 		return nil, err
 	}

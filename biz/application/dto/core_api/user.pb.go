@@ -1224,6 +1224,7 @@ var file_core_api_user_proto_depIdxs = []int32{
 	0,  // [0:7] is the sub-list for field type_name
 }
 
+func init() { file_core_api_user_proto_init() }
 func file_core_api_user_proto_init() {
 	if File_core_api_user_proto != nil {
 		return

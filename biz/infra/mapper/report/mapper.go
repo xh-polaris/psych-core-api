@@ -2,6 +2,7 @@ package report
 
 import (
 	"context"
+	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
@@ -33,8 +34,8 @@ type IMongoMapper interface {
 	FindByConversationPreferSuccess(ctx context.Context, sessionId bson.ObjectID) (*Report, error)
 	BatchFindBySession(ctx context.Context, sessionIds []bson.ObjectID) (map[bson.ObjectID]*Report, error)
 	// 词云相关接口
-	GetAllUnitsKW(ctx context.Context) (map[string]int32, error)
-	GetUnitKW(ctx context.Context, unitId bson.ObjectID) (map[string]int32, error)
+	GetAllUnitsKW(ctx context.Context, start, end time.Time) (map[string]int32, error)
+	GetUnitKW(ctx context.Context, unitId bson.ObjectID, start, end time.Time) (map[string]int32, error)
 }
 
 type mongoMapper struct {
@@ -134,16 +135,26 @@ func (m *mongoMapper) FindAllByUser(ctx context.Context, userId bson.ObjectID) (
 }
 
 // GetAllUnitsKW 统计所有unit的报表的关键词以及它们的个数，优先考虑性能
-func (m *mongoMapper) GetAllUnitsKW(ctx context.Context) (map[string]int32, error) {
+func (m *mongoMapper) GetAllUnitsKW(ctx context.Context, start, end time.Time) (map[string]int32, error) {
+	matchFilter := bson.M{
+		cst.Keywords: bson.M{
+			"$exists": true,
+			"$ne":     nil,
+		},
+	}
+	if !start.IsZero() || !end.IsZero() {
+		tf := bson.M{}
+		if !start.IsZero() {
+			tf["$gte"] = start
+		}
+		if !end.IsZero() {
+			tf["$lte"] = end
+		}
+		matchFilter[cst.CreateTime] = tf
+	}
 	pipeline := mongo.Pipeline{
-		// 过滤：只处理有关键词的报表
 		{{
-			Key: "$match", Value: bson.M{
-				cst.Keywords: bson.M{
-					"$exists": true,
-					"$ne":     nil,
-				},
-			},
+			Key: "$match", Value: matchFilter,
 		}},
 		// 将关键词map转换为数组便于统计
 		{{
@@ -198,17 +209,27 @@ func (m *mongoMapper) GetAllUnitsKW(ctx context.Context) (map[string]int32, erro
 }
 
 // GetUnitKW 统计某个unit下报表的关键词及个数，优先考虑性能
-func (m *mongoMapper) GetUnitKW(ctx context.Context, unitId bson.ObjectID) (map[string]int32, error) {
+func (m *mongoMapper) GetUnitKW(ctx context.Context, unitId bson.ObjectID, start, end time.Time) (map[string]int32, error) {
+	matchFilter := bson.M{
+		cst.UnitID: unitId,
+		cst.Keywords: bson.M{
+			"$exists": true,
+			"$ne":     nil,
+		},
+	}
+	if !start.IsZero() || !end.IsZero() {
+		tf := bson.M{}
+		if !start.IsZero() {
+			tf["$gte"] = start
+		}
+		if !end.IsZero() {
+			tf["$lte"] = end
+		}
+		matchFilter[cst.CreateTime] = tf
+	}
 	pipeline := mongo.Pipeline{
-		// 过滤：匹配指定unit且有关键词的报表
 		{{
-			Key: "$match", Value: bson.M{
-				cst.UnitID: unitId,
-				cst.Keywords: bson.M{
-					"$exists": true,
-					"$ne":     nil,
-				},
-			},
+			Key: "$match", Value: matchFilter,
 		}},
 		// 将关键词map转换为数组便于统计
 		{{

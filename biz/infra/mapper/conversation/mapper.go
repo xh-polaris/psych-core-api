@@ -47,7 +47,7 @@ type IMongoMapper interface {
 	// 批量统计
 	BatchConvStats(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*ConvStats, error)
 	// 按时长分桶统计对话数量
-	CountByDurationBucket(ctx context.Context, unitId *bson.ObjectID, minMinutes, maxMinutes float64) (int32, error)
+	CountByDurationBucket(ctx context.Context, unitId *bson.ObjectID, minMinutes, maxMinutes float64, start, end time.Time) (int32, error)
 	// 按年级统计对话时长分布
 	ConvDurationByGrade(ctx context.Context, unitId *bson.ObjectID) (map[int32]int32, int32, error)
 
@@ -59,7 +59,7 @@ type IMongoMapper interface {
 	CountByClassList(ctx context.Context, grades, classes []int32) (int32, error)
 	FindManyByClassList(ctx context.Context, grades, classes []int32, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
 	// 按时长分桶统计（按班级列表）
-	CountByDurationBucketByClassList(ctx context.Context, grades, classes []int32, minMinutes, maxMinutes float64) (int32, error)
+	CountByDurationBucketByClassList(ctx context.Context, grades, classes []int32, minMinutes, maxMinutes float64, start, end time.Time) (int32, error)
 	// 按年级统计对话时长分布（按班级列表）
 	ConvDurationByGradeByClassList(ctx context.Context, grades, classes []int32) (map[int32]int32, int32, error)
 }
@@ -489,8 +489,18 @@ func (m *mongoMapper) FindManyByUnitId(ctx context.Context, unitId *bson.ObjectI
 
 // CountByDurationBucket 按时长分桶统计对话数量（支持四舍五入到整数分钟）
 // minMinutes, maxMinutes: 时长范围（分钟），maxMinutes < 0 表示无上限
-func (m *mongoMapper) CountByDurationBucket(ctx context.Context, unitId *bson.ObjectID, minMinutes, maxMinutes float64) (int32, error) {
+func (m *mongoMapper) CountByDurationBucket(ctx context.Context, unitId *bson.ObjectID, minMinutes, maxMinutes float64, start, end time.Time) (int32, error) {
 	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
+	if !start.IsZero() || !end.IsZero() {
+		tf := bson.M{}
+		if !start.IsZero() {
+			tf["$gte"] = start
+		}
+		if !end.IsZero() {
+			tf["$lte"] = end
+		}
+		matchStage[cst.StartTime] = tf
+	}
 
 	// 构建时长过滤条件：durationMinutes = (end_time - start_time) / 60000
 	// 使用 $round 四舍五入到整数分钟
@@ -1013,7 +1023,7 @@ func (m *mongoMapper) FindManyByClassList(ctx context.Context, grades, classes [
 }
 
 // CountByDurationBucketByClassList 按时长分桶统计对话数量（按班级列表）
-func (m *mongoMapper) CountByDurationBucketByClassList(ctx context.Context, grades, classes []int32, minMinutes, maxMinutes float64) (int32, error) {
+func (m *mongoMapper) CountByDurationBucketByClassList(ctx context.Context, grades, classes []int32, minMinutes, maxMinutes float64, start, end time.Time) (int32, error) {
 	if len(grades) == 0 && len(classes) == 0 {
 		return 0, nil
 	}
@@ -1029,6 +1039,16 @@ func (m *mongoMapper) CountByDurationBucketByClassList(ctx context.Context, grad
 	matchStage := bson.M{
 		cst.UserID: bson.M{cst.In: userIds},
 		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+	}
+	if !start.IsZero() || !end.IsZero() {
+		tf := bson.M{}
+		if !start.IsZero() {
+			tf["$gte"] = start
+		}
+		if !end.IsZero() {
+			tf["$lte"] = end
+		}
+		matchStage[cst.StartTime] = tf
 	}
 
 	durationExpr := bson.M{
