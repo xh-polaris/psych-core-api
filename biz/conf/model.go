@@ -18,11 +18,12 @@ type ChatConfig struct {
 }
 
 type TTSConfig struct {
-	URL         string
-	AccessKey   string
-	Namespace   string
-	ResourceId  string
-	AudioParams struct {
+	URL          string
+	VoiceListURL string `json:",optional"`
+	AccessKey    string
+	Namespace    string
+	ResourceId   string
+	AudioParams  struct {
 		Format       string
 		Codec        string
 		Rate         int32

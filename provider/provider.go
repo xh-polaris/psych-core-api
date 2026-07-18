@@ -10,10 +10,12 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/prompt"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/sms_alert"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
+	"github.com/xh-polaris/psych-core-api/biz/infra/storage"
 	"github.com/xh-polaris/psych-core-api/biz/infra/synapse"
 )
 
@@ -36,6 +38,7 @@ type Provider struct {
 	UserService         service.UserService
 	UnitService         service.UnitService
 	ConversationService service.ConversationService
+	FileService         service.FileService
 	MessageMapper       message.IMongoMapper
 	ConversationMapper  conversation.IMongoMapper
 	ReportMapper        report.IMongoMapper
@@ -43,6 +46,7 @@ type Provider struct {
 	ConfigMapper        config.IMongoMapper
 	UnitMapper          unit.IMongoMapper
 	SmsAlertMapper      sms_alert.IMongoMapper
+	PromptMapper        prompt.IMongoMapper
 }
 
 func Get() *Provider {
@@ -58,6 +62,7 @@ var ApplicationSet = wire.NewSet(
 	service.UserServiceSet,
 	service.UnitServiceSet,
 	service.ConversationServiceSet,
+	service.FileServiceSet,
 )
 
 var DomainSet = wire.NewSet(
@@ -75,8 +80,10 @@ var InfrastructureSet = wire.NewSet(
 	alarm.NewAlarmMongoMapper,
 	report.NewReportMongoMapper,
 	sms_alert.NewSmsAlertMongoMapper,
+	prompt.NewPromptMongoMapper,
 	RpcSet,
 	synapse.New4b,
+	storage.NewCOS,
 )
 
 var AllProvider = wire.NewSet(

@@ -3,6 +3,7 @@ package application
 import (
 	"github.com/xh-polaris/psych-core-api/biz/domain/alert"
 	"github.com/xh-polaris/psych-core-api/biz/domain/his"
+	"github.com/xh-polaris/psych-core-api/biz/domain/prompt"
 	"github.com/xh-polaris/psych-core-api/biz/domain/wordcld"
 	"github.com/xh-polaris/psych-core-api/biz/infra/cache"
 	"github.com/xh-polaris/psych-core-api/biz/infra/cache/redis"
@@ -10,6 +11,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
+	pmapper "github.com/xh-polaris/psych-core-api/biz/infra/mapper/prompt"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/sms_alert"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
@@ -28,6 +30,7 @@ type AppDependency struct {
 	UnitMapper         unit.IMongoMapper
 	ConfigMapper       config.IMongoMapper
 	SmsAlertMapper     sms_alert.IMongoMapper
+	PromptMapper       pmapper.IMongoMapper
 }
 
 func InitApplication() {
@@ -51,6 +54,7 @@ func InitInfra(app *AppDependency) {
 	app.UnitMapper = provider.Get().UnitMapper
 	app.ConfigMapper = provider.Get().ConfigMapper
 	app.SmsAlertMapper = provider.Get().SmsAlertMapper
+	app.PromptMapper = provider.Get().PromptMapper
 	lock.New(app.Cache)
 	sms.New(provider.Get().Config)
 }
@@ -59,4 +63,5 @@ func InitDomain(app *AppDependency) {
 	his.New(app.Cache, app.MessageMapper, app.ConversationMapper)
 	wordcld.NewWordCloudExtractor(app.ReportMapper)
 	alert.New(app.Cache, app.UserMapper, app.ConfigMapper, app.UnitMapper, app.SmsAlertMapper)
+	prompt.New(app.Cache, app.PromptMapper)
 }

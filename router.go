@@ -11,6 +11,7 @@ import (
 func customizedRegister(r *server.Hertz) {
 	r.GET("/ping", handler.Ping)
 	r.GET("/chat", handler.Chat)
+	r.POST("/file/upload", handler.UploadImage)
 	// your code ...
 	r.GET("healthz", handler.Healthz)
 }

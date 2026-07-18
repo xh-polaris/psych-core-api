@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math"
 	"sort"
@@ -32,6 +33,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -726,6 +728,25 @@ func (s *DashboardService) DashboardListUnits(ctx context.Context, req *core_api
 		Code:  0,
 		Msg:   "success",
 	}, nil
+}
+
+func toStructPB(v any) *structpb.Struct {
+	if v == nil {
+		return nil
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return nil
+	}
+	var m map[string]any
+	if err = json.Unmarshal(b, &m); err != nil {
+		return nil
+	}
+	s, err := structpb.NewStruct(m)
+	if err != nil {
+		return nil
+	}
+	return s
 }
 
 // DashboardGetPsychTrend 情绪分布，风险性别分布，关键词词云
@@ -1707,6 +1728,8 @@ func (s *DashboardService) dashboardGetReportUnit(ctx context.Context, convOID b
 		NeedAlarm:      rpt.NeedAlarm,
 		KeywordPercent: rpt.Keywords,
 		ReportStatus:   int32(rpt.Status),
+		Analysis:       toStructPB(rpt.Analysis),
+		SimpleReport:   toStructPB(rpt.SimpleReport),
 		Code:           0,
 		Msg:            "success",
 	}

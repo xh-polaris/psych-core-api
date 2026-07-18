@@ -84,3 +84,11 @@ func ConfigGetCharacter(ctx context.Context, c *app.RequestContext) {
 	resp, err := p.ConfigService.ConfigGetCharacters(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
+
+// ConfigListVoice .
+// @router /config/list_voice [GET]
+func ConfigListVoice(ctx context.Context, c *app.RequestContext) {
+	p := provider.Get()
+	resp, err := p.ConfigService.ListVoice(ctx)
+	httpx.PostProcess(ctx, c, nil, resp, err)
+}

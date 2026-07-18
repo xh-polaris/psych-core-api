@@ -6,10 +6,12 @@ import (
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
+	"github.com/xh-polaris/psych-core-api/biz/infra/volc"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/enum"
@@ -26,6 +28,7 @@ type IConfigService interface {
 	ConfigUpdate(ctx context.Context, req *core_api.ConfigCreateOrUpdateReq) (resp *basic.Response, err error)
 	ConfigGetByUnitID(ctx context.Context, req *core_api.ConfigGetByUnitIdReq) (resp *core_api.ConfigGetByUnitIdResp, err error)
 	ConfigGetCharacters(ctx context.Context, req *core_api.ConfigGetCharacterReq) (resp *core_api.ConfigGetCharacterResp, err error)
+	ListVoice(ctx context.Context) (*ListVoiceResp, error)
 }
 
 type ConfigService struct {
@@ -422,4 +425,43 @@ func characterReq2DB(in []*core_api.Character) []*config.Character {
 		}
 	}
 	return out
+}
+
+type ListVoiceResp struct {
+	Code   int32             `json:"code"`
+	Msg    string            `json:"msg"`
+	Voices []*volc.VoiceInfo `json:"voices"`
+}
+
+func (c *ConfigService) ListVoice(ctx context.Context) (*ListVoiceResp, error) {
+	cfg := conf.GetConfig()
+	if cfg.ModelConfig == nil || cfg.ModelConfig.TTS == nil {
+		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "TTS配置不存在"))
+	}
+
+	var ttsCfg *conf.TTSConfig
+	for _, v := range cfg.ModelConfig.TTS {
+		ttsCfg = v
+		break
+	}
+	if ttsCfg == nil {
+		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "TTS配置不存在"))
+	}
+
+	baseURL := ttsCfg.VoiceListURL
+	if baseURL == "" {
+		baseURL = "openspeech.bytedance.com"
+	}
+
+	result, raw, err := volc.ListVoices(baseURL, ttsCfg.AccessKey)
+	if err != nil {
+		logs.CtxErrorf(ctx, "[ListVoice] volc API error: %v, raw: %+v", err, raw)
+		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "获取音色列表失败，请检查VoiceListURL配置"))
+	}
+
+	return &ListVoiceResp{
+		Code:   0,
+		Msg:    "success",
+		Voices: result.Voices,
+	}, nil
 }

@@ -15,10 +15,12 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/prompt"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/sms_alert"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
+	"github.com/xh-polaris/psych-core-api/biz/infra/storage"
 	"github.com/xh-polaris/psych-core-api/biz/infra/synapse"
 )
 
@@ -85,7 +87,12 @@ func NewProvider() (*Provider, error) {
 		MessageMapper:      messageIMongoMapper,
 		ConversationMapper: conversationIMongoMapper,
 	}
+	storageProvider := storage.NewCOS(confConfig)
+	fileService := service.FileService{
+		StoragePvd: storageProvider,
+	}
 	sms_alertIMongoMapper := sms_alert.NewSmsAlertMongoMapper(confConfig)
+	promptIMongoMapper := prompt.NewPromptMongoMapper(confConfig)
 	providerProvider := &Provider{
 		Config:              confConfig,
 		AlarmService:        alarmService,
@@ -94,6 +101,7 @@ func NewProvider() (*Provider, error) {
 		UserService:         userService,
 		UnitService:         unitService,
 		ConversationService: conversationService,
+		FileService:         fileService,
 		MessageMapper:       messageIMongoMapper,
 		ConversationMapper:  conversationIMongoMapper,
 		ReportMapper:        reportIMongoMapper,
@@ -101,6 +109,7 @@ func NewProvider() (*Provider, error) {
 		ConfigMapper:        configIMongoMapper,
 		UnitMapper:          unitIMongoMapper,
 		SmsAlertMapper:      sms_alertIMongoMapper,
+		PromptMapper:        promptIMongoMapper,
 	}
 	return providerProvider, nil
 }

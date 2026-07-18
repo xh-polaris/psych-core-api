@@ -51,6 +51,7 @@ type Config struct {
 	ModelConfig *ModelConfig
 	Synapse     *Synapse
 	SMS         *SMS
+	COS         *COS
 }
 
 func NewConfig() (*Config, error) {
