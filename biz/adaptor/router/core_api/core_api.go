@@ -26,6 +26,12 @@ func Register(r *server.Hertz) {
 		_config.GET("/list_voice", append(_configlistvoiceMw(), core_api.ConfigListVoice)...)
 	}
 	{
+		_config0 := root.Group("/config/character", _configcharacterMw()...)
+		_config0.POST("/add", append(_configcharacteraddMw(), core_api.ConfigAddCharacter)...)
+		_config0.POST("/update", append(_configcharacterupdateMw(), core_api.ConfigUpdateCharacter)...)
+		_config0.POST("/delete", append(_configcharacterdeleteMw(), core_api.ConfigDeleteCharacter)...)
+	}
+	{
 		_conversation := root.Group("/conversation", _conversationMw()...)
 		_conversation.POST("/create", append(_createconversationMw(), core_api.CreateConversation)...)
 		_conversation.POST("/get_by_date", append(_getconvbydateMw(), core_api.GetConvByDate)...)

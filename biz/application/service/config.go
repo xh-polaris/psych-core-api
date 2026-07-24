@@ -6,12 +6,11 @@ import (
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
-	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/voice"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
-	"github.com/xh-polaris/psych-core-api/biz/infra/volc"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/enum"
@@ -29,11 +28,15 @@ type IConfigService interface {
 	ConfigGetByUnitID(ctx context.Context, req *core_api.ConfigGetByUnitIdReq) (resp *core_api.ConfigGetByUnitIdResp, err error)
 	ConfigGetCharacters(ctx context.Context, req *core_api.ConfigGetCharacterReq) (resp *core_api.ConfigGetCharacterResp, err error)
 	ListVoice(ctx context.Context) (*ListVoiceResp, error)
+	AddCharacter(ctx context.Context, unitId string, ch *AddCharacterReq) (*AddCharacterResp, error)
+	UpdateCharacter(ctx context.Context, unitId string, ch *UpdateCharacterReq) (*basic.Response, error)
+	DeleteCharacter(ctx context.Context, unitId, characterId string) (*basic.Response, error)
 }
 
 type ConfigService struct {
 	AuthDomain   auth.IAuthDomain
 	ConfigMapper config.IMongoMapper
+	VoiceMapper  voice.IMongoMapper
 }
 
 var ConfigServiceSet = wire.NewSet(
@@ -395,11 +398,14 @@ func characterDB2Resp(in []*config.Character) []*core_api.Character {
 	out := make([]*core_api.Character, len(in))
 	for i, c := range in {
 		out[i] = &core_api.Character{
-			Id:     c.ID.Hex(),
-			Name:   c.Name,
-			Voice:  c.Voice,
-			Image:  c.Image,
-			Status: int32(c.Status),
+			Id:       c.ID.Hex(),
+			Name:     c.Name,
+			Voice:    c.Voice,
+			Image:    c.Image,
+			Status:   int32(c.Status),
+			Identity: c.Identity,
+			Style:    c.Style,
+			Greeting: c.Greeting,
 		}
 	}
 	return out
@@ -417,51 +423,196 @@ func characterReq2DB(in []*core_api.Character) []*config.Character {
 		}
 		oid, _ := bson.ObjectIDFromHex(id)
 		out[i] = &config.Character{
-			ID:     oid,
-			Name:   c.Name,
-			Voice:  c.Voice,
-			Image:  c.Image,
-			Status: int(c.Status),
+			ID:       oid,
+			Name:     c.Name,
+			Voice:    c.Voice,
+			Image:    c.Image,
+			Status:   int(c.Status),
+			Identity: c.Identity,
+			Style:    c.Style,
+			Greeting: c.Greeting,
 		}
 	}
 	return out
 }
 
 type ListVoiceResp struct {
-	Code   int32             `json:"code"`
-	Msg    string            `json:"msg"`
-	Voices []*volc.VoiceInfo `json:"voices"`
+	Code   int32          `json:"code"`
+	Msg    string         `json:"msg"`
+	Voices []*VoiceItemVO `json:"voices"`
+}
+
+type VoiceItemVO struct {
+	Name      string `json:"name"`
+	VoiceType string `json:"voiceType"`
+}
+
+type AddCharacterReq struct {
+	Name     string `json:"name"`
+	Voice    string `json:"voice"`
+	Image    string `json:"image"`
+	Identity string `json:"identity"`
+	Style    string `json:"style"`
+	Greeting string `json:"greeting"`
+}
+
+type AddCharacterResp struct {
+	Code        int32  `json:"code"`
+	Msg         string `json:"msg"`
+	CharacterId string `json:"characterId"`
+}
+
+type UpdateCharacterReq struct {
+	CharacterId string `json:"characterId"`
+	Name        string `json:"name"`
+	Voice       string `json:"voice"`
+	Image       string `json:"image"`
+	Identity    string `json:"identity"`
+	Style       string `json:"style"`
+	Greeting    string `json:"greeting"`
 }
 
 func (c *ConfigService) ListVoice(ctx context.Context) (*ListVoiceResp, error) {
-	cfg := conf.GetConfig()
-	if cfg.ModelConfig == nil || cfg.ModelConfig.TTS == nil {
-		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "TTS配置不存在"))
-	}
-
-	var ttsCfg *conf.TTSConfig
-	for _, v := range cfg.ModelConfig.TTS {
-		ttsCfg = v
-		break
-	}
-	if ttsCfg == nil {
-		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "TTS配置不存在"))
-	}
-
-	baseURL := ttsCfg.VoiceListURL
-	if baseURL == "" {
-		baseURL = "openspeech.bytedance.com"
-	}
-
-	result, raw, err := volc.ListVoices(baseURL, ttsCfg.AccessKey)
+	voices, err := c.VoiceMapper.FindAllByFields(ctx, bson.M{})
 	if err != nil {
-		logs.CtxErrorf(ctx, "[ListVoice] volc API error: %v, raw: %+v", err, raw)
-		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "获取音色列表失败，请检查VoiceListURL配置"))
+		logs.CtxErrorf(ctx, "[ListVoice] mongo error: %v", err)
+		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "获取音色列表失败"))
 	}
 
-	return &ListVoiceResp{
-		Code:   0,
-		Msg:    "success",
-		Voices: result.Voices,
-	}, nil
+	res := make([]*VoiceItemVO, len(voices))
+	for i, v := range voices {
+		res[i] = &VoiceItemVO{Name: v.Name, VoiceType: v.VoiceType}
+	}
+
+	return &ListVoiceResp{Code: 0, Msg: "success", Voices: res}, nil
+}
+
+func (c *ConfigService) AddCharacter(ctx context.Context, unitId string, req *AddCharacterReq) (*AddCharacterResp, error) {
+	m, err := c.AuthDomain.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.AuthDomain.VerifySuperAdmin(ctx, m); err != nil {
+		return nil, err
+	}
+
+	unitOID, err := bson.ObjectIDFromHex(unitId)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "unitId"))
+	}
+	if req.Name == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "角色名称"))
+	}
+	if req.Voice == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "音色"))
+	}
+
+	cfg, err := c.ConfigMapper.FindOneByUnitID(ctx, unitOID)
+	if err != nil || cfg == nil {
+		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "单位配置"))
+	}
+
+	chId := bson.NewObjectID()
+	ch := &config.Character{
+		ID:       chId,
+		Name:     req.Name,
+		Voice:    req.Voice,
+		Image:    req.Image,
+		Status:   enum.ConfigStatusActive,
+		Identity: req.Identity,
+		Style:    req.Style,
+		Greeting: req.Greeting,
+	}
+
+	if err := c.ConfigMapper.PushCharacter(ctx, cfg.ID, ch); err != nil {
+		logs.CtxErrorf(ctx, "[AddCharacter] mongo error: %v", err)
+		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "添加角色失败"))
+	}
+
+	return &AddCharacterResp{Code: 0, Msg: "success", CharacterId: chId.Hex()}, nil
+}
+
+func (c *ConfigService) UpdateCharacter(ctx context.Context, unitId string, req *UpdateCharacterReq) (*basic.Response, error) {
+	m, err := c.AuthDomain.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.AuthDomain.VerifySuperAdmin(ctx, m); err != nil {
+		return nil, err
+	}
+
+	unitOID, err := bson.ObjectIDFromHex(unitId)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "unitId"))
+	}
+	chOID, err := bson.ObjectIDFromHex(req.CharacterId)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "characterId"))
+	}
+
+	cfg, err := c.ConfigMapper.FindOneByUnitID(ctx, unitOID)
+	if err != nil || cfg == nil {
+		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "单位配置"))
+	}
+
+	setFields := bson.M{}
+	if req.Name != "" {
+		setFields["character.$.name"] = req.Name
+	}
+	if req.Voice != "" {
+		setFields["character.$.voice"] = req.Voice
+	}
+	if req.Image != "" {
+		setFields["character.$.image"] = req.Image
+	}
+	if req.Identity != "" {
+		setFields["character.$.identity"] = req.Identity
+	}
+	if req.Style != "" {
+		setFields["character.$.style"] = req.Style
+	}
+	if req.Greeting != "" {
+		setFields["character.$.greeting"] = req.Greeting
+	}
+	if len(setFields) == 0 {
+		return &basic.Response{Code: 0, Msg: "success"}, nil
+	}
+
+	if err := c.ConfigMapper.SetCharacter(ctx, cfg.ID, chOID, setFields); err != nil {
+		logs.CtxErrorf(ctx, "[UpdateCharacter] mongo error: %v", err)
+		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "更新角色失败"))
+	}
+
+	return &basic.Response{Code: 0, Msg: "success"}, nil
+}
+
+func (c *ConfigService) DeleteCharacter(ctx context.Context, unitId, characterId string) (*basic.Response, error) {
+	m, err := c.AuthDomain.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.AuthDomain.VerifySuperAdmin(ctx, m); err != nil {
+		return nil, err
+	}
+
+	unitOID, err := bson.ObjectIDFromHex(unitId)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "unitId"))
+	}
+	chOID, err := bson.ObjectIDFromHex(characterId)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "characterId"))
+	}
+
+	cfg, err := c.ConfigMapper.FindOneByUnitID(ctx, unitOID)
+	if err != nil || cfg == nil {
+		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "单位配置"))
+	}
+
+	if err := c.ConfigMapper.SetCharacterStatus(ctx, cfg.ID, chOID, enum.ConfigStatusDeleted); err != nil {
+		logs.CtxErrorf(ctx, "[DeleteCharacter] mongo error: %v", err)
+		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "删除角色失败"))
+	}
+
+	return &basic.Response{Code: 0, Msg: "success"}, nil
 }

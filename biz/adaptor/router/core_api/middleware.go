@@ -266,6 +266,26 @@ func _configlistvoiceMw() []app.HandlerFunc {
 	return nil
 }
 
+func _configcharacterMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _configcharacteraddMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _configcharacterupdateMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _configcharacterdeleteMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
 func _getdailymessagesMw() []app.HandlerFunc {
 	// your code...
 	return nil

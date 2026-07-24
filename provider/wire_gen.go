@@ -20,6 +20,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/sms_alert"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/voice"
 	"github.com/xh-polaris/psych-core-api/biz/infra/storage"
 	"github.com/xh-polaris/psych-core-api/biz/infra/synapse"
 )
@@ -59,9 +60,11 @@ func NewProvider() (*Provider, error) {
 		AlarmMapper:        alarmIMongoMapper,
 	}
 	configIMongoMapper := config.NewConfigMongoMapper(confConfig)
+	voiceIMongoMapper := voice.NewVoiceMongoMapper(confConfig)
 	configService := service.ConfigService{
 		AuthDomain:   authDomain,
 		ConfigMapper: configIMongoMapper,
+		VoiceMapper:  voiceIMongoMapper,
 	}
 	client := synapse.New4b(confConfig)
 	userDomainSVC := &usr.UserDomainSVC{
@@ -110,6 +113,7 @@ func NewProvider() (*Provider, error) {
 		UnitMapper:          unitIMongoMapper,
 		SmsAlertMapper:      sms_alertIMongoMapper,
 		PromptMapper:        promptIMongoMapper,
+		VoiceMapper:         voiceIMongoMapper,
 	}
 	return providerProvider, nil
 }

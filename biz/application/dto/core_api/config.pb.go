@@ -263,6 +263,12 @@ type Character struct {
 	Image string `protobuf:"bytes,4,opt,name=image,proto3" form:"image" json:"image" query:"image"`
 	// 是否删除
 	Status int32 `protobuf:"varint,5,opt,name=status,proto3" form:"status" json:"status" query:"status"`
+	// 背景人设（端到端模式）
+	Identity string `json:"identity" form:"identity" query:"identity"`
+	// 对话风格（端到端模式）
+	Style string `json:"style" form:"style" query:"style"`
+	// 开场白（端到端模式）
+	Greeting string `json:"greeting" form:"greeting" query:"greeting"`
 }
 
 func (x *Character) Reset() {
