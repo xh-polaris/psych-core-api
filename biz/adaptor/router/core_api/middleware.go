@@ -300,3 +300,8 @@ func _getsingleconvMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _dashboardchatreportMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

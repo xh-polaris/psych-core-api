@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/redis/go-redis/extra/redisotel/v9"
@@ -10,10 +11,18 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/cache"
 )
 
+var (
+	instance     cache.Cmdable
+	instanceOnce sync.Once
+)
+
 func New() cache.Cmdable {
-	addr := conf.GetConfig().Cache.Addr
-	password := conf.GetConfig().Cache.Password
-	return NewWithAddrAndPassword(addr, password)
+	instanceOnce.Do(func() {
+		addr := conf.GetConfig().Cache.Addr
+		password := conf.GetConfig().Cache.Password
+		instance = NewWithAddrAndPassword(addr, password)
+	})
+	return instance
 }
 
 func NewWithAddrAndPassword(addr, password string) cache.Cmdable {

@@ -53,6 +53,7 @@ func Register(r *server.Hertz) {
 		_dashboard.POST("/update_alarm", append(_dashboardupdatealarmMw(), core_api.DashboardUpdateAlarm)...)
 		_dashboard.POST("/user_conversation_records", append(_dashboarduserconvrecordsMw(), core_api.DashboardUserConvRecords)...)
 		_dashboard.POST("/users", append(_dashboardlistusersMw(), core_api.DashboardListUsers)...)
+		_dashboard.POST("/chat_report", append(_dashboardchatreportMw(), core_api.DashboardChatReport)...)
 	}
 	{
 		_unit := root.Group("/unit", _unitMw()...)

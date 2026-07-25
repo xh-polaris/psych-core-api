@@ -16,6 +16,7 @@ type Conversation struct {
 	CreateTime   time.Time     `json:"createTime,omitempty" bson:"create_time,omitempty"`
 	UpdateTime   time.Time     `json:"updateTime,omitempty" bson:"update_time,omitempty"`
 	Status       int           `json:"status,omitempty" bson:"status,omitempty"` // 1-2: Active | Deleted
+	Type         int           `json:"type,omitempty" bson:"type,omitempty"`     // 1-2: Student | Teacher
 	MessageCount int           `json:"messageCount" bson:"message_count"`        // 消息总数
 }
 

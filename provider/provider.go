@@ -6,6 +6,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	"github.com/xh-polaris/psych-core-api/biz/domain/usr"
+	"github.com/xh-polaris/psych-core-api/biz/infra/cache/redis"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
@@ -40,6 +41,7 @@ type Provider struct {
 	UnitService         service.UnitService
 	ConversationService service.ConversationService
 	FileService         service.FileService
+	ChatReportService   service.ChatReportService
 	MessageMapper       message.IMongoMapper
 	ConversationMapper  conversation.IMongoMapper
 	ReportMapper        report.IMongoMapper
@@ -65,6 +67,7 @@ var ApplicationSet = wire.NewSet(
 	service.UnitServiceSet,
 	service.ConversationServiceSet,
 	service.FileServiceSet,
+	service.ChatReportServiceSet,
 )
 
 var DomainSet = wire.NewSet(
@@ -74,6 +77,7 @@ var DomainSet = wire.NewSet(
 
 var InfrastructureSet = wire.NewSet(
 	conf.NewConfig,
+	redis.New,
 	message.NewMessageMongoMapper,
 	user.NewUserMongoMapper,
 	unit.NewUnitMongoMapper,
