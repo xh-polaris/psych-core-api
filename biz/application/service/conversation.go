@@ -145,6 +145,7 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 			CreateTime:     conv.CreateTime.Unix(),
 			UpdateTime:     conv.UpdateTime.Unix(),
 			Date:           date,
+			CharacterId:    conv.CharacterID.Hex(),
 		})
 	}
 

@@ -22,14 +22,8 @@ func Register(r *server.Hertz) {
 		_config.POST("/create", append(_configcreateMw(), core_api.ConfigCreate)...)
 		_config.GET("/get_by_unit_id", append(_configgetbyunitidMw(), core_api.ConfigGetByUnitID)...)
 		_config.GET("/get_character", append(_configgetcharacterMw(), core_api.ConfigGetCharacter)...)
-		_config.POST("/update_info", append(_configupdateinfoMw(), core_api.ConfigUpdateInfo)...)
 		_config.GET("/list_voice", append(_configlistvoiceMw(), core_api.ConfigListVoice)...)
-	}
-	{
-		_config0 := root.Group("/config/character", _configcharacterMw()...)
-		_config0.POST("/add", append(_configcharacteraddMw(), core_api.ConfigAddCharacter)...)
-		_config0.POST("/update", append(_configcharacterupdateMw(), core_api.ConfigUpdateCharacter)...)
-		_config0.POST("/delete", append(_configcharacterdeleteMw(), core_api.ConfigDeleteCharacter)...)
+		_config.POST("/update_info", append(_configupdateinfoMw(), core_api.ConfigUpdateInfo)...)
 	}
 	{
 		_conversation := root.Group("/conversation", _conversationMw()...)
@@ -53,7 +47,6 @@ func Register(r *server.Hertz) {
 		_dashboard.POST("/update_alarm", append(_dashboardupdatealarmMw(), core_api.DashboardUpdateAlarm)...)
 		_dashboard.POST("/user_conversation_records", append(_dashboarduserconvrecordsMw(), core_api.DashboardUserConvRecords)...)
 		_dashboard.POST("/users", append(_dashboardlistusersMw(), core_api.DashboardListUsers)...)
-		_dashboard.POST("/chat_report", append(_dashboardchatreportMw(), core_api.DashboardChatReport)...)
 	}
 	{
 		_unit := root.Group("/unit", _unitMw()...)

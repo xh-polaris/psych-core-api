@@ -14,6 +14,7 @@ type Coze struct {
 
 type ChatConfig struct {
 	URL       string
+	Model     string
 	AccessKey string
 }
 
@@ -68,7 +69,7 @@ func (c *Config) ChatConf(chat *core_api.ChatApp) (*app.ChatSetting, error) {
 		return nil, errorx.New(errno.ConfigErr, errorx.KV("app", "chat"))
 	}
 	if cc, ok := c.ModelConfig.Chat[chat.Provider]; ok {
-		return &app.ChatSetting{Provider: chat.Provider, Url: cc.URL, Model: "",
+		return &app.ChatSetting{Provider: chat.Provider, Url: cc.URL, Model: cc.Model,
 			BotId: chat.AppId, UserId: "", AccessKey: cc.AccessKey}, nil
 	}
 	return nil, errorx.New(errno.ConfigErr, errorx.KV("app", "chat"))

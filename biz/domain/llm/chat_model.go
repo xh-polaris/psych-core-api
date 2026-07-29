@@ -12,11 +12,13 @@ import (
 )
 
 const (
-	ProviderCoze = "coze"
+	ProviderCoze     = "coze"
+	ProviderDeepSeek = "deepseek"
 )
 
 func init() {
 	app.ChatRegister(ProviderCoze, NewChatModel)
+	app.ChatRegister(ProviderDeepSeek, NewChatModel)
 }
 
 // ChatModel 对话大模型
@@ -38,6 +40,8 @@ func newCli(ctx context.Context, provider, url, sk, model, botId, uid string) (_
 	switch provider {
 	case impl.Coze:
 		return impl.NewCozeModel(ctx, url, sk, uid, botId)
+	case impl.DeepSeek:
+		return impl.NewDeepSeekModel(ctx, url, sk, model)
 	default:
 		return nil, errorx.New(errno.UnImplementErr)
 	}

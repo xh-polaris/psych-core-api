@@ -27,7 +27,7 @@ type IConfigService interface {
 	ConfigUpdate(ctx context.Context, req *core_api.ConfigCreateOrUpdateReq) (resp *basic.Response, err error)
 	ConfigGetByUnitID(ctx context.Context, req *core_api.ConfigGetByUnitIdReq) (resp *core_api.ConfigGetByUnitIdResp, err error)
 	ConfigGetCharacters(ctx context.Context, req *core_api.ConfigGetCharacterReq) (resp *core_api.ConfigGetCharacterResp, err error)
-	ListVoice(ctx context.Context) (*ListVoiceResp, error)
+	ConfigListVoice(ctx context.Context, req *core_api.ConfigListVoiceReq) (*core_api.ConfigListVoiceResp, error)
 	AddCharacter(ctx context.Context, unitId string, ch *AddCharacterReq) (*AddCharacterResp, error)
 	UpdateCharacter(ctx context.Context, unitId string, ch *UpdateCharacterReq) (*basic.Response, error)
 	DeleteCharacter(ctx context.Context, unitId, characterId string) (*basic.Response, error)
@@ -45,22 +45,18 @@ var ConfigServiceSet = wire.NewSet(
 )
 
 func (c *ConfigService) ConfigCreate(ctx context.Context, req *core_api.ConfigCreateOrUpdateReq) (resp *basic.Response, err error) {
-	// 参数合法性校验
 	unitOID, err := bson.ObjectIDFromHex(req.Config.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitID"), errorx.KV("value", "单位ID"))
 	}
-
-	// 鉴权
-	usrMeta, err := c.AuthDomain.ExtraUserMeta(ctx)
+	_, isStaff, err := c.authCfg(ctx, req.Config.UnitId)
 	if err != nil {
 		return nil, err
 	}
-	if !usrMeta.HasUnitAdminAuth(req.Config.UnitId) {
-		return nil, errorx.New(errno.ErrInsufficientAuth)
+	if isStaff {
+		strip4Unit(req)
 	}
 
-	// 构造并插入数据库
 	now := time.Now()
 	confDAO := &config.Config{
 		ID:         bson.NewObjectID(),
@@ -69,105 +65,106 @@ func (c *ConfigService) ConfigCreate(ctx context.Context, req *core_api.ConfigCr
 		Characters: characterReq2DB(req.Config.Characters),
 		Scene:      req.Config.Scene,
 		AlertPhone: req.Config.AlertPhone,
-		Chat: &config.Chat{
-			Name:        req.Config.Chat.Name,
-			Description: req.Config.Chat.Description,
-			Provider:    req.Config.Chat.Provider,
-			AppID:       req.Config.Chat.AppId,
-		},
-		TTS: &config.TTS{
-			Name:        req.Config.Tts.Name,
-			Description: req.Config.Tts.Description,
-			Provider:    req.Config.Tts.Provider,
-			AppID:       req.Config.Tts.AppId,
-			Speaker:     req.Config.Tts.Speaker,
-		},
-		Report: &config.Report{
-			Name:        req.Config.Report.Name,
-			Description: req.Config.Report.Description,
-			Provider:    req.Config.Report.Provider,
-			AppID:       req.Config.Report.AppId,
-		},
 		Status:     enum.ConfigStatusActive,
 		CreateTime: now,
 		UpdateTime: now,
 	}
-	// 插入数据库
+	if cht := req.Config.GetChat(); cht != nil {
+		confDAO.Chat = &config.Chat{
+			Name: cht.Name, Description: cht.Description,
+			Provider: cht.Provider, AppID: cht.AppId,
+		}
+	}
+	if tts := req.Config.GetTts(); tts != nil {
+		confDAO.TTS = &config.TTS{
+			Name: tts.Name, Description: tts.Description,
+			Provider: tts.Provider, AppID: tts.AppId, Speaker: tts.Speaker,
+		}
+	}
+	if rpt := req.Config.GetReport(); rpt != nil {
+		confDAO.Report = &config.Report{
+			Name: rpt.Name, Description: rpt.Description,
+			Provider: rpt.Provider, AppID: rpt.AppId,
+		}
+	}
 	if err = c.ConfigMapper.Insert(ctx, confDAO); err != nil {
 		logs.Errorf("insert config error: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}
-	// 构造返回结果
-	return &basic.Response{
-		Code: 0,
-		Msg:  "success",
-	}, nil
+	return &basic.Response{Code: 0, Msg: "success"}, nil
 }
 
 // ConfigUpdate 更改单位配置
 func (c *ConfigService) ConfigUpdate(ctx context.Context, req *core_api.ConfigCreateOrUpdateReq) (resp *basic.Response, err error) {
-	// 参数校验
 	unitOid, err := bson.ObjectIDFromHex(req.Config.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "单位ID"))
 	}
-
-	// 鉴权
-	usrMeta, err := c.AuthDomain.ExtraUserMeta(ctx)
+	_, isStaff, err := c.authCfg(ctx, req.Config.UnitId)
 	if err != nil {
 		return nil, err
 	}
-	if !usrMeta.HasUnitAdminAuth(req.Config.UnitId) {
-		return nil, errorx.New(errno.ErrInsufficientAuth)
+	if isStaff {
+		strip4Unit(req)
 	}
 
-	// 存在性验证
 	oldConf, err := c.ConfigMapper.FindOneByUnitID(ctx, unitOid)
 	if err != nil || oldConf == nil {
-		// 若不存在，当成create处理
 		return c.ConfigCreate(ctx, req)
 	}
-
-	// 若存在，执行更新逻辑
-	// 提取req中的非空字段，构造bson
 	update := extractUpdateBSON(req)
-
 	err = c.ConfigMapper.UpdateFields(ctx, oldConf.ID, update)
 	if err != nil {
 		logs.Errorf("update config error: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}
-
-	return &basic.Response{
-		Code: 0,
-		Msg:  "success",
-	}, nil
+	return &basic.Response{Code: 0, Msg: "success"}, nil
 }
 
 func (c *ConfigService) ConfigGetByUnitID(ctx context.Context, req *core_api.ConfigGetByUnitIdReq) (resp *core_api.ConfigGetByUnitIdResp, err error) {
-	// 参数校验和转化
 	if req.UnitId == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
 	}
-
-	unitOid, err := bson.ObjectIDFromHex(req.UnitId)
+	uOid, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "单位ID"))
 	}
-
-	// 获得配置对象
-	configDAO, err := c.ConfigMapper.FindOneByUnitID(ctx, unitOid)
+	cfg, err := c.ConfigMapper.FindOneByUnitID(ctx, uOid)
 	if err != nil {
 		logs.Errorf("find config error: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}
+	vo := configDB2VO(cfg)
+	_, isStaff, err := c.authCfg(ctx, req.UnitId)
+	if err != nil {
+		return nil, err
+	}
+	if isStaff {
+		mask4Unit(vo)
+	}
+	return &core_api.ConfigGetByUnitIdResp{Config: vo, Code: 0, Msg: "success"}, nil
+}
 
-	util.DPrint("configDAO: %+v\n", configDAO.Chat)
-	return &core_api.ConfigGetByUnitIdResp{
-		Config: configDB2VO(configDAO),
-		Code:   0,
-		Msg:    "success",
-	}, nil
+// authCfg 鉴权并返回角色：isSA=超管, isStaff=单位管理员/教师
+func (c *ConfigService) authCfg(ctx context.Context, uID string) (isSA bool, isStaff bool, err error) {
+	m, err := c.AuthDomain.ExtraUserMeta(ctx)
+	if err != nil {
+		return false, false, err
+	}
+	if m.HasSuperAdminAuth() {
+		return true, false, nil
+	}
+	if m.Role >= enum.UserRoleTeacher && m.UnitId == uID {
+		return false, true, nil
+	}
+	return false, false, errorx.New(errno.ErrInsufficientAuth)
+}
+
+// strip4Unit 移除单位管理员/教师无权配置的字段
+func strip4Unit(req *core_api.ConfigCreateOrUpdateReq) {
+	req.Config.Chat = nil
+	req.Config.Tts = nil
+	req.Config.Report = nil
 }
 
 // ConfigGetCharacters 获取心理老师虚拟形象
@@ -342,53 +339,44 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 }
 
 // 将数据库Config对象字段转化为DTO对象
-func configDB2VO(configDAO *config.Config) *core_api.ConfigVO {
-	return &core_api.ConfigVO{
-		UnitId:     configDAO.UnitID.Hex(),
-		Type:       int32(configDAO.Type),
-		Characters: characterDB2Resp(configDAO.Characters),
-		Scene:      configDAO.Scene,
-		AlertPhone: configDAO.AlertPhone,
-		Chat: &core_api.ChatApp{
-			Name:        configDAO.Chat.Name,
-			Description: configDAO.Chat.Description,
-			Provider:    configDAO.Chat.Provider,
-			AppId:       configDAO.Chat.AppID,
-		},
-
-		Tts: &core_api.TTSApp{
-			Name:        configDAO.TTS.Name,
-			Description: configDAO.TTS.Description,
-			Provider:    configDAO.TTS.Provider,
-			AppId:       configDAO.TTS.AppID,
-			Speaker:     configDAO.TTS.Speaker,
-		},
-
-		Report: &core_api.ReportApp{
-			Name:        configDAO.Report.Name,
-			Description: configDAO.Report.Description,
-			Provider:    configDAO.Report.Provider,
-			AppId:       configDAO.Report.AppID,
-		},
-
-		Status:     int32(configDAO.Status),
-		CreateTime: configDAO.CreateTime.Unix(),
-		UpdateTime: configDAO.UpdateTime.Unix(),
+func configDB2VO(cfg *config.Config) *core_api.ConfigVO {
+	vo := &core_api.ConfigVO{
+		UnitId:     cfg.UnitID.Hex(),
+		Type:       int32(cfg.Type),
+		Characters: characterDB2Resp(cfg.Characters),
+		Scene:      cfg.Scene,
+		AlertPhone: cfg.AlertPhone,
+		Status:     int32(cfg.Status),
+		CreateTime: cfg.CreateTime.Unix(),
+		UpdateTime: cfg.UpdateTime.Unix(),
 	}
+	if cfg.Chat != nil {
+		vo.Chat = &core_api.ChatApp{
+			Name: cfg.Chat.Name, Description: cfg.Chat.Description,
+			Provider: cfg.Chat.Provider, AppId: cfg.Chat.AppID,
+		}
+	}
+	if cfg.TTS != nil {
+		vo.Tts = &core_api.TTSApp{
+			Name: cfg.TTS.Name, Description: cfg.TTS.Description,
+			Provider: cfg.TTS.Provider, AppId: cfg.TTS.AppID,
+			Speaker: cfg.TTS.Speaker,
+		}
+	}
+	if cfg.Report != nil {
+		vo.Report = &core_api.ReportApp{
+			Name: cfg.Report.Name, Description: cfg.Report.Description,
+			Provider: cfg.Report.Provider, AppId: cfg.Report.AppID,
+		}
+	}
+	return vo
 }
 
-// MaskConfig 隐藏Config的一些敏感字段
-func MaskConfig(conf *core_api.ConfigVO) *core_api.ConfigVO {
-	if conf.Chat != nil {
-		conf.Chat.AppId = ""
-	}
-	if conf.Tts != nil {
-		conf.Tts.AppId = ""
-	}
-	if conf.Report != nil {
-		conf.Report.AppId = ""
-	}
-	return conf
+// mask4Unit 对单位管理员隐藏 chat/tts/report
+func mask4Unit(vo *core_api.ConfigVO) {
+	vo.Chat = nil
+	vo.Tts = nil
+	vo.Report = nil
 }
 
 func characterDB2Resp(in []*config.Character) []*core_api.Character {
@@ -436,17 +424,6 @@ func characterReq2DB(in []*core_api.Character) []*config.Character {
 	return out
 }
 
-type ListVoiceResp struct {
-	Code   int32          `json:"code"`
-	Msg    string         `json:"msg"`
-	Voices []*VoiceItemVO `json:"voices"`
-}
-
-type VoiceItemVO struct {
-	Name      string `json:"name"`
-	VoiceType string `json:"voiceType"`
-}
-
 type AddCharacterReq struct {
 	Name     string `json:"name"`
 	Voice    string `json:"voice"`
@@ -472,19 +449,54 @@ type UpdateCharacterReq struct {
 	Greeting    string `json:"greeting"`
 }
 
-func (c *ConfigService) ListVoice(ctx context.Context) (*ListVoiceResp, error) {
-	voices, err := c.VoiceMapper.FindAllByFields(ctx, bson.M{})
+func (c *ConfigService) ConfigListVoice(ctx context.Context, req *core_api.ConfigListVoiceReq) (*core_api.ConfigListVoiceResp, error) {
+	m, err := c.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
-		logs.CtxErrorf(ctx, "[ListVoice] mongo error: %v", err)
+		return nil, err
+	}
+	if err := c.AuthDomain.VerifySuperAdmin(ctx, m); err != nil {
+		return nil, err
+	}
+
+	pg := util.EnsurePaginationOptions(req.GetPaginationOptions())
+	opt := util.PagedFindOpt(pg).SetSort(bson.D{{cst.VoiceType, 1}})
+
+	voices, err := c.VoiceMapper.FindManyWithOption(ctx, bson.M{}, opt)
+	if err != nil {
+		logs.CtxErrorf(ctx, "[ConfigListVoice] mongo error: %v", err)
 		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "获取音色列表失败"))
 	}
 
-	res := make([]*VoiceItemVO, len(voices))
-	for i, v := range voices {
-		res[i] = &VoiceItemVO{Name: v.Name, VoiceType: v.VoiceType}
+	total, err := c.VoiceMapper.CountByFields(ctx, bson.M{})
+	if err != nil {
+		logs.CtxErrorf(ctx, "[ConfigListVoice] count error: %v", err)
+		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "获取音色总数失败"))
 	}
 
-	return &ListVoiceResp{Code: 0, Msg: "success", Voices: res}, nil
+	res := make([]*core_api.VoiceItemVO, len(voices))
+	for i, v := range voices {
+		res[i] = &core_api.VoiceItemVO{
+			Id:          v.ID.Hex(),
+			VoiceType:   v.VoiceType,
+			Name:        v.Name,
+			Avatar:      v.Avatar,
+			Gender:      v.Gender,
+			Age:         v.Age,
+			Description: v.Description,
+			TrialUrl:    v.TrialURL,
+			VolcanoId:   v.VolcanoID,
+			ResourceId:  v.ResourceID,
+			CreateTime:  v.CreateTime.Unix(),
+			UpdateTime:  v.UpdateTime.Unix(),
+		}
+	}
+
+	return &core_api.ConfigListVoiceResp{
+		Code:       0,
+		Msg:        "success",
+		Voices:     res,
+		Pagination: util.PaginationRes(int32(total), pg),
+	}, nil
 }
 
 func (c *ConfigService) AddCharacter(ctx context.Context, unitId string, req *AddCharacterReq) (*AddCharacterResp, error) {

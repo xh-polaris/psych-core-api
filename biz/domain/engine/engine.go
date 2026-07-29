@@ -264,11 +264,16 @@ func (e *Engine) Close() (err error) {
 				return
 			}
 
-			// 更新会话信息 (时间、消息数)
+			// 更新会话信息 (时间、消息数、角色)
 			update := bson.M{
 				cst.StartTime:    e.start,
 				cst.EndTime:      time.Now(),
 				cst.MessageCount: currentTotal,
+			}
+			if e.Character != nil && e.Character.Id != "" {
+				if charOID, err := bson.ObjectIDFromHex(e.Character.Id); err == nil {
+					update[cst.CharacterID] = charOID
+				}
 			}
 			if err = e.convMapper.UpdateFields(pCtx, oid, update); err != nil {
 				logs.Error("[engine] update conversation time err: %v", err)

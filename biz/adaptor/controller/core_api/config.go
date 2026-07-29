@@ -27,6 +27,10 @@ func ConfigCreate(ctx context.Context, c *app.RequestContext) {
 	}
 
 	middleware.StoreToken(ctx, c, &req)
+	if c.IsAborted() {
+		return
+	}
+
 	p := provider.Get()
 	resp, err := p.ConfigService.ConfigCreate(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
@@ -44,6 +48,10 @@ func ConfigUpdateInfo(ctx context.Context, c *app.RequestContext) {
 	}
 
 	middleware.StoreToken(ctx, c, &req)
+	if c.IsAborted() {
+		return
+	}
+
 	p := provider.Get()
 	resp, err := p.ConfigService.ConfigUpdate(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
@@ -60,12 +68,13 @@ func ConfigGetByUnitID(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	p := provider.Get()
-	resp, err := p.ConfigService.ConfigGetByUnitID(ctx, &req)
-	if resp != nil {
-		resp.Config = service.MaskConfig(resp.Config)
+	middleware.StoreToken(ctx, c, &req)
+	if c.IsAborted() {
+		return
 	}
 
+	p := provider.Get()
+	resp, err := p.ConfigService.ConfigGetByUnitID(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
@@ -88,9 +97,17 @@ func ConfigGetCharacter(ctx context.Context, c *app.RequestContext) {
 // ConfigListVoice .
 // @router /config/list_voice [GET]
 func ConfigListVoice(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.ConfigListVoiceReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
 	p := provider.Get()
-	resp, err := p.ConfigService.ListVoice(ctx)
-	httpx.PostProcess(ctx, c, nil, resp, err)
+	resp, err := p.ConfigService.ConfigListVoice(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // ConfigAddCharacter .
