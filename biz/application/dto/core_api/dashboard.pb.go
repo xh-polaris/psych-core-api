@@ -10,8 +10,6 @@ import (
 	basic "github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	_ "google.golang.org/protobuf/types/known/anypb"
-	structpb "google.golang.org/protobuf/types/known/structpb"
 	reflect "reflect"
 	sync "sync"
 )
@@ -2559,10 +2557,10 @@ type DashboardGetReportResp struct {
 	CharacterVoice string `protobuf:"bytes,13,opt,name=characterVoice,proto3" form:"characterVoice" json:"characterVoice" query:"characterVoice"`
 	// 心理老师形象图片URL
 	CharacterImage string `protobuf:"bytes,14,opt,name=characterImage,proto3" form:"characterImage" json:"characterImage" query:"characterImage"`
-	// 评估分析（JSON）
-	Analysis *structpb.Struct `protobuf:"bytes,15,opt,name=analysis,proto3" form:"analysis" json:"analysis" query:"analysis"`
-	// 简易报告（JSON）
-	SimpleReport *structpb.Struct `protobuf:"bytes,16,opt,name=simpleReport,proto3" form:"simpleReport" json:"simpleReport" query:"simpleReport"`
+	// 评估分析（13维度）
+	Analysis *ReportAnalysis `protobuf:"bytes,15,opt,name=analysis,proto3" form:"analysis" json:"analysis" query:"analysis"`
+	// 简易报告（16板块）
+	SimpleReport *SimpleReportMsg `protobuf:"bytes,16,opt,name=simpleReport,proto3" form:"simpleReport" json:"simpleReport" query:"simpleReport"`
 	Code         int32            `protobuf:"varint,255,opt,name=code,proto3" form:"code" json:"code" query:"code"`
 	Msg          string           `protobuf:"bytes,256,opt,name=msg,proto3" form:"msg" json:"msg" query:"msg"`
 }
@@ -2697,14 +2695,14 @@ func (x *DashboardGetReportResp) GetCharacterImage() string {
 	return ""
 }
 
-func (x *DashboardGetReportResp) GetAnalysis() *structpb.Struct {
+func (x *DashboardGetReportResp) GetAnalysis() *ReportAnalysis {
 	if x != nil {
 		return x.Analysis
 	}
 	return nil
 }
 
-func (x *DashboardGetReportResp) GetSimpleReport() *structpb.Struct {
+func (x *DashboardGetReportResp) GetSimpleReport() *SimpleReportMsg {
 	if x != nil {
 		return x.SimpleReport
 	}
@@ -3636,7 +3634,7 @@ var file_core_api_dashboard_proto_goTypes = []interface{}{
 	(*basic.PaginationOptions)(nil),       // 44: basic.PaginationOptions
 	(*basic.Pagination)(nil),              // 45: basic.Pagination
 	(*UserVO)(nil),                        // 46: core_api.UserVO
-	(*structpb.Struct)(nil),               // 47: google.protobuf.Struct
+	nil,                                   // 47: google.protobuf.Struct (replaced by ReportAnalysis/SimpleReportMsg)
 }
 var file_core_api_dashboard_proto_depIdxs = []int32{
 	4,  // 0: core_api.DashboardGetDataTrendResp.activePoints:type_name -> core_api.TrendPoint
@@ -3669,8 +3667,8 @@ var file_core_api_dashboard_proto_depIdxs = []int32{
 	4,  // 27: core_api.UserConvTrend.trendPoints:type_name -> core_api.TrendPoint
 	13, // 28: core_api.ConvDetail.keywords:type_name -> core_api.Keywords
 	43, // 29: core_api.DashboardGetReportResp.keywordPercent:type_name -> core_api.DashboardGetReportResp.KeywordPercentEntry
-	47, // 30: core_api.DashboardGetReportResp.analysis:type_name -> google.protobuf.Struct
-	47, // 31: core_api.DashboardGetReportResp.simpleReport:type_name -> google.protobuf.Struct
+	0,  // 30: core_api.DashboardGetReportResp.analysis:type_name (outdated; see ReportAnalysis)
+	0,  // 31: core_api.DashboardGetReportResp.simpleReport:type_name (outdated; see SimpleReportMsg)
 	44, // 32: core_api.DashboardUnitConvRecordsReq.paginationOptions:type_name -> basic.PaginationOptions
 	37, // 33: core_api.DashboardUnitConvRecordsResp.conversationList:type_name -> core_api.ConvOverview
 	45, // 34: core_api.DashboardUnitConvRecordsResp.pagination:type_name -> basic.Pagination

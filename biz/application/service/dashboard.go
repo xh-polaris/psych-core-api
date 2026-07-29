@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"math"
 	"sort"
@@ -33,7 +32,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
-	"google.golang.org/protobuf/types/known/structpb"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -730,23 +728,90 @@ func (s *DashboardService) DashboardListUnits(ctx context.Context, req *core_api
 	}, nil
 }
 
-func toStructPB(v any) *structpb.Struct {
-	if v == nil {
+// analysisToPB converts report.Analysis to core_api.ReportAnalysis
+func analysisToPB(a *report.Analysis) *core_api.ReportAnalysis {
+	if a == nil {
 		return nil
 	}
-	b, err := json.Marshal(v)
-	if err != nil {
+	r := &core_api.ReportAnalysis{
+		Cognition:   a.Cognition,
+		Behavior:    a.Behavior,
+		Duration:    a.Duration,
+		Trigger:     a.Trigger,
+		Coping:      a.Coping,
+		HelpSeeking: a.HelpSeeking,
+		MissingInfo: a.MissingInfo,
+		Problem:     &core_api.AnalysisProblem{},
+		Emotion:     &core_api.AnalysisEmotion{Type: a.Emotion.Types, Intensity: a.Emotion.Intensity},
+		Support: &core_api.AnalysisSupport{
+			Family: a.Support.Family, Teacher: a.Support.Teacher, Friend: a.Support.Friend,
+			Other: a.Support.Other, ProtectiveResources: a.Support.ProtectiveResources,
+		},
+		Function: &core_api.AnalysisFunction{
+			Learning: a.Function.Learning, Sleep: a.Function.Sleep, Diet: a.Function.Diet,
+			Interpersonal: a.Function.Interpersonal, DailyLife: a.Function.DailyLife,
+		},
+		Distress:   &core_api.AnalysisDistress{Level: a.Distress.Level, Reason: a.Distress.Reason},
+		Confidence: &core_api.AnalysisConfidence{Overall: a.Confidence.Overall, Risk: a.Confidence.Risk, Reason: a.Confidence.Reason},
+	}
+	if a.Problem.Primary.Category != "" || a.Problem.Primary.Subcategory != "" {
+		r.Problem.Primary = &core_api.ProblemItem{Category: a.Problem.Primary.Category, Subcategory: a.Problem.Primary.Subcategory}
+	}
+	if len(a.Problem.Secondary) > 0 {
+		r.Problem.Secondary = make([]*core_api.ProblemItem, len(a.Problem.Secondary))
+		for i, s := range a.Problem.Secondary {
+			r.Problem.Secondary[i] = &core_api.ProblemItem{Category: s.Category, Subcategory: s.Subcategory}
+		}
+	}
+
+	risk := &core_api.AnalysisRisk{Level: a.Risk.Level, Evidence: a.Risk.Evidence, Action: a.Risk.Action}
+	risk.Score = &core_api.RiskScore{
+		CurrentIdeation: int32(a.Risk.Score.CurrentIdeation), History: int32(a.Risk.Score.History),
+		CurrentStress: int32(a.Risk.Score.CurrentStress), ProtectiveResources: int32(a.Risk.Score.ProtectiveResources),
+		MentalHealthHistory: int32(a.Risk.Score.MentalHealthHistory), Total: int32(a.Risk.Score.Total),
+	}
+	risk.Profile = &core_api.RiskProfile{
+		CurrentRisk:       secToPB(a.Risk.Profile.CurrentRisk),
+		Stressors:         secToPB(a.Risk.Profile.Stressors),
+		RiskFactors:       secToPB(a.Risk.Profile.RiskFactors),
+		ProtectiveFactors: secToPB(a.Risk.Profile.ProtectiveFactors),
+		InformationGap:    secToPB(a.Risk.Profile.InformationGap),
+		CurrentSafety:     &core_api.RiskProfile_CurrentSafety{Summary: a.Risk.Profile.CurrentSafety.Summary, Status: a.Risk.Profile.CurrentSafety.Status},
+	}
+	r.Risk = risk
+	return r
+}
+
+func secToPB(s report.ProfileSection) *core_api.ProfileSection {
+	return &core_api.ProfileSection{Summary: s.Summary, Items: s.Items}
+}
+
+// simpleReportToPB converts report.SimpleReport to core_api.SimpleReportMsg
+func simpleReportToPB(sr *report.SimpleReport) *core_api.SimpleReportMsg {
+	if sr == nil {
 		return nil
 	}
-	var m map[string]any
-	if err = json.Unmarshal(b, &m); err != nil {
-		return nil
+	return &core_api.SimpleReportMsg{
+		MainProblem:        sr.MainProblem,
+		Thoughts:           sr.Thoughts,
+		Behaviors:          sr.Behaviors,
+		Needs:              sr.Needs,
+		Duration:           sr.Duration,
+		FunctionImpact:     sr.FunctionImpact,
+		Triggers:           sr.Triggers,
+		Coping:             sr.Coping,
+		Support:            sr.Support,
+		HelpSeeking:        sr.HelpSeeking,
+		ProvidedSupport:    sr.ProvidedSupport,
+		Suggestions:        sr.Suggestions,
+		Emotion:            &core_api.ReportEmotion{Type: sr.Emotion.Type, Intensity: sr.Emotion.Intensity},
+		RiskObservation:    &core_api.ReportRiskObs{Level: sr.RiskObservation.Level, Evidence: sr.RiskObservation.Evidence},
+		SeverityAssessment: &core_api.ReportSeverity{Level: sr.SeverityAssessment.Level, Basis: sr.SeverityAssessment.Basis},
+		Summary: &core_api.ReportSummary{
+			MainProblem: sr.Summary.MainProblem, EmotionState: sr.Summary.EmotionState,
+			Severity: sr.Summary.Severity, RiskLevel: sr.Summary.RiskLevel, Focus: sr.Summary.Focus,
+		},
 	}
-	s, err := structpb.NewStruct(m)
-	if err != nil {
-		return nil
-	}
-	return s
 }
 
 // DashboardGetPsychTrend 情绪分布，风险性别分布，关键词词云
@@ -1728,8 +1793,8 @@ func (s *DashboardService) dashboardGetReportUnit(ctx context.Context, convOID b
 		NeedAlarm:      rpt.NeedAlarm,
 		KeywordPercent: rpt.Keywords,
 		ReportStatus:   int32(rpt.Status),
-		Analysis:       toStructPB(rpt.Analysis),
-		SimpleReport:   toStructPB(rpt.SimpleReport),
+		Analysis:       analysisToPB(rpt.Analysis),
+		SimpleReport:   simpleReportToPB(rpt.SimpleReport),
 		Code:           0,
 		Msg:            "success",
 	}
