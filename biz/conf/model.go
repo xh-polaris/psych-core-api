@@ -14,7 +14,7 @@ type Coze struct {
 
 type ChatConfig struct {
 	URL       string
-	Model     string
+	Model     string `json:",optional"`
 	AccessKey string
 }
 

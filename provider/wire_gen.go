@@ -94,6 +94,7 @@ func NewProvider() (*Provider, error) {
 	storageProvider := storage.NewCOS(confConfig)
 	fileService := service.FileService{
 		StoragePvd: storageProvider,
+		AuthDomain: authDomain,
 	}
 	cmdable := redis.New()
 	chatReportService := service.ChatReportService{

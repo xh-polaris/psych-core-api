@@ -72,7 +72,7 @@ func (p *cosProvider) GenPresignUploadURL(ctx context.Context, key string) (stri
 		ctx,
 		http.MethodPut,
 		key,
-		24*time.Hour,
+		5*time.Minute,
 		&cos.PresignedURLOptions{},
 	)
 	if err != nil || u == nil {

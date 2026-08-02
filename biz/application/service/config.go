@@ -26,6 +26,7 @@ type IConfigService interface {
 	ConfigCreate(ctx context.Context, req *core_api.ConfigCreateOrUpdateReq) (resp *basic.Response, err error)
 	ConfigUpdate(ctx context.Context, req *core_api.ConfigCreateOrUpdateReq) (resp *basic.Response, err error)
 	ConfigGetByUnitID(ctx context.Context, req *core_api.ConfigGetByUnitIdReq) (resp *core_api.ConfigGetByUnitIdResp, err error)
+	ConfigGetByUnitID4Engine(ctx context.Context, unitId string) (*core_api.ConfigVO, error)
 	ConfigGetCharacters(ctx context.Context, req *core_api.ConfigGetCharacterReq) (resp *core_api.ConfigGetCharacterResp, err error)
 	ConfigListVoice(ctx context.Context, req *core_api.ConfigListVoiceReq) (*core_api.ConfigListVoiceResp, error)
 	AddCharacter(ctx context.Context, unitId string, ch *AddCharacterReq) (*AddCharacterResp, error)
@@ -143,6 +144,57 @@ func (c *ConfigService) ConfigGetByUnitID(ctx context.Context, req *core_api.Con
 		mask4Unit(vo)
 	}
 	return &core_api.ConfigGetByUnitIdResp{Config: vo, Code: 0, Msg: "success"}, nil
+}
+
+// ConfigGetByUnitID4Engine 供对话引擎内部使用：返回引擎所需的最小字段
+// （Type / Chat.Provider+AppId / TTS.Provider+AppId+Speaker / Report.Provider+AppId / Characters 子集），
+// 不做鉴权、不填 AlertPhone/Scene 等敏感字段。
+func (c *ConfigService) ConfigGetByUnitID4Engine(ctx context.Context, unitId string) (*core_api.ConfigVO, error) {
+	if unitId == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
+	}
+	uOid, err := bson.ObjectIDFromHex(unitId)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "单位ID"))
+	}
+	cfg, err := c.ConfigMapper.FindOneByUnitID(ctx, uOid)
+	if err != nil {
+		logs.Errorf("find config error: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+	vo := &core_api.ConfigVO{
+		Type: int32(cfg.Type),
+	}
+	if cfg.Chat != nil {
+		vo.Chat = &core_api.ChatApp{
+			Provider: cfg.Chat.Provider,
+			AppId:    cfg.Chat.AppID,
+		}
+	}
+	if cfg.TTS != nil {
+		vo.Tts = &core_api.TTSApp{
+			Provider: cfg.TTS.Provider,
+			AppId:    cfg.TTS.AppID,
+			Speaker:  cfg.TTS.Speaker,
+		}
+	}
+	if cfg.Report != nil {
+		vo.Report = &core_api.ReportApp{
+			Provider: cfg.Report.Provider,
+			AppId:    cfg.Report.AppID,
+		}
+	}
+	vo.Characters = make([]*core_api.Character, len(cfg.Characters))
+	for i, ch := range cfg.Characters {
+		vo.Characters[i] = &core_api.Character{
+			Id:     ch.ID.Hex(),
+			Name:   ch.Name,
+			Voice:  ch.Voice,
+			Image:  ch.Image,
+			Status: int32(ch.Status),
+		}
+	}
+	return vo, nil
 }
 
 // authCfg 鉴权并返回角色：isSA=超管, isStaff=单位管理员/教师
@@ -454,6 +506,8 @@ func (c *ConfigService) ConfigListVoice(ctx context.Context, req *core_api.Confi
 	if err != nil {
 		return nil, err
 	}
+
+	// 暂仅支持超管在配置心理老师角色时查看音色列表
 	if err := c.AuthDomain.VerifySuperAdmin(ctx, m); err != nil {
 		return nil, err
 	}
