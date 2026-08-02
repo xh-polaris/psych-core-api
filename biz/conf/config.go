@@ -46,24 +46,19 @@ type COS struct {
 	SecretKey string
 }
 
-type StreamFilter struct {
-	AlertSMS string
-}
-
 type Config struct {
 	service.ServiceConf
-	ListenOn     string
-	State        string
-	Auth         Auth
-	Cache        *Cache
-	CacheConf    cache.CacheConf
-	RabbitMQ     *RabbitMQ
-	Mongo        *Mongo
-	ModelConfig  *ModelConfig
-	Synapse      *Synapse
-	SMS          *SMS
-	COS          *COS
-	StreamFilter *StreamFilter
+	ListenOn    string
+	State       string
+	Auth        Auth
+	Cache       *Cache
+	CacheConf   cache.CacheConf
+	RabbitMQ    *RabbitMQ
+	Mongo       *Mongo
+	ModelConfig *ModelConfig
+	Synapse     *Synapse
+	SMS         *SMS
+	COS         *COS
 }
 
 func NewConfig() (*Config, error) {
