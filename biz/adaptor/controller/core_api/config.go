@@ -27,6 +27,10 @@ func ConfigCreate(ctx context.Context, c *app.RequestContext) {
 	}
 
 	middleware.StoreToken(ctx, c, &req)
+	if c.IsAborted() {
+		return
+	}
+
 	p := provider.Get()
 	resp, err := p.ConfigService.ConfigCreate(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
@@ -44,6 +48,10 @@ func ConfigUpdateInfo(ctx context.Context, c *app.RequestContext) {
 	}
 
 	middleware.StoreToken(ctx, c, &req)
+	if c.IsAborted() {
+		return
+	}
+
 	p := provider.Get()
 	resp, err := p.ConfigService.ConfigUpdate(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
@@ -60,12 +68,13 @@ func ConfigGetByUnitID(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	p := provider.Get()
-	resp, err := p.ConfigService.ConfigGetByUnitID(ctx, &req)
-	if resp != nil {
-		resp.Config = service.MaskConfig(resp.Config)
+	middleware.StoreToken(ctx, c, &req)
+	if c.IsAborted() {
+		return
 	}
 
+	p := provider.Get()
+	resp, err := p.ConfigService.ConfigGetByUnitID(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
@@ -82,5 +91,93 @@ func ConfigGetCharacter(ctx context.Context, c *app.RequestContext) {
 
 	p := provider.Get()
 	resp, err := p.ConfigService.ConfigGetCharacters(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// ConfigListVoice .
+// @router /config/list_voice [GET]
+func ConfigListVoice(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.ConfigListVoiceReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.ConfigService.ConfigListVoice(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// ConfigAddCharacter .
+// @router /config/character/add [POST]
+func ConfigAddCharacter(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req struct {
+		UnitId string                  `json:"unitId"`
+		Ch     service.AddCharacterReq `json:"character"`
+	}
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	middleware.StoreToken(ctx, c, &req)
+	if c.IsAborted() {
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.ConfigService.AddCharacter(ctx, req.UnitId, &req.Ch)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// ConfigUpdateCharacter .
+// @router /config/character/update [POST]
+func ConfigUpdateCharacter(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req struct {
+		UnitId string                     `json:"unitId"`
+		Ch     service.UpdateCharacterReq `json:"character"`
+	}
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	middleware.StoreToken(ctx, c, &req)
+	if c.IsAborted() {
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.ConfigService.UpdateCharacter(ctx, req.UnitId, &req.Ch)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// ConfigDeleteCharacter .
+// @router /config/character/delete [POST]
+func ConfigDeleteCharacter(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req struct {
+		UnitId      string `json:"unitId"`
+		CharacterId string `json:"characterId"`
+	}
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	middleware.StoreToken(ctx, c, &req)
+	if c.IsAborted() {
+		return
+	}
+
+	p := provider.Get()
+	resp, err := p.ConfigService.DeleteCharacter(ctx, req.UnitId, req.CharacterId)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }

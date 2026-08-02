@@ -17,66 +17,59 @@ import (
 // config 配置app与workflow
 func (e *Engine) config() error {
 	var (
-		err        error
-		cf         *core.Config
-		wfc        *core.WorkFlowConfig
-		configResp *core_api.ConfigGetByUnitIdResp
+		err error
+		cf  *core.Config
+		wfc *core.WorkFlowConfig
 	)
 
-	// 获取配置
-	req := &core_api.ConfigGetByUnitIdReq{UnitId: e.info[cst.JsonUnitID].(string)}
-	if configResp, err = e.cfgSvc.ConfigGetByUnitID(e.ctx, req); err != nil {
+	vo, err := e.cfgSvc.ConfigGetByUnitID4Engine(e.ctx, e.info[cst.JsonUnitID].(string))
+	if err != nil {
 		logs.Errorf("[engine] [%s] UnitAppConfigGetByUnitId err: %v", core.AConfig, err)
 		return e.MWrite(core.MErr, core.ToErr(errorx.WrapByCode(err, errno.GetConfigErr)))
 	}
-	logs.Infof("configResp: %+v", configResp)
 
-	// 构造配置
-	if cf, wfc, err = e.buildConfig(configResp); err != nil {
+	if cf, wfc, err = e.buildConfig(vo); err != nil {
 		logs.Error("[workflow] [config] build config err: %v", err)
 		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "llm"))
 	}
-	// 提取心理老师形象: 前端指定名称则匹配, 否则取第一个活跃的
-	e.Character = e.pickCharacter(configResp.Config.Characters)
-	// 构造llm
+	e.Character = e.pickCharacter(vo.Characters)
+	logs.Infof("[engine] [config] chat=%s/%s tts=%s/%s asr=%s type=%d",
+		wfc.ChatConfig.Provider, wfc.ChatConfig.BotId,
+		wfc.TTSConfig.Provider, wfc.TTSConfig.Speaker,
+		wfc.ASRConfig.Provider, cf.Type)
+
 	if e.llm, err = app.NewChatApp(e.ctx, e.uSession, wfc.ChatConfig); err != nil {
 		logs.Error("[workflow] [config] new chatApp err: %v", err)
 		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "llm"))
 	}
-	logs.Infof("llm: %+v", e.llm)
-	// 构造asr
 	if e.asr, err = app.NewASRApp(e.uSession, wfc.ASRConfig); err != nil {
 		logs.Error("[workflow] [config] new asrApp err: %v", err)
 		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "asr"))
 	}
-	// 构造tts
 	if e.tts, err = app.NewTTSApp(e.uSession, wfc.TTSConfig); err != nil {
 		logs.Error("[workflow] [config] new asrApp err: %v", err)
 		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "tts"))
 	}
-	logs.Infof("tts: %+v", e.tts)
-	// 返回前端
-	logs.Infof("[engine] [config] workflow config: %+v conf: %+v", wfc, cf)
 	return e.MWrite(core.MConfig, cf)
 }
 
 // 构造配置
-func (e *Engine) buildConfig(resp *core_api.ConfigGetByUnitIdResp) (c *core.Config, wfc *core.WorkFlowConfig, err error) {
+func (e *Engine) buildConfig(vo *core_api.ConfigVO) (c *core.Config, wfc *core.WorkFlowConfig, err error) {
 	wfc = &core.WorkFlowConfig{}
-	if wfc.ChatConfig, err = conf.GetConfig().ChatConf(resp.Config.Chat); err != nil {
+	if wfc.ChatConfig, err = conf.GetConfig().ChatConf(vo.Chat); err != nil {
 		return
 	}
 	wfc.ChatConfig.UserId = e.info[cst.JsonUserID].(string)
-	if wfc.TTSConfig, err = conf.GetConfig().TTSConf(resp.Config.Tts); err != nil {
+	if wfc.TTSConfig, err = conf.GetConfig().TTSConf(vo.Tts); err != nil {
 		return
 	}
-	if wfc.ReportConfig, err = conf.GetConfig().ReportConf(resp.Config.Report); err != nil {
+	if wfc.ReportConfig, err = conf.GetConfig().ReportConf(vo.Report); err != nil {
 		return
 	}
 	if wfc.ASRConfig, err = conf.GetConfig().ASRConf(); err != nil {
 		return
 	}
-	c = &core.Config{Type: int(resp.Config.Type), ModelName: "", ModelView: "", ChatConfig: core.ChatConfig{},
+	c = &core.Config{Type: int(vo.Type), ModelName: "", ModelView: "", ChatConfig: core.ChatConfig{},
 		ASRConfig: core.ASRConfig{Format: wfc.ASRConfig.Format, Codec: wfc.ASRConfig.Codec, Rate: wfc.ASRConfig.Rate,
 			Bits: wfc.ASRConfig.Bits, Channels: wfc.ASRConfig.Channels, ResultType: wfc.ASRConfig.ResultType},
 		TTSConfig: core.TTSConfig{Format: wfc.TTSConfig.AudioParams.Format, Codec: wfc.TTSConfig.AudioParams.Codec,

@@ -31,10 +31,10 @@ type IMongoMapper interface {
 	RetrieveByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time, opt *options.FindOptionsBuilder) ([]*Alarm, error)
 	CountByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (int32, error)
 	ExistsById(ctx context.Context, id bson.ObjectID) (bool, error)
-	AggregateStats(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (*OverviewStats, error)
-	AggregateStatsByClassList(ctx context.Context, unitID bson.ObjectID, grades, classes []int32, start, end time.Time) (*OverviewStats, error)
-	EmotionDistribution(ctx context.Context, unitId *bson.ObjectID) (*EmotionDistribution, error)
-	EmotionDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) (*EmotionDistribution, error)
+	AggregateStats(ctx context.Context, unitID bson.ObjectID, curStart, curEnd, prevStart, prevEnd time.Time) (*OverviewStats, error)
+	AggregateStatsByClassList(ctx context.Context, unitID bson.ObjectID, grades, classes []int32, curStart, curEnd, prevStart, prevEnd time.Time) (*OverviewStats, error)
+	EmotionDistribution(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (*EmotionDistribution, error)
+	EmotionDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32, start, end time.Time) (*EmotionDistribution, error)
 	BatchExistsByConvId(ctx context.Context, convId []bson.ObjectID) (map[bson.ObjectID]bool, error)
 	FindManyWithOption(ctx context.Context, filter bson.M, opts options.Lister[options.FindOptions]) ([]*Alarm, error)
 	CountByFields(ctx context.Context, filter bson.M) (int32, error)
@@ -123,22 +123,25 @@ type weekData []struct {
 	Count int32 `bson:"count"`
 }
 
-// AggregateStats 计算预警统计信息：当前和较上周变化
-// 入参start, end暂无用
-func (m *mongoMapper) AggregateStats(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (*OverviewStats, error) {
+// AggregateStats 计算预警统计信息：当前周期和对比上一周期变化。零值时间回退到 now / now-7d。
+func (m *mongoMapper) AggregateStats(ctx context.Context, unitID bson.ObjectID, curStart, curEnd, prevStart, prevEnd time.Time) (*OverviewStats, error) {
 	now := time.Now()
-	lastweek := time.Now().AddDate(0, 0, -7)
+	if curEnd.IsZero() {
+		curEnd = now
+	}
+	lastweek := now.AddDate(0, 0, -7)
+	if prevEnd.IsZero() {
+		prevEnd = lastweek
+	}
 
-	// 使用 $facet 一次查询获取当前周和上周的数据
 	pipeline := mongo.Pipeline{
 		{{Key: "$match", Value: bson.M{
 			cst.UnitID: unitID,
-			//cst.Status: bson.M{cst.NE: cst.DeletedStatus},
 		}}},
 		{{Key: "$facet", Value: bson.M{
 			"currentWeek": []bson.M{
 				{"$match": bson.M{
-					cst.CreateTime: bson.M{cst.LT: now},
+					cst.CreateTime: bson.M{cst.GTE: curStart, cst.LTE: curEnd},
 				}},
 				{"$group": bson.M{
 					"_id":   "$" + cst.Status,
@@ -147,7 +150,7 @@ func (m *mongoMapper) AggregateStats(ctx context.Context, unitID bson.ObjectID, 
 			},
 			"lastWeek": []bson.M{
 				{"$match": bson.M{
-					cst.CreateTime: bson.M{cst.LT: lastweek},
+					cst.CreateTime: bson.M{cst.GTE: prevStart, cst.LTE: prevEnd},
 				}},
 				{"$group": bson.M{
 					"_id":   "$" + cst.Status,
@@ -214,12 +217,20 @@ type EmotionDistribution map[int]int32
 
 // EmotionDistribution 计算某Unit的情绪分布
 // unitId传入nil则计算所有Unit的情绪分布
-func (m *mongoMapper) EmotionDistribution(ctx context.Context, unitId *bson.ObjectID) (*EmotionDistribution, error) {
-	match := bson.M{
-		//cst.Status: bson.M{cst.NE: cst.DeletedStatus},
-	}
+func (m *mongoMapper) EmotionDistribution(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (*EmotionDistribution, error) {
+	match := bson.M{}
 	if unitId != nil {
 		match[cst.UnitID] = *unitId
+	}
+	if !start.IsZero() || !end.IsZero() {
+		tf := bson.M{}
+		if !start.IsZero() {
+			tf["$gte"] = start
+		}
+		if !end.IsZero() {
+			tf["$lte"] = end
+		}
+		match[cst.CreateTime] = tf
 	}
 
 	// 对每个用户取最新一条Alarm 统计emotion分布
@@ -256,9 +267,19 @@ func (m *mongoMapper) EmotionDistribution(ctx context.Context, unitId *bson.Obje
 	return &distribution, nil
 }
 
-func (m *mongoMapper) EmotionDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) (*EmotionDistribution, error) {
+func (m *mongoMapper) EmotionDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32, start, end time.Time) (*EmotionDistribution, error) {
 	match := bson.M{
 		cst.UnitID: unitId,
+	}
+	if !start.IsZero() || !end.IsZero() {
+		tf := bson.M{}
+		if !start.IsZero() {
+			tf["$gte"] = start
+		}
+		if !end.IsZero() {
+			tf["$lte"] = end
+		}
+		match[cst.CreateTime] = tf
 	}
 
 	pipeline := mongo.Pipeline{
@@ -346,7 +367,7 @@ func (m *mongoMapper) BatchExistsByConvId(ctx context.Context, convId []bson.Obj
 }
 
 // AggregateStatsByClassList 按班级列表统计预警数据
-func (m *mongoMapper) AggregateStatsByClassList(ctx context.Context, unitID bson.ObjectID, grades, classes []int32, start, end time.Time) (*OverviewStats, error) {
+func (m *mongoMapper) AggregateStatsByClassList(ctx context.Context, unitID bson.ObjectID, grades, classes []int32, curStart, curEnd, prevStart, prevEnd time.Time) (*OverviewStats, error) {
 	if len(grades) == 0 && len(classes) == 0 {
 		return &OverviewStats{}, nil
 	}
@@ -391,19 +412,23 @@ func (m *mongoMapper) AggregateStatsByClassList(ctx context.Context, unitID bson
 		userIds[i] = u.ID
 	}
 
-	// 使用 $facet 查询当前周和上周的数据
 	now := time.Now()
+	if curEnd.IsZero() {
+		curEnd = now
+	}
 	lastweek := now.AddDate(0, 0, -7)
+	if prevEnd.IsZero() {
+		prevEnd = lastweek
+	}
 
 	aggPipeline := mongo.Pipeline{
 		{{Key: "$match", Value: bson.M{
 			cst.UserID: bson.M{cst.In: userIds},
-			// cst.Status: bson.M{cst.NE: cst.DeletedStatus},
 		}}},
 		{{Key: "$facet", Value: bson.M{
 			"currentWeek": []bson.M{
 				{"$match": bson.M{
-					cst.CreateTime: bson.M{cst.LT: now},
+					cst.CreateTime: bson.M{cst.GTE: curStart, cst.LTE: curEnd},
 				}},
 				{"$group": bson.M{
 					"_id":   "$" + cst.Status,
@@ -412,7 +437,7 @@ func (m *mongoMapper) AggregateStatsByClassList(ctx context.Context, unitID bson
 			},
 			"lastWeek": []bson.M{
 				{"$match": bson.M{
-					cst.CreateTime: bson.M{cst.LT: lastweek},
+					cst.CreateTime: bson.M{cst.GTE: prevStart, cst.LTE: prevEnd},
 				}},
 				{"$group": bson.M{
 					"_id":   "$" + cst.Status,

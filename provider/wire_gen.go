@@ -11,14 +11,18 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	"github.com/xh-polaris/psych-core-api/biz/domain/usr"
+	"github.com/xh-polaris/psych-core-api/biz/infra/cache/redis"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/prompt"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/sms_alert"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/voice"
+	"github.com/xh-polaris/psych-core-api/biz/infra/storage"
 	"github.com/xh-polaris/psych-core-api/biz/infra/synapse"
 )
 
@@ -57,9 +61,11 @@ func NewProvider() (*Provider, error) {
 		AlarmMapper:        alarmIMongoMapper,
 	}
 	configIMongoMapper := config.NewConfigMongoMapper(confConfig)
+	voiceIMongoMapper := voice.NewVoiceMongoMapper(confConfig)
 	configService := service.ConfigService{
 		AuthDomain:   authDomain,
 		ConfigMapper: configIMongoMapper,
+		VoiceMapper:  voiceIMongoMapper,
 	}
 	client := synapse.New4b(confConfig)
 	userDomainSVC := &usr.UserDomainSVC{
@@ -85,7 +91,22 @@ func NewProvider() (*Provider, error) {
 		MessageMapper:      messageIMongoMapper,
 		ConversationMapper: conversationIMongoMapper,
 	}
+	storageProvider := storage.NewCOS(confConfig)
+	fileService := service.FileService{
+		StoragePvd: storageProvider,
+		AuthDomain: authDomain,
+	}
+	cmdable := redis.New()
+	chatReportService := service.ChatReportService{
+		AuthDomain:         authDomain,
+		ReportMapper:       reportIMongoMapper,
+		ConversationMapper: conversationIMongoMapper,
+		UserMapper:         iMongoMapper,
+		ConfigMapper:       configIMongoMapper,
+		Cache:              cmdable,
+	}
 	sms_alertIMongoMapper := sms_alert.NewSmsAlertMongoMapper(confConfig)
+	promptIMongoMapper := prompt.NewPromptMongoMapper(confConfig)
 	providerProvider := &Provider{
 		Config:              confConfig,
 		AlarmService:        alarmService,
@@ -94,6 +115,8 @@ func NewProvider() (*Provider, error) {
 		UserService:         userService,
 		UnitService:         unitService,
 		ConversationService: conversationService,
+		FileService:         fileService,
+		ChatReportService:   chatReportService,
 		MessageMapper:       messageIMongoMapper,
 		ConversationMapper:  conversationIMongoMapper,
 		ReportMapper:        reportIMongoMapper,
@@ -101,6 +124,8 @@ func NewProvider() (*Provider, error) {
 		ConfigMapper:        configIMongoMapper,
 		UnitMapper:          unitIMongoMapper,
 		SmsAlertMapper:      sms_alertIMongoMapper,
+		PromptMapper:        promptIMongoMapper,
+		VoiceMapper:         voiceIMongoMapper,
 	}
 	return providerProvider, nil
 }

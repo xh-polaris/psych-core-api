@@ -396,6 +396,7 @@ type ConversationVO struct {
 	CreateTime     int64  `protobuf:"varint,3,opt,name=createTime,proto3" form:"createTime" json:"createTime" query:"createTime"`
 	UpdateTime     int64  `protobuf:"varint,4,opt,name=updateTime,proto3" form:"updateTime" json:"updateTime" query:"updateTime"`
 	Date           string `protobuf:"bytes,5,opt,name=date,proto3" form:"date" json:"date" query:"date"`
+	CharacterId    string `protobuf:"bytes,6,opt,name=characterId,proto3" form:"characterId" json:"characterId" query:"characterId"`
 }
 
 func (x *ConversationVO) Reset() {

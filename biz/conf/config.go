@@ -39,18 +39,31 @@ type Synapse struct {
 	State     string
 }
 
+type COS struct {
+	BucketURL string
+	CDN       string `json:",optional"`
+	SecretID  string
+	SecretKey string
+}
+
+type StreamFilter struct {
+	AlertSMS string
+}
+
 type Config struct {
 	service.ServiceConf
-	ListenOn    string
-	State       string
-	Auth        Auth
-	Cache       *Cache
-	CacheConf   cache.CacheConf
-	RabbitMQ    *RabbitMQ
-	Mongo       *Mongo
-	ModelConfig *ModelConfig
-	Synapse     *Synapse
-	SMS         *SMS
+	ListenOn     string
+	State        string
+	Auth         Auth
+	Cache        *Cache
+	CacheConf    cache.CacheConf
+	RabbitMQ     *RabbitMQ
+	Mongo        *Mongo
+	ModelConfig  *ModelConfig
+	Synapse      *Synapse
+	SMS          *SMS
+	COS          *COS
+	StreamFilter *StreamFilter
 }
 
 func NewConfig() (*Config, error) {

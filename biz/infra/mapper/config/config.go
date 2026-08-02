@@ -28,13 +28,18 @@ type Report struct {
 	AppID       string `json:"appId,omitempty" bson:"app_id,omitempty"`
 }
 
-// Character 心理老师虚拟形象
+// Character 心理老师虚拟形象 已兼容端到端语音大模型字段
 type Character struct {
 	ID     bson.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`        // 角色ID
 	Name   string        `json:"name,omitempty" bson:"name,omitempty"`     // 教师名称
 	Voice  string        `json:"voice,omitempty" bson:"voice,omitempty"`   // 音色配置，参考火山引擎提供的音色
 	Image  string        `json:"image,omitempty" bson:"image,omitempty"`   // 形象图片url
 	Status int           `json:"status,omitempty" bson:"status,omitempty"` // 是否删除
+
+	// 端到端模型字段
+	Identity string `json:"identity,omitempty" bson:"identity,omitempty"` //背景人设
+	Style    string `json:"style,omitempty" bson:"style,omitempty"`       // 模型对话风格
+	Greeting string `json:"greeting,omitempty" bson:"greeting,omitempty"` // 开场白
 }
 
 type Config struct {

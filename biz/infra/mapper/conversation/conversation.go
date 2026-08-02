@@ -15,8 +15,10 @@ type Conversation struct {
 	EndTime      time.Time     `json:"endTime,omitempty" bson:"end_time,omitempty"`
 	CreateTime   time.Time     `json:"createTime,omitempty" bson:"create_time,omitempty"`
 	UpdateTime   time.Time     `json:"updateTime,omitempty" bson:"update_time,omitempty"`
-	Status       int           `json:"status,omitempty" bson:"status,omitempty"` // 1-2: Active | Deleted
-	MessageCount int           `json:"messageCount" bson:"message_count"`        // 消息总数
+	Status       int           `json:"status,omitempty" bson:"status,omitempty"`            // 1-2: Active | Deleted
+	Type         int           `json:"type,omitempty" bson:"type,omitempty"`                // 1-2: Student | Teacher
+	MessageCount int           `json:"messageCount" bson:"message_count"`                   // 消息总数
+	CharacterID  bson.ObjectID `json:"characterId,omitempty" bson:"character_id,omitempty"` // 绑定对话角色
 }
 
 // DurationMinutes 返回对话时长（分钟）
