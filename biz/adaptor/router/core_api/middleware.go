@@ -305,3 +305,8 @@ func _dashboardchatreportMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _configaddcharacterMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
