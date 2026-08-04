@@ -6,7 +6,6 @@ import (
 	"context"
 
 	"github.com/xh-polaris/psych-core-api/biz/adaptor/middleware"
-	"github.com/xh-polaris/psych-core-api/biz/application/service"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
@@ -111,13 +110,10 @@ func ConfigListVoice(ctx context.Context, c *app.RequestContext) {
 }
 
 // ConfigAddCharacter .
-// @router /config/character/add [POST]
+// @router /config/add_character [POST]
 func ConfigAddCharacter(ctx context.Context, c *app.RequestContext) {
 	var err error
-	var req struct {
-		UnitId string                  `json:"unitId"`
-		Ch     service.AddCharacterReq `json:"character"`
-	}
+	var req core_api.ConfigAddCharacterReq
 	err = c.BindAndValidate(&req)
 	if err != nil {
 		c.String(consts.StatusBadRequest, err.Error())
@@ -130,18 +126,15 @@ func ConfigAddCharacter(ctx context.Context, c *app.RequestContext) {
 	}
 
 	p := provider.Get()
-	resp, err := p.ConfigService.AddCharacter(ctx, req.UnitId, &req.Ch)
+	resp, err := p.ConfigService.AddCharacter(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // ConfigUpdateCharacter .
-// @router /config/character/update [POST]
+// @router /config/update_character [POST]
 func ConfigUpdateCharacter(ctx context.Context, c *app.RequestContext) {
 	var err error
-	var req struct {
-		UnitId string                     `json:"unitId"`
-		Ch     service.UpdateCharacterReq `json:"character"`
-	}
+	var req core_api.ConfigUpdateCharacterReq
 	err = c.BindAndValidate(&req)
 	if err != nil {
 		c.String(consts.StatusBadRequest, err.Error())
@@ -154,18 +147,15 @@ func ConfigUpdateCharacter(ctx context.Context, c *app.RequestContext) {
 	}
 
 	p := provider.Get()
-	resp, err := p.ConfigService.UpdateCharacter(ctx, req.UnitId, &req.Ch)
+	resp, err := p.ConfigService.UpdateCharacter(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
 // ConfigDeleteCharacter .
-// @router /config/character/delete [POST]
+// @router /config/delete_character [POST]
 func ConfigDeleteCharacter(ctx context.Context, c *app.RequestContext) {
 	var err error
-	var req struct {
-		UnitId      string `json:"unitId"`
-		CharacterId string `json:"characterId"`
-	}
+	var req core_api.ConfigDeleteCharacterReq
 	err = c.BindAndValidate(&req)
 	if err != nil {
 		c.String(consts.StatusBadRequest, err.Error())
@@ -178,6 +168,6 @@ func ConfigDeleteCharacter(ctx context.Context, c *app.RequestContext) {
 	}
 
 	p := provider.Get()
-	resp, err := p.ConfigService.DeleteCharacter(ctx, req.UnitId, req.CharacterId)
+	resp, err := p.ConfigService.DeleteCharacter(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }

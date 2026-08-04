@@ -29,9 +29,9 @@ type IConfigService interface {
 	ConfigGetByUnitID4Engine(ctx context.Context, unitId string) (*core_api.ConfigVO, error)
 	ConfigGetCharacters(ctx context.Context, req *core_api.ConfigGetCharacterReq) (resp *core_api.ConfigGetCharacterResp, err error)
 	ConfigListVoice(ctx context.Context, req *core_api.ConfigListVoiceReq) (*core_api.ConfigListVoiceResp, error)
-	AddCharacter(ctx context.Context, unitId string, ch *AddCharacterReq) (*AddCharacterResp, error)
-	UpdateCharacter(ctx context.Context, unitId string, ch *UpdateCharacterReq) (*basic.Response, error)
-	DeleteCharacter(ctx context.Context, unitId, characterId string) (*basic.Response, error)
+	AddCharacter(ctx context.Context, req *core_api.ConfigAddCharacterReq) (*core_api.ConfigAddCharacterResp, error)
+	UpdateCharacter(ctx context.Context, req *core_api.ConfigUpdateCharacterReq) (*core_api.ConfigUpdateCharacterResp, error)
+	DeleteCharacter(ctx context.Context, req *core_api.ConfigDeleteCharacterReq) (*core_api.ConfigDeleteCharacterResp, error)
 }
 
 type ConfigService struct {
@@ -476,31 +476,6 @@ func characterReq2DB(in []*core_api.Character) []*config.Character {
 	return out
 }
 
-type AddCharacterReq struct {
-	Name     string `json:"name"`
-	Voice    string `json:"voice"`
-	Image    string `json:"image"`
-	Identity string `json:"identity"`
-	Style    string `json:"style"`
-	Greeting string `json:"greeting"`
-}
-
-type AddCharacterResp struct {
-	Code        int32  `json:"code"`
-	Msg         string `json:"msg"`
-	CharacterId string `json:"characterId"`
-}
-
-type UpdateCharacterReq struct {
-	CharacterId string `json:"characterId"`
-	Name        string `json:"name"`
-	Voice       string `json:"voice"`
-	Image       string `json:"image"`
-	Identity    string `json:"identity"`
-	Style       string `json:"style"`
-	Greeting    string `json:"greeting"`
-}
-
 func (c *ConfigService) ConfigListVoice(ctx context.Context, req *core_api.ConfigListVoiceReq) (*core_api.ConfigListVoiceResp, error) {
 	m, err := c.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
@@ -553,23 +528,28 @@ func (c *ConfigService) ConfigListVoice(ctx context.Context, req *core_api.Confi
 	}, nil
 }
 
-func (c *ConfigService) AddCharacter(ctx context.Context, unitId string, req *AddCharacterReq) (*AddCharacterResp, error) {
+func (c *ConfigService) AddCharacter(ctx context.Context, req *core_api.ConfigAddCharacterReq) (*core_api.ConfigAddCharacterResp, error) {
 	m, err := c.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if err := c.AuthDomain.VerifySuperAdmin(ctx, m); err != nil {
+	if err := c.AuthDomain.VerifyUnitAdmin(m, req.UnitId); err != nil {
 		return nil, err
 	}
 
-	unitOID, err := bson.ObjectIDFromHex(unitId)
+	chReq := req.GetCharacter()
+	if chReq == nil {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "角色信息"))
+	}
+
+	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "unitId"))
 	}
-	if req.Name == "" {
+	if chReq.Name == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "角色名称"))
 	}
-	if req.Voice == "" {
+	if chReq.Voice == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "音色"))
 	}
 
@@ -581,13 +561,13 @@ func (c *ConfigService) AddCharacter(ctx context.Context, unitId string, req *Ad
 	chId := bson.NewObjectID()
 	ch := &config.Character{
 		ID:       chId,
-		Name:     req.Name,
-		Voice:    req.Voice,
-		Image:    req.Image,
+		Name:     chReq.Name,
+		Voice:    chReq.Voice,
+		Image:    chReq.Image,
 		Status:   enum.ConfigStatusActive,
-		Identity: req.Identity,
-		Style:    req.Style,
-		Greeting: req.Greeting,
+		Identity: chReq.Identity,
+		Style:    chReq.Style,
+		Greeting: chReq.Greeting,
 	}
 
 	if err := c.ConfigMapper.PushCharacter(ctx, cfg.ID, ch); err != nil {
@@ -595,23 +575,28 @@ func (c *ConfigService) AddCharacter(ctx context.Context, unitId string, req *Ad
 		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "添加角色失败"))
 	}
 
-	return &AddCharacterResp{Code: 0, Msg: "success", CharacterId: chId.Hex()}, nil
+	return &core_api.ConfigAddCharacterResp{Code: 0, Msg: "success", CharacterId: chId.Hex()}, nil
 }
 
-func (c *ConfigService) UpdateCharacter(ctx context.Context, unitId string, req *UpdateCharacterReq) (*basic.Response, error) {
+func (c *ConfigService) UpdateCharacter(ctx context.Context, req *core_api.ConfigUpdateCharacterReq) (*core_api.ConfigUpdateCharacterResp, error) {
 	m, err := c.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if err := c.AuthDomain.VerifySuperAdmin(ctx, m); err != nil {
+	if err := c.AuthDomain.VerifyUnitAdmin(m, req.UnitId); err != nil {
 		return nil, err
 	}
 
-	unitOID, err := bson.ObjectIDFromHex(unitId)
+	chReq := req.GetCharacter()
+	if chReq == nil || chReq.Id == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "角色信息"))
+	}
+
+	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "unitId"))
 	}
-	chOID, err := bson.ObjectIDFromHex(req.CharacterId)
+	chOID, err := bson.ObjectIDFromHex(chReq.Id)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "characterId"))
 	}
@@ -622,26 +607,26 @@ func (c *ConfigService) UpdateCharacter(ctx context.Context, unitId string, req 
 	}
 
 	setFields := bson.M{}
-	if req.Name != "" {
-		setFields["character.$.name"] = req.Name
+	if chReq.Name != "" {
+		setFields["character.$.name"] = chReq.Name
 	}
-	if req.Voice != "" {
-		setFields["character.$.voice"] = req.Voice
+	if chReq.Voice != "" {
+		setFields["character.$.voice"] = chReq.Voice
 	}
-	if req.Image != "" {
-		setFields["character.$.image"] = req.Image
+	if chReq.Image != "" {
+		setFields["character.$.image"] = chReq.Image
 	}
-	if req.Identity != "" {
-		setFields["character.$.identity"] = req.Identity
+	if chReq.Identity != "" {
+		setFields["character.$.identity"] = chReq.Identity
 	}
-	if req.Style != "" {
-		setFields["character.$.style"] = req.Style
+	if chReq.Style != "" {
+		setFields["character.$.style"] = chReq.Style
 	}
-	if req.Greeting != "" {
-		setFields["character.$.greeting"] = req.Greeting
+	if chReq.Greeting != "" {
+		setFields["character.$.greeting"] = chReq.Greeting
 	}
 	if len(setFields) == 0 {
-		return &basic.Response{Code: 0, Msg: "success"}, nil
+		return &core_api.ConfigUpdateCharacterResp{Code: 0, Msg: "success"}, nil
 	}
 
 	if err := c.ConfigMapper.SetCharacter(ctx, cfg.ID, chOID, setFields); err != nil {
@@ -649,23 +634,23 @@ func (c *ConfigService) UpdateCharacter(ctx context.Context, unitId string, req 
 		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "更新角色失败"))
 	}
 
-	return &basic.Response{Code: 0, Msg: "success"}, nil
+	return &core_api.ConfigUpdateCharacterResp{Code: 0, Msg: "success"}, nil
 }
 
-func (c *ConfigService) DeleteCharacter(ctx context.Context, unitId, characterId string) (*basic.Response, error) {
+func (c *ConfigService) DeleteCharacter(ctx context.Context, req *core_api.ConfigDeleteCharacterReq) (*core_api.ConfigDeleteCharacterResp, error) {
 	m, err := c.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if err := c.AuthDomain.VerifySuperAdmin(ctx, m); err != nil {
+	if err := c.AuthDomain.VerifyUnitAdmin(m, req.UnitId); err != nil {
 		return nil, err
 	}
 
-	unitOID, err := bson.ObjectIDFromHex(unitId)
+	unitOID, err := bson.ObjectIDFromHex(req.UnitId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "unitId"))
 	}
-	chOID, err := bson.ObjectIDFromHex(characterId)
+	chOID, err := bson.ObjectIDFromHex(req.CharacterId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "characterId"))
 	}
@@ -680,5 +665,5 @@ func (c *ConfigService) DeleteCharacter(ctx context.Context, unitId, characterId
 		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "删除角色失败"))
 	}
 
-	return &basic.Response{Code: 0, Msg: "success"}, nil
+	return &core_api.ConfigDeleteCharacterResp{Code: 0, Msg: "success"}, nil
 }

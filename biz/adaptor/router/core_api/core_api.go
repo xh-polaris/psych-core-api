@@ -21,9 +21,11 @@ func Register(r *server.Hertz) {
 		_config := root.Group("/config", _configMw()...)
 		_config.POST("/add_character", append(_configaddcharacterMw(), core_api.ConfigAddCharacter)...)
 		_config.POST("/create", append(_configcreateMw(), core_api.ConfigCreate)...)
+		_config.POST("/delete_character", append(_configdeletecharacterMw(), core_api.ConfigDeleteCharacter)...)
 		_config.GET("/get_by_unit_id", append(_configgetbyunitidMw(), core_api.ConfigGetByUnitID)...)
 		_config.GET("/get_character", append(_configgetcharacterMw(), core_api.ConfigGetCharacter)...)
 		_config.GET("/list_voice", append(_configlistvoiceMw(), core_api.ConfigListVoice)...)
+		_config.POST("/update_character", append(_configupdatecharacterMw(), core_api.ConfigUpdateCharacter)...)
 		_config.POST("/update_info", append(_configupdateinfoMw(), core_api.ConfigUpdateInfo)...)
 	}
 	{
