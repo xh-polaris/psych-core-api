@@ -359,14 +359,14 @@ func (x *Character) GetGreeting() string {
 	return ""
 }
 
-// 单位配置
+// 单位全量配置（包含对话bot、TTS、报表、角色、对话场景、告警手机号等）
 type ConfigVO struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
 	UnitId string `protobuf:"bytes,1,opt,name=unitId,proto3" form:"unitId" json:"unitId" query:"unitId"`
-	// 1-2: Chain | End2End
+	// 对话engine实现模式 1-2: Chain | End2End
 	Type   int32      `protobuf:"varint,2,opt,name=type,proto3" form:"type" json:"type" query:"type"`
 	Chat   *ChatApp   `protobuf:"bytes,3,opt,name=chat,proto3" form:"chat" json:"chat" query:"chat"`
 	Tts    *TTSApp    `protobuf:"bytes,4,opt,name=tts,proto3" form:"tts" json:"tts" query:"tts"`
@@ -377,11 +377,11 @@ type ConfigVO struct {
 	UpdateTime      int64  `protobuf:"varint,8,opt,name=updateTime,proto3" form:"updateTime" json:"updateTime" query:"updateTime"`
 	ModelView       string `protobuf:"bytes,9,opt,name=modelView,proto3" form:"modelView" json:"modelView" query:"modelView"`
 	BackgroundImage string `protobuf:"bytes,10,opt,name=backgroundImage,proto3" form:"backgroundImage" json:"backgroundImage" query:"backgroundImage"`
-	// 心理老师形象列表
+	// 心理老师角色列表
 	Characters []*Character `protobuf:"bytes,11,rep,name=characters,proto3" form:"characters" json:"characters" query:"characters"`
 	// 对话背景图列表
 	Scene []string `protobuf:"bytes,12,rep,name=scene,proto3" form:"scene" json:"scene" query:"scene"`
-	// 接收告警的手机号
+	// 接收告警短信的手机号列表
 	AlertPhone []string `protobuf:"bytes,13,rep,name=alertPhone,proto3" form:"alertPhone" json:"alertPhone" query:"alertPhone"`
 }
 
@@ -508,7 +508,7 @@ func (x *ConfigVO) GetAlertPhone() []string {
 	return nil
 }
 
-// 创建或更新配置请求
+// 创建或更新配置请求（超管可配置全量；单位管理员/教师仅可配置角色/场景/告警手机号）
 type ConfigCreateOrUpdateReq struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -556,7 +556,7 @@ func (x *ConfigCreateOrUpdateReq) GetConfig() *ConfigVO {
 	return nil
 }
 
-// 根据单位ID获取配置请求
+// 获取单位配置请求（超管返回全量；单位管理员/教师返回角色/场景/告警手机号等）
 type ConfigGetByUnitIdReq struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -604,7 +604,7 @@ func (x *ConfigGetByUnitIdReq) GetUnitId() string {
 	return ""
 }
 
-// 根据单位ID获取配置响应
+// 获取单位全量配置响应
 type ConfigGetByUnitIdResp struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -668,7 +668,7 @@ func (x *ConfigGetByUnitIdResp) GetMsg() string {
 	return ""
 }
 
-// 获取展示信息请求（无需鉴权）
+// 获取单位所有角色请求（无需鉴权，可用于学生端获取对话角色列表）
 type ConfigGetCharacterReq struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -716,15 +716,15 @@ func (x *ConfigGetCharacterReq) GetUnitId() string {
 	return ""
 }
 
-// 获取展示信息响应（只返回展示相关字段）
+// 获取心理老师角色列表及对话背景（无需鉴权，返回该单位所有character及对话场景，可用于学生端展示）
 type ConfigGetCharacterResp struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// 心理老师形象列表
+	// 心理老师角色列表
 	Characters []*Character `protobuf:"bytes,1,rep,name=characters,proto3" form:"characters" json:"characters" query:"characters"`
-	// 对话背景图列表
+	// 对话背景图/场景列表
 	Scene []string `protobuf:"bytes,2,rep,name=scene,proto3" form:"scene" json:"scene" query:"scene"`
 	Code  int32    `protobuf:"varint,255,opt,name=code,proto3" form:"code" json:"code" query:"code"`
 	Msg   string   `protobuf:"bytes,256,opt,name=msg,proto3" form:"msg" json:"msg" query:"msg"`
@@ -1046,6 +1046,356 @@ func (x *ConfigListVoiceResp) GetMsg() string {
 	return ""
 }
 
+// 向单位新增角色请求
+type ConfigAddCharacterReq struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// 单位ID
+	UnitId string `protobuf:"bytes,1,opt,name=unitId,proto3" form:"unitId" json:"unitId" query:"unitId"`
+	// 角色信息
+	Character *Character `protobuf:"bytes,2,opt,name=character,proto3" form:"character" json:"character" query:"character"`
+}
+
+func (x *ConfigAddCharacterReq) Reset() {
+	*x = ConfigAddCharacterReq{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_config_proto_msgTypes[13]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ConfigAddCharacterReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfigAddCharacterReq) ProtoMessage() {}
+
+func (x *ConfigAddCharacterReq) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_config_proto_msgTypes[13]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfigAddCharacterReq.ProtoReflect.Descriptor instead.
+func (*ConfigAddCharacterReq) Descriptor() ([]byte, []int) {
+	return file_core_api_config_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ConfigAddCharacterReq) GetUnitId() string {
+	if x != nil {
+		return x.UnitId
+	}
+	return ""
+}
+
+func (x *ConfigAddCharacterReq) GetCharacter() *Character {
+	if x != nil {
+		return x.Character
+	}
+	return nil
+}
+
+// 向单位新增角色响应
+type ConfigAddCharacterResp struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	CharacterId string `protobuf:"bytes,1,opt,name=characterId,proto3" form:"characterId" json:"characterId" query:"characterId"`
+	Code        int32  `protobuf:"varint,255,opt,name=code,proto3" form:"code" json:"code" query:"code"`
+	Msg         string `protobuf:"bytes,256,opt,name=msg,proto3" form:"msg" json:"msg" query:"msg"`
+}
+
+func (x *ConfigAddCharacterResp) Reset() {
+	*x = ConfigAddCharacterResp{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_config_proto_msgTypes[14]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ConfigAddCharacterResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfigAddCharacterResp) ProtoMessage() {}
+
+func (x *ConfigAddCharacterResp) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_config_proto_msgTypes[14]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfigAddCharacterResp.ProtoReflect.Descriptor instead.
+func (*ConfigAddCharacterResp) Descriptor() ([]byte, []int) {
+	return file_core_api_config_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ConfigAddCharacterResp) GetCharacterId() string {
+	if x != nil {
+		return x.CharacterId
+	}
+	return ""
+}
+
+func (x *ConfigAddCharacterResp) GetCode() int32 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *ConfigAddCharacterResp) GetMsg() string {
+	if x != nil {
+		return x.Msg
+	}
+	return ""
+}
+
+// 更新单位角色请求
+type ConfigUpdateCharacterReq struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// 单位ID
+	UnitId string `protobuf:"bytes,1,opt,name=unitId,proto3" form:"unitId" json:"unitId" query:"unitId"`
+	// 角色信息（id 为角色ID，其余字段为待更新值，空字段不更新）
+	Character *Character `protobuf:"bytes,2,opt,name=character,proto3" form:"character" json:"character" query:"character"`
+}
+
+func (x *ConfigUpdateCharacterReq) Reset() {
+	*x = ConfigUpdateCharacterReq{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_config_proto_msgTypes[15]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ConfigUpdateCharacterReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfigUpdateCharacterReq) ProtoMessage() {}
+
+func (x *ConfigUpdateCharacterReq) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_config_proto_msgTypes[15]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfigUpdateCharacterReq.ProtoReflect.Descriptor instead.
+func (*ConfigUpdateCharacterReq) Descriptor() ([]byte, []int) {
+	return file_core_api_config_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ConfigUpdateCharacterReq) GetUnitId() string {
+	if x != nil {
+		return x.UnitId
+	}
+	return ""
+}
+
+func (x *ConfigUpdateCharacterReq) GetCharacter() *Character {
+	if x != nil {
+		return x.Character
+	}
+	return nil
+}
+
+// 更新单位角色响应
+type ConfigUpdateCharacterResp struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Code int32  `protobuf:"varint,255,opt,name=code,proto3" form:"code" json:"code" query:"code"`
+	Msg  string `protobuf:"bytes,256,opt,name=msg,proto3" form:"msg" json:"msg" query:"msg"`
+}
+
+func (x *ConfigUpdateCharacterResp) Reset() {
+	*x = ConfigUpdateCharacterResp{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_config_proto_msgTypes[16]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ConfigUpdateCharacterResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfigUpdateCharacterResp) ProtoMessage() {}
+
+func (x *ConfigUpdateCharacterResp) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_config_proto_msgTypes[16]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfigUpdateCharacterResp.ProtoReflect.Descriptor instead.
+func (*ConfigUpdateCharacterResp) Descriptor() ([]byte, []int) {
+	return file_core_api_config_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ConfigUpdateCharacterResp) GetCode() int32 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *ConfigUpdateCharacterResp) GetMsg() string {
+	if x != nil {
+		return x.Msg
+	}
+	return ""
+}
+
+// 删除单位角色请求
+type ConfigDeleteCharacterReq struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// 单位ID
+	UnitId string `protobuf:"bytes,1,opt,name=unitId,proto3" form:"unitId" json:"unitId" query:"unitId"`
+	// 角色ID
+	CharacterId string `protobuf:"bytes,2,opt,name=characterId,proto3" form:"characterId" json:"characterId" query:"characterId"`
+}
+
+func (x *ConfigDeleteCharacterReq) Reset() {
+	*x = ConfigDeleteCharacterReq{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_config_proto_msgTypes[17]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ConfigDeleteCharacterReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfigDeleteCharacterReq) ProtoMessage() {}
+
+func (x *ConfigDeleteCharacterReq) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_config_proto_msgTypes[17]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfigDeleteCharacterReq.ProtoReflect.Descriptor instead.
+func (*ConfigDeleteCharacterReq) Descriptor() ([]byte, []int) {
+	return file_core_api_config_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ConfigDeleteCharacterReq) GetUnitId() string {
+	if x != nil {
+		return x.UnitId
+	}
+	return ""
+}
+
+func (x *ConfigDeleteCharacterReq) GetCharacterId() string {
+	if x != nil {
+		return x.CharacterId
+	}
+	return ""
+}
+
+// 删除单位角色响应
+type ConfigDeleteCharacterResp struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Code int32  `protobuf:"varint,255,opt,name=code,proto3" form:"code" json:"code" query:"code"`
+	Msg  string `protobuf:"bytes,256,opt,name=msg,proto3" form:"msg" json:"msg" query:"msg"`
+}
+
+func (x *ConfigDeleteCharacterResp) Reset() {
+	*x = ConfigDeleteCharacterResp{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_config_proto_msgTypes[18]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ConfigDeleteCharacterResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfigDeleteCharacterResp) ProtoMessage() {}
+
+func (x *ConfigDeleteCharacterResp) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_config_proto_msgTypes[18]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfigDeleteCharacterResp.ProtoReflect.Descriptor instead.
+func (*ConfigDeleteCharacterResp) Descriptor() ([]byte, []int) {
+	return file_core_api_config_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ConfigDeleteCharacterResp) GetCode() int32 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *ConfigDeleteCharacterResp) GetMsg() string {
+	if x != nil {
+		return x.Msg
+	}
+	return ""
+}
+
 var File_core_api_config_proto protoreflect.FileDescriptor
 
 var file_core_api_config_proto_rawDesc = []byte{
@@ -1183,12 +1533,45 @@ var file_core_api_config_proto_rawDesc = []byte{
 	0x67, 0x69, 0x6e, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x0a, 0x70, 0x61, 0x67, 0x69, 0x6e, 0x61,
 	0x74, 0x69, 0x6f, 0x6e, 0x12, 0x13, 0x0a, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x18, 0xff, 0x01, 0x20,
 	0x01, 0x28, 0x05, 0x52, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x12, 0x11, 0x0a, 0x03, 0x6d, 0x73, 0x67,
-	0x18, 0x80, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6d, 0x73, 0x67, 0x42, 0x43, 0x5a, 0x41,
-	0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x78, 0x68, 0x2d, 0x70, 0x6f,
-	0x6c, 0x61, 0x72, 0x69, 0x73, 0x2f, 0x70, 0x73, 0x79, 0x63, 0x68, 0x2d, 0x63, 0x6f, 0x72, 0x65,
-	0x2d, 0x61, 0x70, 0x69, 0x2f, 0x62, 0x69, 0x7a, 0x2f, 0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61,
-	0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x64, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70,
-	0x69, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x18, 0x80, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6d, 0x73, 0x67, 0x22, 0x62, 0x0a, 0x15,
+	0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x41, 0x64, 0x64, 0x43, 0x68, 0x61, 0x72, 0x61, 0x63, 0x74,
+	0x65, 0x72, 0x52, 0x65, 0x71, 0x12, 0x16, 0x0a, 0x06, 0x75, 0x6e, 0x69, 0x74, 0x49, 0x64, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x75, 0x6e, 0x69, 0x74, 0x49, 0x64, 0x12, 0x31, 0x0a,
+	0x09, 0x63, 0x68, 0x61, 0x72, 0x61, 0x63, 0x74, 0x65, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b,
+	0x32, 0x13, 0x2e, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x2e, 0x43, 0x68, 0x61, 0x72,
+	0x61, 0x63, 0x74, 0x65, 0x72, 0x52, 0x09, 0x63, 0x68, 0x61, 0x72, 0x61, 0x63, 0x74, 0x65, 0x72,
+	0x22, 0x62, 0x0a, 0x16, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x41, 0x64, 0x64, 0x43, 0x68, 0x61,
+	0x72, 0x61, 0x63, 0x74, 0x65, 0x72, 0x52, 0x65, 0x73, 0x70, 0x12, 0x20, 0x0a, 0x0b, 0x63, 0x68,
+	0x61, 0x72, 0x61, 0x63, 0x74, 0x65, 0x72, 0x49, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x0b, 0x63, 0x68, 0x61, 0x72, 0x61, 0x63, 0x74, 0x65, 0x72, 0x49, 0x64, 0x12, 0x13, 0x0a, 0x04,
+	0x63, 0x6f, 0x64, 0x65, 0x18, 0xff, 0x01, 0x20, 0x01, 0x28, 0x05, 0x52, 0x04, 0x63, 0x6f, 0x64,
+	0x65, 0x12, 0x11, 0x0a, 0x03, 0x6d, 0x73, 0x67, 0x18, 0x80, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x03, 0x6d, 0x73, 0x67, 0x22, 0x65, 0x0a, 0x18, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x55, 0x70,
+	0x64, 0x61, 0x74, 0x65, 0x43, 0x68, 0x61, 0x72, 0x61, 0x63, 0x74, 0x65, 0x72, 0x52, 0x65, 0x71,
+	0x12, 0x16, 0x0a, 0x06, 0x75, 0x6e, 0x69, 0x74, 0x49, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x06, 0x75, 0x6e, 0x69, 0x74, 0x49, 0x64, 0x12, 0x31, 0x0a, 0x09, 0x63, 0x68, 0x61, 0x72,
+	0x61, 0x63, 0x74, 0x65, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x13, 0x2e, 0x63, 0x6f,
+	0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x2e, 0x43, 0x68, 0x61, 0x72, 0x61, 0x63, 0x74, 0x65, 0x72,
+	0x52, 0x09, 0x63, 0x68, 0x61, 0x72, 0x61, 0x63, 0x74, 0x65, 0x72, 0x22, 0x43, 0x0a, 0x19, 0x43,
+	0x6f, 0x6e, 0x66, 0x69, 0x67, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x43, 0x68, 0x61, 0x72, 0x61,
+	0x63, 0x74, 0x65, 0x72, 0x52, 0x65, 0x73, 0x70, 0x12, 0x13, 0x0a, 0x04, 0x63, 0x6f, 0x64, 0x65,
+	0x18, 0xff, 0x01, 0x20, 0x01, 0x28, 0x05, 0x52, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x12, 0x11, 0x0a,
+	0x03, 0x6d, 0x73, 0x67, 0x18, 0x80, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6d, 0x73, 0x67,
+	0x22, 0x54, 0x0a, 0x18, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x44, 0x65, 0x6c, 0x65, 0x74, 0x65,
+	0x43, 0x68, 0x61, 0x72, 0x61, 0x63, 0x74, 0x65, 0x72, 0x52, 0x65, 0x71, 0x12, 0x16, 0x0a, 0x06,
+	0x75, 0x6e, 0x69, 0x74, 0x49, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x75, 0x6e,
+	0x69, 0x74, 0x49, 0x64, 0x12, 0x20, 0x0a, 0x0b, 0x63, 0x68, 0x61, 0x72, 0x61, 0x63, 0x74, 0x65,
+	0x72, 0x49, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x63, 0x68, 0x61, 0x72, 0x61,
+	0x63, 0x74, 0x65, 0x72, 0x49, 0x64, 0x22, 0x43, 0x0a, 0x19, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67,
+	0x44, 0x65, 0x6c, 0x65, 0x74, 0x65, 0x43, 0x68, 0x61, 0x72, 0x61, 0x63, 0x74, 0x65, 0x72, 0x52,
+	0x65, 0x73, 0x70, 0x12, 0x13, 0x0a, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x18, 0xff, 0x01, 0x20, 0x01,
+	0x28, 0x05, 0x52, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x12, 0x11, 0x0a, 0x03, 0x6d, 0x73, 0x67, 0x18,
+	0x80, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6d, 0x73, 0x67, 0x42, 0x43, 0x5a, 0x41, 0x67,
+	0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x78, 0x68, 0x2d, 0x70, 0x6f, 0x6c,
+	0x61, 0x72, 0x69, 0x73, 0x2f, 0x70, 0x73, 0x79, 0x63, 0x68, 0x2d, 0x63, 0x6f, 0x72, 0x65, 0x2d,
+	0x61, 0x70, 0x69, 0x2f, 0x62, 0x69, 0x7a, 0x2f, 0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74,
+	0x69, 0x6f, 0x6e, 0x2f, 0x64, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69,
+	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1203,23 +1586,29 @@ func file_core_api_config_proto_rawDescGZIP() []byte {
 	return file_core_api_config_proto_rawDescData
 }
 
-var file_core_api_config_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_core_api_config_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_core_api_config_proto_goTypes = []interface{}{
-	(*ChatApp)(nil),                 // 0: core_api.ChatApp
-	(*TTSApp)(nil),                  // 1: core_api.TTSApp
-	(*ReportApp)(nil),               // 2: core_api.ReportApp
-	(*Character)(nil),               // 3: core_api.Character
-	(*ConfigVO)(nil),                // 4: core_api.ConfigVO
-	(*ConfigCreateOrUpdateReq)(nil), // 5: core_api.ConfigCreateOrUpdateReq
-	(*ConfigGetByUnitIdReq)(nil),    // 6: core_api.ConfigGetByUnitIdReq
-	(*ConfigGetByUnitIdResp)(nil),   // 7: core_api.ConfigGetByUnitIdResp
-	(*ConfigGetCharacterReq)(nil),   // 8: core_api.ConfigGetCharacterReq
-	(*ConfigGetCharacterResp)(nil),  // 9: core_api.ConfigGetCharacterResp
-	(*VoiceItemVO)(nil),             // 10: core_api.VoiceItemVO
-	(*ConfigListVoiceReq)(nil),      // 11: core_api.ConfigListVoiceReq
-	(*ConfigListVoiceResp)(nil),     // 12: core_api.ConfigListVoiceResp
-	(*basic.PaginationOptions)(nil), // 13: basic.PaginationOptions
-	(*basic.Pagination)(nil),        // 14: basic.Pagination
+	(*ChatApp)(nil),                   // 0: core_api.ChatApp
+	(*TTSApp)(nil),                    // 1: core_api.TTSApp
+	(*ReportApp)(nil),                 // 2: core_api.ReportApp
+	(*Character)(nil),                 // 3: core_api.Character
+	(*ConfigVO)(nil),                  // 4: core_api.ConfigVO
+	(*ConfigCreateOrUpdateReq)(nil),   // 5: core_api.ConfigCreateOrUpdateReq
+	(*ConfigGetByUnitIdReq)(nil),      // 6: core_api.ConfigGetByUnitIdReq
+	(*ConfigGetByUnitIdResp)(nil),     // 7: core_api.ConfigGetByUnitIdResp
+	(*ConfigGetCharacterReq)(nil),     // 8: core_api.ConfigGetCharacterReq
+	(*ConfigGetCharacterResp)(nil),    // 9: core_api.ConfigGetCharacterResp
+	(*VoiceItemVO)(nil),               // 10: core_api.VoiceItemVO
+	(*ConfigListVoiceReq)(nil),        // 11: core_api.ConfigListVoiceReq
+	(*ConfigListVoiceResp)(nil),       // 12: core_api.ConfigListVoiceResp
+	(*ConfigAddCharacterReq)(nil),     // 13: core_api.ConfigAddCharacterReq
+	(*ConfigAddCharacterResp)(nil),    // 14: core_api.ConfigAddCharacterResp
+	(*ConfigUpdateCharacterReq)(nil),  // 15: core_api.ConfigUpdateCharacterReq
+	(*ConfigUpdateCharacterResp)(nil), // 16: core_api.ConfigUpdateCharacterResp
+	(*ConfigDeleteCharacterReq)(nil),  // 17: core_api.ConfigDeleteCharacterReq
+	(*ConfigDeleteCharacterResp)(nil), // 18: core_api.ConfigDeleteCharacterResp
+	(*basic.PaginationOptions)(nil),   // 19: basic.PaginationOptions
+	(*basic.Pagination)(nil),          // 20: basic.Pagination
 }
 var file_core_api_config_proto_depIdxs = []int32{
 	0,  // 0: core_api.ConfigVO.chat:type_name -> core_api.ChatApp
@@ -1229,14 +1618,16 @@ var file_core_api_config_proto_depIdxs = []int32{
 	4,  // 4: core_api.ConfigCreateOrUpdateReq.config:type_name -> core_api.ConfigVO
 	4,  // 5: core_api.ConfigGetByUnitIdResp.config:type_name -> core_api.ConfigVO
 	3,  // 6: core_api.ConfigGetCharacterResp.characters:type_name -> core_api.Character
-	13, // 7: core_api.ConfigListVoiceReq.paginationOptions:type_name -> basic.PaginationOptions
+	19, // 7: core_api.ConfigListVoiceReq.paginationOptions:type_name -> basic.PaginationOptions
 	10, // 8: core_api.ConfigListVoiceResp.voices:type_name -> core_api.VoiceItemVO
-	14, // 9: core_api.ConfigListVoiceResp.pagination:type_name -> basic.Pagination
-	10, // [10:10] is the sub-list for method output_type
-	10, // [10:10] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	20, // 9: core_api.ConfigListVoiceResp.pagination:type_name -> basic.Pagination
+	3,  // 10: core_api.ConfigAddCharacterReq.character:type_name -> core_api.Character
+	3,  // 11: core_api.ConfigUpdateCharacterReq.character:type_name -> core_api.Character
+	12, // [12:12] is the sub-list for method output_type
+	12, // [12:12] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func file_core_api_config_proto_init() {
@@ -1400,6 +1791,78 @@ func file_core_api_config_proto_init() {
 				return nil
 			}
 		}
+		file_core_api_config_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ConfigAddCharacterReq); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_core_api_config_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ConfigAddCharacterResp); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_core_api_config_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ConfigUpdateCharacterReq); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_core_api_config_proto_msgTypes[16].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ConfigUpdateCharacterResp); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_core_api_config_proto_msgTypes[17].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ConfigDeleteCharacterReq); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_core_api_config_proto_msgTypes[18].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ConfigDeleteCharacterResp); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1407,7 +1870,7 @@ func file_core_api_config_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_core_api_config_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
