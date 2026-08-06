@@ -44,6 +44,10 @@ type IMongoMapper interface {
 	AverageDuration(ctx context.Context, unitId *bson.ObjectID) (float64, error)
 	AverageDurationByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (float64, error)
 	CountActiveUsers(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
+	// 按星期聚合对话数（key: 1=Mon ... 7=Sun）
+	CountUnitConvByWeekday(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (map[int32]int32, error)
+	// 按星期聚合活跃用户数（key: 1=Mon ... 7=Sun）
+	CountActiveUsersByWeekday(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (map[int32]int32, error)
 	// 批量统计
 	BatchConvStats(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*ConvStats, error)
 	// 按时长分桶统计对话数量
@@ -55,6 +59,10 @@ type IMongoMapper interface {
 	CountConversationsByClassList(ctx context.Context, grades, classes []int32, start, end time.Time) (int32, error)
 	CountActiveUsersByClassList(ctx context.Context, grades, classes []int32, start, end time.Time) (int32, error)
 	AverageDurationByClassListAndPeriod(ctx context.Context, grades, classes []int32, start, end time.Time) (float64, error)
+	// 按星期聚合对话数（按班级列表，key: 1=Mon ... 7=Sun）
+	CountConversationsByWeekdayByClassList(ctx context.Context, grades, classes []int32, start, end time.Time) (map[int32]int32, error)
+	// 按星期聚合活跃用户数（按班级列表，key: 1=Mon ... 7=Sun）
+	CountActiveUsersByWeekdayByClassList(ctx context.Context, grades, classes []int32, start, end time.Time) (map[int32]int32, error)
 	// 按班级列表查询对话（不分时间范围）
 	CountByClassList(ctx context.Context, grades, classes []int32) (int32, error)
 	FindManyByClassList(ctx context.Context, grades, classes []int32, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
@@ -276,6 +284,119 @@ func (m *mongoMapper) CountActiveUsers(ctx context.Context, unitId *bson.ObjectI
 		return 0, nil
 	}
 	return result[0].Count, nil
+}
+
+// weekdayToCn 将 MongoDB $dayOfWeek 结果（1=Sun ... 7=Sat）映射为 1=Mon ... 7=Sun
+func weekdayToCn(wd int32) int32 {
+	return (wd+5)%7 + 1
+}
+
+// CountUnitConvByWeekday 按星期聚合对话数（create_time 口径，与 CountUnitConvByPeriod 一致）
+func (m *mongoMapper) CountUnitConvByWeekday(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (map[int32]int32, error) {
+	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
+	timeFilter := bson.M{}
+	if !start.IsZero() {
+		timeFilter[cst.GTE] = start
+	}
+	if !end.IsZero() {
+		timeFilter[cst.LTE] = end
+	}
+	if len(timeFilter) > 0 {
+		matchStage[cst.CreateTime] = timeFilter
+	}
+
+	pipeline := []bson.M{{"$match": matchStage}}
+
+	if unitId != nil {
+		pipeline = append(pipeline,
+			bson.M{"$lookup": bson.M{
+				"from":         userCollection,
+				"localField":   cst.UserID,
+				"foreignField": cst.ID,
+				"as":           "userDoc",
+			}},
+			bson.M{"$match": bson.M{"userDoc.unit_id": *unitId}},
+		)
+	}
+
+	pipeline = append(pipeline, bson.M{"$group": bson.M{
+		cst.ID:  bson.M{"wd": bson.M{"$dayOfWeek": "$" + cst.CreateTime}},
+		"count": bson.M{"$sum": 1},
+	}})
+
+	var result []struct {
+		ID struct {
+			WD int32 `bson:"wd"`
+		} `bson:"_id"`
+		Count int32 `bson:"count"`
+	}
+	if err := m.conn.Aggregate(ctx, &result, pipeline); err != nil {
+		logs.Errorf("[conversation mapper] count conv by weekday err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	out := make(map[int32]int32, len(result))
+	for _, r := range result {
+		out[weekdayToCn(r.ID.WD)] = r.Count
+	}
+	return out, nil
+}
+
+// CountActiveUsersByWeekday 按星期聚合活跃用户数（end_time 口径，与 CountActiveUsers 一致，先按 user+星期去重再计数）
+func (m *mongoMapper) CountActiveUsersByWeekday(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (map[int32]int32, error) {
+	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
+	timeFilter := bson.M{}
+	if !start.IsZero() {
+		timeFilter[cst.GTE] = start
+	}
+	if !end.IsZero() {
+		timeFilter[cst.LT] = end
+	}
+	if len(timeFilter) > 0 {
+		matchStage[cst.EndTime] = timeFilter
+	}
+
+	pipeline := []bson.M{{"$match": matchStage}}
+
+	if unitId != nil {
+		pipeline = append(pipeline,
+			bson.M{"$lookup": bson.M{
+				"from":         userCollection,
+				"localField":   cst.UserID,
+				"foreignField": cst.ID,
+				"as":           "userDoc",
+			}},
+			bson.M{"$match": bson.M{"userDoc.unit_id": *unitId}},
+		)
+	}
+
+	pipeline = append(pipeline,
+		// 同一用户在同一星期去重
+		bson.M{"$group": bson.M{cst.ID: bson.M{
+			"user": "$" + cst.UserID,
+			"wd":   bson.M{"$dayOfWeek": "$" + cst.EndTime},
+		}}},
+		// 按星期统计去重后的用户数
+		bson.M{"$group": bson.M{
+			cst.ID:  "$_id.wd",
+			"count": bson.M{"$sum": 1},
+		}},
+	)
+
+	var result []struct {
+		ID    int32 `bson:"_id"`
+		Count int32 `bson:"count"`
+	}
+	if err := m.conn.Aggregate(ctx, &result, pipeline); err != nil {
+		logs.Errorf("[conversation mapper] count active users by weekday err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	out := make(map[int32]int32, len(result))
+	for _, r := range result {
+		out[weekdayToCn(r.ID)] = r.Count
+	}
+	return out, nil
 }
 
 type ConvStats struct {
@@ -764,6 +885,112 @@ func (m *mongoMapper) CountActiveUsersByClassList(ctx context.Context, grades, c
 	return results[0].Count, nil
 }
 
+// CountConversationsByWeekdayByClassList 按星期聚合对话数（按班级列表，start_time 口径，与 CountConversationsByClassList 一致）
+func (m *mongoMapper) CountConversationsByWeekdayByClassList(ctx context.Context, grades, classes []int32, start, end time.Time) (map[int32]int32, error) {
+	userIds, err := m.classListUserIds(ctx, grades, classes)
+	if err != nil {
+		logs.Errorf("[conversation mapper] count conversations by weekday class list find users err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+	if len(userIds) == 0 {
+		return make(map[int32]int32), nil
+	}
+
+	convFilter := bson.M{
+		cst.UserID: bson.M{cst.In: userIds},
+		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+	}
+	timeFilter := bson.M{}
+	if !start.IsZero() {
+		timeFilter[cst.GTE] = start
+	}
+	if !end.IsZero() {
+		timeFilter[cst.LTE] = end
+	}
+	if len(timeFilter) > 0 {
+		convFilter[cst.StartTime] = timeFilter
+	}
+
+	pipeline := []bson.M{
+		{"$match": convFilter},
+		{"$group": bson.M{
+			cst.ID:  bson.M{"wd": bson.M{"$dayOfWeek": "$" + cst.StartTime}},
+			"count": bson.M{"$sum": 1},
+		}},
+	}
+
+	var result []struct {
+		ID struct {
+			WD int32 `bson:"wd"`
+		} `bson:"_id"`
+		Count int32 `bson:"count"`
+	}
+	if err := m.conn.Aggregate(ctx, &result, pipeline); err != nil {
+		logs.Errorf("[conversation mapper] count conversations by weekday class list err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	out := make(map[int32]int32, len(result))
+	for _, r := range result {
+		out[weekdayToCn(r.ID.WD)] = r.Count
+	}
+	return out, nil
+}
+
+// CountActiveUsersByWeekdayByClassList 按星期聚合活跃用户数（按班级列表，start_time 口径，与 CountActiveUsersByClassList 一致）
+func (m *mongoMapper) CountActiveUsersByWeekdayByClassList(ctx context.Context, grades, classes []int32, start, end time.Time) (map[int32]int32, error) {
+	userIds, err := m.classListUserIds(ctx, grades, classes)
+	if err != nil {
+		logs.Errorf("[conversation mapper] count active users by weekday class list find users err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+	if len(userIds) == 0 {
+		return make(map[int32]int32), nil
+	}
+
+	convFilter := bson.M{
+		cst.UserID: bson.M{cst.In: userIds},
+		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+	}
+	timeFilter := bson.M{}
+	if !start.IsZero() {
+		timeFilter[cst.GTE] = start
+	}
+	if !end.IsZero() {
+		timeFilter[cst.LTE] = end
+	}
+	if len(timeFilter) > 0 {
+		convFilter[cst.StartTime] = timeFilter
+	}
+
+	pipeline := []bson.M{
+		{"$match": convFilter},
+		{"$group": bson.M{cst.ID: bson.M{
+			"user": "$" + cst.UserID,
+			"wd":   bson.M{"$dayOfWeek": "$" + cst.StartTime},
+		}}},
+		{"$group": bson.M{
+			cst.ID:  "$_id.wd",
+			"count": bson.M{"$sum": 1},
+		}},
+	}
+
+	var result []struct {
+		ID    int32 `bson:"_id"`
+		Count int32 `bson:"count"`
+	}
+	if err := m.conn.Aggregate(ctx, &result, pipeline); err != nil {
+		logs.Errorf("[conversation mapper] count active users by weekday class list err: %s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+
+	out := make(map[int32]int32, len(result))
+	for _, r := range result {
+		out[weekdayToCn(r.ID)] = r.Count
+	}
+	return out, nil
+}
+
 // AverageDurationByClassListAndPeriod 按班级列表和时间段统计平均对话时长
 func (m *mongoMapper) AverageDurationByClassListAndPeriod(ctx context.Context, grades, classes []int32, start, end time.Time) (float64, error) {
 	if len(grades) == 0 && len(classes) == 0 {
@@ -869,6 +1096,38 @@ func (m *mongoMapper) findAllUsersByFilter(ctx context.Context, filter bson.M) (
 	}
 
 	return results, nil
+}
+
+// classListUserIds 按班级列表查询学生用户 ID
+func (m *mongoMapper) classListUserIds(ctx context.Context, grades, classes []int32) ([]bson.ObjectID, error) {
+	if len(grades) == 0 && len(classes) == 0 {
+		return nil, nil
+	}
+
+	userFilter := bson.M{
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+	}
+	andFilters := make([]bson.M, 0)
+	if len(grades) > 0 {
+		andFilters = append(andFilters, bson.M{cst.Grade: bson.M{cst.In: grades}})
+	}
+	if len(classes) > 0 {
+		andFilters = append(andFilters, bson.M{cst.Class: bson.M{cst.In: classes}})
+	}
+	if len(andFilters) > 0 {
+		userFilter[cst.And] = andFilters
+	}
+
+	users, err := m.findAllUsersByFilter(ctx, userFilter)
+	if err != nil {
+		return nil, err
+	}
+
+	userIds := make([]bson.ObjectID, len(users))
+	for i, u := range users {
+		userIds[i] = u.ID
+	}
+	return userIds, nil
 }
 
 // CountByClassList 按班级列表统计对话数量（不分时间范围）

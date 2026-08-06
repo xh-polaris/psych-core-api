@@ -23,6 +23,7 @@ var _ IMongoMapper = (*mongoMapper)(nil)
 
 const (
 	collection     = "alarm"
+	userCollection = "user"
 	cacheKeyPrefix = "cache:alarm:"
 )
 
@@ -33,11 +34,16 @@ type IMongoMapper interface {
 	ExistsById(ctx context.Context, id bson.ObjectID) (bool, error)
 	AggregateStats(ctx context.Context, unitID bson.ObjectID, curStart, curEnd, prevStart, prevEnd time.Time) (*OverviewStats, error)
 	AggregateStatsByClassList(ctx context.Context, unitID bson.ObjectID, grades, classes []int32, curStart, curEnd, prevStart, prevEnd time.Time) (*OverviewStats, error)
-	EmotionDistribution(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (*EmotionDistribution, error)
-	EmotionDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32, start, end time.Time) (*EmotionDistribution, error)
 	BatchExistsByConvId(ctx context.Context, convId []bson.ObjectID) (map[bson.ObjectID]bool, error)
+	// 批量取每个用户最新的一条 alarm 记录（按 create_time 倒序），无记录的用户不出现在结果中
+	BatchFindLatestByUserIds(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*Alarm, error)
 	FindManyWithOption(ctx context.Context, filter bson.M, opts options.Lister[options.FindOptions]) ([]*Alarm, error)
 	CountByFields(ctx context.Context, filter bson.M) (int32, error)
+	// 高危用户统计：用户存在关联 alarm 记录即视为高危，时间以 alarm.create_time 为准
+	CountAlarmUsers(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
+	CountAlarmUsersByClassList(ctx context.Context, unitOID bson.ObjectID, grades, classes []int32, start, end time.Time) (int32, error)
+	CountAlarmUsersByGrade(ctx context.Context, unitId bson.ObjectID, startGrade int, start, end time.Time) (map[int32]int32, int32, error)
+	CountAlarmUsersByGradeAndClasses(ctx context.Context, unitId bson.ObjectID, startGrade int, enrollYears, classes []int32, start, end time.Time) (map[int32]int32, int32, error)
 }
 
 type mongoMapper struct {
@@ -105,6 +111,193 @@ func (m *mongoMapper) ExistsById(ctx context.Context, userID bson.ObjectID) (boo
 		return false, err
 	}
 	return c > 0, err
+}
+
+// countAlarmUsers 统计 [start,end] 内有 alarm 记录的去重用户数
+func (m *mongoMapper) countAlarmUsers(ctx context.Context, match bson.M) (int32, error) {
+	pipeline := []bson.M{
+		{"$match": match},
+		{"$group": bson.M{"_id": "$" + cst.UserID}},
+		{"$count": "count"},
+	}
+
+	var results []struct {
+		Count int32 `bson:"count"`
+	}
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
+		logs.Errorf("[alarm mapper] count alarm users err:%s", errorx.ErrorWithoutStack(err))
+		return 0, err
+	}
+	if len(results) == 0 {
+		return 0, nil
+	}
+	return results[0].Count, nil
+}
+
+// CountAlarmUsers 统计高危用户数：在 [start,end] 内有 alarm 记录的去重用户数，unitId 传 nil 则统计全部
+func (m *mongoMapper) CountAlarmUsers(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error) {
+	match := bson.M{}
+	if unitId != nil {
+		match[cst.UnitID] = *unitId
+	}
+	if !start.IsZero() || !end.IsZero() {
+		tf := bson.M{}
+		if !start.IsZero() {
+			tf[cst.GTE] = start
+		}
+		if !end.IsZero() {
+			tf[cst.LTE] = end
+		}
+		match[cst.CreateTime] = tf
+	}
+	return m.countAlarmUsers(ctx, match)
+}
+
+// CountAlarmUsersByClassList 按班级列表统计高危用户数
+func (m *mongoMapper) CountAlarmUsersByClassList(ctx context.Context, unitOID bson.ObjectID, grades, classes []int32, start, end time.Time) (int32, error) {
+	// 先查询班级列表下的用户 ID
+	userFilter := bson.M{
+		cst.UnitID: unitOID,
+		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
+	}
+	andFilters := make([]bson.M, 0)
+	if len(grades) > 0 {
+		andFilters = append(andFilters, bson.M{cst.Grade: bson.M{cst.In: grades}})
+	}
+	if len(classes) > 0 {
+		andFilters = append(andFilters, bson.M{cst.Class: bson.M{cst.In: classes}})
+	}
+	if len(andFilters) > 0 {
+		userFilter[cst.And] = andFilters
+	}
+
+	pipeline := []bson.M{
+		{"$match": userFilter},
+		{"$project": bson.M{"_id": 1}},
+	}
+	var users []struct {
+		ID bson.ObjectID `bson:"_id"`
+	}
+	if err := m.conn.Aggregate(ctx, &users, pipeline); err != nil {
+		logs.Errorf("[alarm mapper] find users by class list err: %s", errorx.ErrorWithoutStack(err))
+		return 0, err
+	}
+	if len(users) == 0 {
+		return 0, nil
+	}
+
+	userIds := make([]bson.ObjectID, len(users))
+	for i, u := range users {
+		userIds[i] = u.ID
+	}
+
+	match := bson.M{cst.UserID: bson.M{cst.In: userIds}}
+	if !start.IsZero() || !end.IsZero() {
+		tf := bson.M{}
+		if !start.IsZero() {
+			tf[cst.GTE] = start
+		}
+		if !end.IsZero() {
+			tf[cst.LTE] = end
+		}
+		match[cst.CreateTime] = tf
+	}
+	return m.countAlarmUsers(ctx, match)
+}
+
+// CountAlarmUsersByGrade 统计各年级高危用户数
+func (m *mongoMapper) CountAlarmUsersByGrade(ctx context.Context, unitId bson.ObjectID, startGrade int, start, end time.Time) (map[int32]int32, int32, error) {
+	match := bson.M{cst.UnitID: unitId}
+	if !start.IsZero() || !end.IsZero() {
+		tf := bson.M{}
+		if !start.IsZero() {
+			tf[cst.GTE] = start
+		}
+		if !end.IsZero() {
+			tf[cst.LTE] = end
+		}
+		match[cst.CreateTime] = tf
+	}
+
+	return m.countAlarmUsersByGrade(ctx, match, startGrade, bson.M{})
+}
+
+// CountAlarmUsersByGradeAndClasses 按班级列表统计各年级高危用户数
+func (m *mongoMapper) CountAlarmUsersByGradeAndClasses(ctx context.Context, unitId bson.ObjectID, startGrade int, enrollYears, classes []int32, start, end time.Time) (map[int32]int32, int32, error) {
+	if len(enrollYears) == 0 && len(classes) == 0 {
+		return make(map[int32]int32), 0, nil
+	}
+
+	match := bson.M{cst.UnitID: unitId}
+	if !start.IsZero() || !end.IsZero() {
+		tf := bson.M{}
+		if !start.IsZero() {
+			tf[cst.GTE] = start
+		}
+		if !end.IsZero() {
+			tf[cst.LTE] = end
+		}
+		match[cst.CreateTime] = tf
+	}
+
+	userMatch := bson.M{
+		"userDoc.role":   enum.UserRoleStudent,
+		"userDoc.status": bson.M{"$ne": enum.UserStatusDeleted},
+	}
+	if len(enrollYears) > 0 {
+		orFilters := make([]bson.M, 0, len(enrollYears))
+		for _, ey := range enrollYears {
+			orFilters = append(orFilters, bson.M{"userDoc.enroll_year": int(ey)})
+		}
+		userMatch[cst.Or] = orFilters
+	}
+	if len(classes) > 0 {
+		userMatch["userDoc.class"] = bson.M{cst.In: classes}
+	}
+
+	return m.countAlarmUsersByGrade(ctx, match, startGrade, userMatch)
+}
+
+// countAlarmUsersByGrade 去重报警用户后关联 user 计算年级分布；userMatch 额外过滤 userDoc 字段
+func (m *mongoMapper) countAlarmUsersByGrade(ctx context.Context, match bson.M, startGrade int, userMatch bson.M) (map[int32]int32, int32, error) {
+	pipeline := []bson.M{
+		{"$match": match},
+		// 去重用户
+		{"$group": bson.M{"_id": "$" + cst.UserID}},
+		// 关联用户取身份信息
+		{"$lookup": bson.M{
+			"from":         userCollection,
+			"localField":   "_id",
+			"foreignField": "_id",
+			"as":           "userDoc",
+		}},
+		{"$unwind": "$userDoc"},
+	}
+	if len(userMatch) > 0 {
+		pipeline = append(pipeline, bson.M{"$match": userMatch})
+	}
+	pipeline = append(pipeline,
+		bson.M{"$replaceRoot": bson.M{"newRoot": "$userDoc"}},
+		bson.M{"$addFields": bson.M{cst.Grade: util.GradeExpr(startGrade)}},
+		bson.M{"$group": bson.M{"_id": "$" + cst.Grade, "count": bson.M{"$sum": 1}}},
+	)
+
+	var results []struct {
+		Grade int32 `bson:"_id"`
+		Count int32 `bson:"count"`
+	}
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
+		logs.Errorf("[alarm mapper] count alarm users by grade err:%s", errorx.ErrorWithoutStack(err))
+		return nil, 0, err
+	}
+
+	dist := make(map[int32]int32, len(results))
+	var total int32
+	for _, r := range results {
+		dist[r.Grade] = r.Count
+		total += r.Count
+	}
+	return dist, total, nil
 }
 
 type OverviewStats struct {
@@ -213,131 +406,6 @@ func parseWeekData(weekData weekData) (map[int32]int32, int32) {
 	return statusMap, total
 }
 
-type EmotionDistribution map[int]int32
-
-// EmotionDistribution 计算某Unit的情绪分布
-// unitId传入nil则计算所有Unit的情绪分布
-func (m *mongoMapper) EmotionDistribution(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (*EmotionDistribution, error) {
-	match := bson.M{}
-	if unitId != nil {
-		match[cst.UnitID] = *unitId
-	}
-	if !start.IsZero() || !end.IsZero() {
-		tf := bson.M{}
-		if !start.IsZero() {
-			tf["$gte"] = start
-		}
-		if !end.IsZero() {
-			tf["$lte"] = end
-		}
-		match[cst.CreateTime] = tf
-	}
-
-	// 对每个用户取最新一条Alarm 统计emotion分布
-	pipeline := mongo.Pipeline{
-		{{Key: "$match", Value: match}},
-		{{Key: "$sort", Value: bson.M{cst.CreateTime: -1}}},
-		// per-user latest emotion
-		{{Key: "$group", Value: bson.M{
-			"_id":     "$" + cst.UserID,
-			"emotion": bson.M{"$first": "$emotion"},
-		}}},
-		// count users by latest emotion
-		{{Key: "$group", Value: bson.M{
-			"_id":   "$emotion",
-			"count": bson.M{"$sum": 1},
-		}}},
-	}
-
-	var results []struct {
-		Emotion int   `bson:"_id"`
-		Count   int32 `bson:"count"`
-	}
-
-	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
-		logs.Errorf("[alarm mapper] emotion distribution aggregate err:%s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-
-	distribution := make(EmotionDistribution)
-	for _, result := range results {
-		distribution[result.Emotion] = result.Count
-	}
-
-	return &distribution, nil
-}
-
-func (m *mongoMapper) EmotionDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32, start, end time.Time) (*EmotionDistribution, error) {
-	match := bson.M{
-		cst.UnitID: unitId,
-	}
-	if !start.IsZero() || !end.IsZero() {
-		tf := bson.M{}
-		if !start.IsZero() {
-			tf["$gte"] = start
-		}
-		if !end.IsZero() {
-			tf["$lte"] = end
-		}
-		match[cst.CreateTime] = tf
-	}
-
-	pipeline := mongo.Pipeline{
-		bson.D{{Key: "$match", Value: match}},
-		bson.D{{Key: "$sort", Value: bson.M{cst.CreateTime: -1}}},
-		bson.D{{Key: "$group", Value: bson.M{
-			"_id":     "$" + cst.UserID,
-			"emotion": bson.M{"$first": "$emotion"},
-		}}},
-		bson.D{{Key: "$lookup", Value: bson.M{
-			"from":         "user",
-			"localField":   "_id",
-			"foreignField": "_id",
-			"as":           "userDoc",
-		}}},
-		bson.D{{Key: "$unwind", Value: "$userDoc"}},
-	}
-
-	if len(grades) > 0 || len(classes) > 0 {
-		matchFilter := bson.M{}
-		andFilters := make([]bson.M, 0)
-		if len(grades) > 0 {
-			andFilters = append(andFilters, bson.M{"userDoc.grade": bson.M{"$in": grades}})
-		}
-		if len(classes) > 0 {
-			andFilters = append(andFilters, bson.M{"userDoc.class": bson.M{"$in": classes}})
-		}
-		if len(andFilters) > 0 {
-			matchFilter["$and"] = andFilters
-		}
-		pipeline = append(pipeline, bson.D{{Key: "$match", Value: matchFilter}})
-	}
-
-	pipeline = append(pipeline, bson.D{
-		{Key: "$group", Value: bson.M{
-			"_id":   "$emotion",
-			"count": bson.M{"$sum": 1},
-		}},
-	})
-
-	var results []struct {
-		Emotion int   `bson:"_id"`
-		Count   int32 `bson:"count"`
-	}
-
-	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
-		logs.Errorf("[alarm mapper] emotion distribution by class list aggregate err:%s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-
-	distribution := make(EmotionDistribution)
-	for _, result := range results {
-		distribution[result.Emotion] = result.Count
-	}
-
-	return &distribution, nil
-}
-
 func (m *mongoMapper) BatchExistsByConvId(ctx context.Context, convId []bson.ObjectID) (map[bson.ObjectID]bool, error) {
 	result := make(map[bson.ObjectID]bool, len(convId))
 	if len(convId) == 0 {
@@ -363,6 +431,44 @@ func (m *mongoMapper) BatchExistsByConvId(ctx context.Context, convId []bson.Obj
 		result[alarm.ConversationID] = true
 	}
 
+	return result, nil
+}
+
+// BatchFindLatestByUserIds 批量取每个用户最新的一条 alarm 记录（按 create_time 倒序取每组第一条）
+func (m *mongoMapper) BatchFindLatestByUserIds(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*Alarm, error) {
+	result := make(map[bson.ObjectID]*Alarm)
+	if len(userIds) == 0 {
+		return result, nil
+	}
+
+	pipeline := mongo.Pipeline{
+		{{
+			Key: "$match", Value: bson.M{cst.UserID: bson.M{cst.In: userIds}},
+		}},
+		{{
+			Key: "$sort", Value: bson.M{cst.CreateTime: -1},
+		}},
+		{{
+			Key: "$group", Value: bson.M{
+				"_id": "$" + cst.UserID,
+				"doc": bson.M{"$first": "$$ROOT"},
+			},
+		}},
+		{{
+			Key: "$replaceRoot", Value: bson.M{"newRoot": "$doc"},
+		}},
+	}
+
+	var alarms []*Alarm
+	if err := m.conn.Aggregate(ctx, &alarms, pipeline); err != nil {
+		logs.Errorf("[alarm mapper] batch find latest by user ids err:%s", errorx.ErrorWithoutStack(err))
+		return nil, err
+	}
+	for _, al := range alarms {
+		if al != nil {
+			result[al.UserID] = al
+		}
+	}
 	return result, nil
 }
 

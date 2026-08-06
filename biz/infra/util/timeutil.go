@@ -39,3 +39,22 @@ func DateToTimestampUTC8(date string) (int64, error) {
 	}
 	return t.Unix(), nil
 }
+
+// ParseEndTime 解析结束时间戳，缺省为当前时间
+func ParseEndTime(ts int64) time.Time {
+	if ts > 0 {
+		return time.Unix(ts, 0)
+	}
+	return time.Now()
+}
+
+// ParseStartTime 解析开始时间戳，缺省为 end 前 7 天
+func ParseStartTime(ts int64, endTime time.Time) time.Time {
+	if ts > 0 {
+		return time.Unix(ts, 0)
+	}
+	if endTime.IsZero() {
+		endTime = time.Now()
+	}
+	return endTime.AddDate(0, 0, -7)
+}

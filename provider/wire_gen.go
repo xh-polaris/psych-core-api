@@ -10,6 +10,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/application/service"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
+	"github.com/xh-polaris/psych-core-api/biz/domain/dashboard"
 	"github.com/xh-polaris/psych-core-api/biz/domain/usr"
 	"github.com/xh-polaris/psych-core-api/biz/infra/cache/redis"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
@@ -50,15 +51,18 @@ func NewProvider() (*Provider, error) {
 		ConversationMapper: conversationIMongoMapper,
 		ReportMapper:       reportIMongoMapper,
 	}
-	messageIMongoMapper := message.NewMessageMongoMapper(confConfig)
-	dashboardService := service.DashboardService{
-		AuthDomain:         authDomain,
+	dashboardDomain := &dashboard.DashboardDomain{
 		UserMapper:         iMongoMapper,
 		UnitMapper:         unitIMongoMapper,
-		MessageMapper:      messageIMongoMapper,
 		ConversationMapper: conversationIMongoMapper,
 		ReportMapper:       reportIMongoMapper,
 		AlarmMapper:        alarmIMongoMapper,
+	}
+	dashboardService := service.DashboardService{
+		AuthDomain:         authDomain,
+		UserMapper:         iMongoMapper,
+		ConversationMapper: conversationIMongoMapper,
+		DashboardDomain:    dashboardDomain,
 	}
 	configIMongoMapper := config.NewConfigMongoMapper(confConfig)
 	voiceIMongoMapper := voice.NewVoiceMongoMapper(confConfig)
@@ -86,6 +90,7 @@ func NewProvider() (*Provider, error) {
 		UserMapper:      iMongoMapper,
 		Synapse4bClient: client,
 	}
+	messageIMongoMapper := message.NewMessageMongoMapper(confConfig)
 	conversationService := service.ConversationService{
 		AuthDomain:         authDomain,
 		MessageMapper:      messageIMongoMapper,
