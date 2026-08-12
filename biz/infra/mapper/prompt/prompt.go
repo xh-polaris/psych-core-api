@@ -8,8 +8,8 @@ import (
 
 type Prompt struct {
 	ID          bson.ObjectID  `bson:"_id,omitempty" json:"id,omitempty"`
-	Stage       int            `bson:"stage" json:"stage"`
-	Type        int            `bson:"type" json:"type"`
+	Stage       string         `bson:"stage" json:"stage"`
+	Type        string         `bson:"type" json:"type"`
 	Name        string         `bson:"name" json:"name"`
 	Content     string         `bson:"content" json:"content"`
 	UnitID      *bson.ObjectID `bson:"unit_id,omitempty" json:"unitId,omitempty"`
