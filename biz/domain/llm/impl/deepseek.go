@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -12,9 +13,7 @@ import (
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
-	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
-	"github.com/xh-polaris/psych-core-api/types/errno"
 )
 
 const (
@@ -22,9 +21,19 @@ const (
 )
 
 type deepseekChatReq struct {
-	Model    string             `json:"model"`
-	Messages []*deepseekMessage `json:"messages"`
-	Stream   bool               `json:"stream"`
+	Model          string             `json:"model"`
+	Messages       []*deepseekMessage `json:"messages"`
+	Stream         bool               `json:"stream"`
+	ResponseFormat *chatRespFormat    `json:"response_format,omitempty"`
+	Thinking       *chatThinking      `json:"thinking,omitempty"`
+}
+
+type chatRespFormat struct {
+	Type string `json:"type"`
+}
+
+type chatThinking struct {
+	Type string `json:"type"`
 }
 
 type deepseekMessage struct {
@@ -65,7 +74,67 @@ func NewDeepSeekModel(ctx context.Context, url, apiKey, modelName string) (_ mod
 }
 
 func (d *DeepSeekModel) Generate(ctx context.Context, in []*schema.Message, opts ...model.Option) (*schema.Message, error) {
-	return nil, errorx.New(errno.UnImplementErr)
+	msgs := e2ds(in)
+	body := &deepseekChatReq{
+		Model:    d.model,
+		Messages: msgs,
+		Stream:   false,
+		// 策略 agent 固定输出 JSON, 并关闭思考模式以更快更稳
+		ResponseFormat: &chatRespFormat{Type: "json_object"},
+		Thinking:       &chatThinking{Type: "disabled"},
+	}
+	reqBytes, err := sonic.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, d.url+"/chat/completions", bytes.NewReader(reqBytes))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+d.apiKey)
+	resp, err := d.cli.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return nil, fmt.Errorf("deepseek generate status %d: %s", resp.StatusCode, string(data))
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var chatResp deepseekChatResp
+	if err := sonic.Unmarshal(data, &chatResp); err != nil {
+		return nil, err
+	}
+
+	msg := &schema.Message{Role: schema.Assistant}
+	if len(chatResp.Choices) > 0 {
+		if chatResp.Choices[0].Message != nil {
+			msg.Content = chatResp.Choices[0].Message.Content
+		}
+		msg.ResponseMeta = &schema.ResponseMeta{}
+		if chatResp.Choices[0].FinishReason != nil {
+			msg.ResponseMeta.FinishReason = *chatResp.Choices[0].FinishReason
+		} else {
+			msg.ResponseMeta.FinishReason = "stop"
+		}
+	}
+	if chatResp.Usage != nil {
+		if msg.ResponseMeta == nil {
+			msg.ResponseMeta = &schema.ResponseMeta{}
+		}
+		msg.ResponseMeta.Usage = &schema.TokenUsage{
+			PromptTokens:     chatResp.Usage.PromptTokens,
+			CompletionTokens: chatResp.Usage.CompletionTokens,
+			TotalTokens:      chatResp.Usage.TotalTokens,
+		}
+	}
+	return msg, nil
 }
 
 func (d *DeepSeekModel) Stream(ctx context.Context, in []*schema.Message, opts ...model.Option) (sr *schema.StreamReader[*schema.Message], err error) {
@@ -79,7 +148,7 @@ func (d *DeepSeekModel) Stream(ctx context.Context, in []*schema.Message, opts .
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, d.url+"/v1/chat/completions", bytes.NewReader(reqBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, d.url+"/chat/completions", bytes.NewReader(reqBytes))
 	if err != nil {
 		return nil, err
 	}

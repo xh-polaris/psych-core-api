@@ -38,9 +38,13 @@ func (e *Engine) config() error {
 		wfc.TTSConfig.Provider, wfc.TTSConfig.Speaker,
 		wfc.ASRConfig.Provider, cf.Type)
 
-	if e.llm, err = app.NewChatApp(e.ctx, e.uSession, wfc.ChatConfig); err != nil {
-		logs.Error("[workflow] [config] new chatApp err: %v", err)
+	if err = e.buildDialogueApp(wfc.ChatConfig); err != nil {
+		logs.Error("[workflow] [config] new dialogueApp err: %v", err)
 		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "llm"))
+	}
+	if err = e.buildStrategyApp(wfc.ChatConfig); err != nil {
+		logs.Error("[workflow] [config] new strategy agent err: %v", err)
+		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "strategy"))
 	}
 	if e.asr, err = app.NewASRApp(e.uSession, wfc.ASRConfig); err != nil {
 		logs.Error("[workflow] [config] new asrApp err: %v", err)

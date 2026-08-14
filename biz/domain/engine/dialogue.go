@@ -9,7 +9,8 @@ import (
 	"github.com/cloudwego/eino/schema"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/domain/his"
-	_ "github.com/xh-polaris/psych-core-api/biz/domain/llm"
+	"github.com/xh-polaris/psych-core-api/biz/domain/llm"
+	"github.com/xh-polaris/psych-core-api/biz/domain/prompt"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/app"
@@ -20,7 +21,24 @@ import (
 	"github.com/xh-polaris/psych-core-api/types/errno"
 )
 
-// execLLM 调用大模型 [engine]
+// dialogueAgent 对话 agent (g-in s-out), 仅封装 LLM client 与 provider 元信息
+type dialogueAgent struct {
+	app      app.ChatApp
+	provider string
+}
+
+// buildDialogueApp 构建对话 agent, Coze/DS 均支持
+func (e *Engine) buildDialogueApp(cfg *app.ChatSetting) error {
+	llmApp, err := app.NewChatApp(e.ctx, e.uSession, cfg)
+	if err != nil {
+		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "llm"))
+	}
+	e.dialogue = &dialogueAgent{app: llmApp, provider: cfg.Provider}
+	return nil
+}
+
+// execLLM 调用大模型回复 [engine]:
+// 先执行意图识别 (策略 agent), 再拼装对话 system prompt, 最后流式返回给前端与 TTS
 func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	userId := e.info[cst.JsonUserID].(string)
 	todayDate := util.FormatDateUTC8(time.Now())
@@ -49,12 +67,17 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	astMsg := convert.AssistantMMsg(oids[0], oids[1], "", index+1)
 
 	logs.Infof("mMsgs:%+v", mMsgs)
-	// 调用大模型
-	eMsgs := convert.MMsgToEMsgList(mMsgs) // 存储域消息转模型域
+	// 存储域消息转模型域 (最新在前)
+	eMsgs := convert.MMsgToEMsgList(mMsgs)
+
+	// 意图识别阶段: 策略 agent 生成策略 JSON + 加载微技能 (失败自动降级为空)
+	strategyJSON, skillsText := e.execIntention(ctx, eMsgs)
+	// 拼装对话 system prompt (DS 注入, Coze 不注入)
+	eMsgs = e.buildDialogueMsgs(ctx, eMsgs, strategyJSON, skillsText)
 
 	var subctx context.Context
 	subctx, e.llmCancel = context.WithCancel(ctx)
-	stream, err := e.llm.Stream(subctx, eMsgs)
+	stream, err := e.dialogue.app.Stream(subctx, eMsgs)
 	if err != nil {
 		return errorx.WrapByCode(err, errno.LLMStreamErr)
 	}
@@ -70,6 +93,38 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	go e.execTTS(subctx, cmd.ID, tts)
 	e.llmWg.Add(3) // 模型, tts发送, tts响应三个子线程
 	return err
+}
+
+// buildDialogueMsgs 拼装对话 agent 的消息列表:
+// System = 对话模板 + Conversation Strategy Plan + Micro Skill References.
+// 仅 DeepSeek 注入; Coze 单元沿用平台 bot 提示词, 直接返回原列表.
+func (e *Engine) buildDialogueMsgs(ctx context.Context, baseMsgs []*schema.Message, strategyJSON, skillsText string) []*schema.Message {
+	if e.dialogue.provider != llm.ProviderDeepSeek {
+		return baseMsgs
+	}
+
+	tpl, err := prompt.Mgr.GetTemplate(ctx, "dialogue", nil)
+	if err != nil || tpl == "" {
+		logs.Errorf("[engine] [dialogue] get dialogue template err: %v", err)
+		return baseMsgs
+	}
+
+	var sb strings.Builder
+	sb.WriteString(tpl)
+	if strategyJSON != "" {
+		sb.WriteString("\n\n## Conversation Strategy Plan\n")
+		sb.WriteString(strategyJSON)
+	}
+	if skillsText != "" {
+		sb.WriteString("\n\n## Micro Skill References\n")
+		sb.WriteString(skillsText)
+	}
+
+	// baseMsgs 最新在前, System 追加末尾, ChatModel 内部 reverse 后 System 置首、历史正序
+	msgs := make([]*schema.Message, 0, len(baseMsgs)+1)
+	msgs = append(msgs, baseMsgs...)
+	msgs = append(msgs, &schema.Message{Role: schema.System, Content: sb.String()})
+	return msgs
 }
 
 // execLLMResponse 负责将大模型响应返回给前端 [task]
