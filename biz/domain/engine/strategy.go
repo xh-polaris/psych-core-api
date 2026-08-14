@@ -79,6 +79,8 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 	if msg == nil {
 		logs.Errorf("[engine] [strategy] nil response")
 		return "", ""
+	} else {
+		logs.Infof("[engine] [strategy] response: %s", msg.Content)
 	}
 	if msg.ResponseMeta != nil && msg.ResponseMeta.Usage != nil {
 		e.llmUsage(msg.ResponseMeta) // 策略调用 token 用量
@@ -100,6 +102,8 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 	if err != nil {
 		logs.Errorf("[engine] [strategy] get skills err: %v", err)
 		return plan, ""
+	} else {
+		logs.Infof("[engine] [strategy] loaded skills: %v", names)
 	}
 	return plan, e.joinSkills(names, skills)
 }
