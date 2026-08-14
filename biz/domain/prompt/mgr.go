@@ -2,8 +2,6 @@ package prompt
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/infra/cache"
@@ -14,8 +12,7 @@ import (
 
 const (
 	keySkills    = "prompt:skills"
-	keyTplDialog = "prompt:template:dialog"
-	keyTplPost   = "prompt:template:post"
+	keyTplPrefix = "prompt:template:"
 	ttl          = time.Hour
 )
 
@@ -72,33 +69,21 @@ func pickMap(raw map[string]string, names []string) map[string]string {
 	return out
 }
 
-func (m *PromptManager) GetTemplates(ctx context.Context, stage string, unitID *bson.ObjectID) (string, error) {
-	key := fmt.Sprintf("prompt:template:%s", stage)
+// GetTemplate 按名称获取模板文本, 缓存 key: prompt:template:{name}
+// name: "dialogue" | "strategy" | "report" ...
+func (m *PromptManager) GetTemplate(ctx context.Context, name string, unitID *bson.ObjectID) (string, error) {
+	key := keyTplPrefix + name
 	if raw, err := m.cache.Get(ctx, key).Result(); err == nil && raw != "" {
 		return raw, nil
 	}
 
-	ty := enum.PromptTypeTemplate
-	all, err := m.mapper.FindActiveByStageType(ctx, stageInt(stage), ty, unitID)
+	p, err := m.mapper.FindActiveTemplateByName(ctx, name, unitID)
 	if err != nil {
 		return "", err
 	}
-	sb := make([]string, len(all))
-	for i, p := range all {
-		sb[i] = p.Content
+	if p == nil {
+		return "", nil
 	}
-	content := strings.Join(sb, "\n")
-	_ = m.cache.Set(ctx, key, content, ttl).Err()
-	return content, nil
-}
-
-func stageInt(s string) int {
-	switch s {
-	case "dialog":
-		return enum.PromptStageDialogue
-	case "post":
-		return enum.PromptStagePost
-	default:
-		return 0
-	}
+	_ = m.cache.Set(ctx, key, p.Content, ttl).Err()
+	return p.Content, nil
 }

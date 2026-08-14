@@ -1,15 +1,15 @@
 package enum
 
-// PromptStage
+// PromptStage 提示词所属流水线阶段
 const (
-	PromptStageDialogue = 1
-	PromptStagePost     = 2
+	PromptStageDialogue = "dialogue"
+	PromptStagePost     = "post"
 )
 
-// PromptType
+// PromptType 提示词类型
 const (
-	PromptTypeTemplate   = 1
-	PromptTypePsychSkill = 2
-	PromptTypeCharacter  = 3
-	PromptTypeReport     = 4
+	PromptTypeTemplate   = "template"
+	PromptTypePsychSkill = "skill"
+	PromptTypeCharacter  = "character"
+	PromptTypeReport     = "report"
 )

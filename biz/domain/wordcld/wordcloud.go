@@ -268,6 +268,21 @@ func (wce *WordCloudExtractor) FromAllUnitsKWs(ctx context.Context, start, end t
 	}, nil
 }
 
+// FromUnitKWsByClassList 按班级列表统计报表关键词
+func (wce *WordCloudExtractor) FromUnitKWsByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32, start, end time.Time) (*core_api.Keywords, error) {
+	kws, err := wce.rptMapper.GetUnitKWByClassList(ctx, unitId, grades, classes, start, end)
+	if err != nil {
+		return nil, err
+	}
+	if kws == nil {
+		kws = make(map[string]int32)
+	}
+	return &core_api.Keywords{
+		KeywordMap: kws,
+		KeyTotal:   int32(len(kws)),
+	}, nil
+}
+
 // isStopWord 判断是否为停用词
 func isStopWord(word string) bool {
 	ensureStopWordsLoaded()

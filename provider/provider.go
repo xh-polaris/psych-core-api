@@ -5,6 +5,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/application/service"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
+	"github.com/xh-polaris/psych-core-api/biz/domain/dashboard"
 	"github.com/xh-polaris/psych-core-api/biz/domain/usr"
 	"github.com/xh-polaris/psych-core-api/biz/infra/cache/redis"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
@@ -73,6 +74,7 @@ var ApplicationSet = wire.NewSet(
 var DomainSet = wire.NewSet(
 	usr.UserDomainSet,
 	auth.AuthDomainSet,
+	dashboard.DashboardDomainSet,
 )
 
 var InfrastructureSet = wire.NewSet(

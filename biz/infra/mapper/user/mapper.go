@@ -32,7 +32,6 @@ type IMongoMapper interface {
 
 	CountStudents(ctx context.Context, unitId bson.ObjectID) (int32, error)
 	CountStudentsByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
-	CountHighRiskStudents(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 
 	FindOneByCodeAndUnitID(ctx context.Context, code string, unitId bson.ObjectID) (*User, error)
 	FindOneByCodeAndRole(ctx context.Context, code string, role int) (*User, error)
@@ -41,19 +40,14 @@ type IMongoMapper interface {
 	FindManyByUnitIDWithFilter(ctx context.Context, unitId bson.ObjectID, grade, class *int32) ([]*User, error)
 	BatchFindByIDs(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*User, error)
 	CountByClasses(ctx context.Context, unitId bson.ObjectID, startGrade int, grade, class []int32) ([]*ClassStatResult, error)
-	RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) ([]*RiskStat, error)
 	FindUnitClassTeachers(ctx context.Context, unitId bson.ObjectID, startGrade int) (ClassTeachers, error)
 	ExistsClassTeacher(ctx context.Context, unitId bson.ObjectID, grade, class int) (bool, error)
 	ExistsByCode(ctx context.Context, code string) (bool, error)
-	CountHighRiskByGrade(ctx context.Context, unitId bson.ObjectID, startGrade int) (map[int32]int32, int32, error)
-	CountHighRiskByGradeAndClasses(ctx context.Context, startGrade int, enrollYears, classes []int32) (map[int32]int32, int32, error)
 
 	GetClassTeacherBoundClasses(ctx context.Context, userId bson.ObjectID) ([]ClassInfo, error)
 	CountStudentsByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) (int32, error)
 	CountStudentsByPeriodAndClassList(ctx context.Context, unitId *bson.ObjectID, grades, classes []int32, start, end time.Time) (int32, error)
-	CountHighRiskStudentsByClassList(ctx context.Context, grades, classes []int32, start, end time.Time) (int32, error)
 	FindManyByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) ([]*User, error)
-	GetRiskDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32, start, end time.Time) ([]*RiskStat, error)
 	ListUsers(ctx context.Context, opts *ListUserOptions) ([]*User, int64, error)
 	FindClassTeacherOfStudent(ctx context.Context, unitId bson.ObjectID, enrollYear, class int) (*User, error)
 }
@@ -153,32 +147,6 @@ func (m *mongoMapper) CountStudentsByPeriod(ctx context.Context, unitId *bson.Ob
 	filter := bson.M{
 		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
 		cst.Role:   enum.UserRoleStudent,
-	}
-	if unitId != nil {
-		filter[cst.UnitID] = *unitId
-	}
-	if len(timeFilter) > 0 {
-		filter[cst.CreateTime] = timeFilter
-	}
-
-	cnt, err := m.conn.CountDocuments(ctx, filter)
-	return int32(cnt), err
-}
-
-// CountHighRiskStudents 统计高风险学生数
-func (m *mongoMapper) CountHighRiskStudents(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error) {
-	timeFilter := bson.M{}
-	if !start.IsZero() {
-		timeFilter["$gte"] = start
-	}
-	if !end.IsZero() {
-		timeFilter["$lte"] = end
-	}
-
-	filter := bson.M{
-		cst.RiskLevel: enum.UserRiskLevelHigh,
-		cst.Status:    bson.M{cst.NE: enum.UserStatusDeleted},
-		cst.Role:      enum.UserRoleStudent,
 	}
 	if unitId != nil {
 		filter[cst.UnitID] = *unitId
@@ -312,154 +280,11 @@ func (m *mongoMapper) CountByClasses(ctx context.Context, unitId bson.ObjectID, 
 	return results, nil
 }
 
-// CountHighRiskByGrade 统计各年级高风险用户数
-func (m *mongoMapper) CountHighRiskByGrade(ctx context.Context, unitId bson.ObjectID, startGrade int) (map[int32]int32, int32, error) {
-	pipeline := []bson.M{
-		{"$match": bson.M{
-			cst.UnitID: unitId,
-			cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
-			cst.Role:   enum.UserRoleStudent,
-		}},
-		{"$addFields": bson.M{
-			cst.Grade: util.GradeExpr(startGrade),
-		}},
-		{"$match": bson.M{
-			cst.RiskLevel: bson.M{cst.In: bson.A{
-				enum.UserRiskLevelHigh, enum.UserRiskLevelMedium, enum.UserRiskLevelLow,
-			}},
-		}},
-		{"$group": bson.M{
-			"_id":   "$" + cst.Grade,
-			"count": bson.M{"$sum": 1},
-		}},
-	}
-
-	var results []struct {
-		Grade int32 `bson:"_id"`
-		Count int32 `bson:"count"`
-	}
-	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
-		logs.Errorf("[user mapper] count high risk by grade err:%s", errorx.ErrorWithoutStack(err))
-		return nil, 0, err
-	}
-
-	dist := make(map[int32]int32, len(results))
-	var total int32
-	for _, r := range results {
-		dist[r.Grade] = r.Count
-		total += r.Count
-	}
-	return dist, total, nil
-}
-
-// CountHighRiskByGradeAndClasses 按班级列表统计各年级高风险用户数
-func (m *mongoMapper) CountHighRiskByGradeAndClasses(ctx context.Context, startGrade int, enrollYears, classes []int32) (map[int32]int32, int32, error) {
-	if len(enrollYears) == 0 && len(classes) == 0 {
-		return make(map[int32]int32), 0, nil
-	}
-
-	// 构建 enroll_year + class 的 or 条件
-	orFilters := make([]bson.M, 0, len(enrollYears))
-	for _, ey := range enrollYears {
-		orFilters = append(orFilters, bson.M{cst.EnrollYear: int(ey)})
-	}
-
-	userFilter := bson.M{
-		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
-		cst.Role:   enum.UserRoleStudent,
-	}
-	if len(orFilters) > 0 {
-		userFilter[cst.Or] = orFilters
-	}
-	if len(classes) > 0 {
-		userFilter[cst.Class] = bson.M{cst.In: classes}
-	}
-
-	pipeline := []bson.M{
-		{"$match": userFilter},
-		{"$addFields": bson.M{
-			cst.Grade: util.GradeExpr(startGrade),
-		}},
-		{"$match": bson.M{
-			cst.RiskLevel: bson.M{cst.In: bson.A{
-				enum.UserRiskLevelHigh, enum.UserRiskLevelMedium, enum.UserRiskLevelLow,
-			}},
-		}},
-		{"$group": bson.M{
-			"_id":   "$" + cst.Grade,
-			"count": bson.M{"$sum": 1},
-		}},
-	}
-
-	var results []struct {
-		Grade int32 `bson:"_id"`
-		Count int32 `bson:"count"`
-	}
-	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
-		logs.Errorf("[user mapper] count high risk by grade and classes err:%s", errorx.ErrorWithoutStack(err))
-		return nil, 0, err
-	}
-
-	dist := make(map[int32]int32, len(results))
-	var total int32
-	for _, r := range results {
-		dist[r.Grade] = r.Count
-		total += r.Count
-	}
-	return dist, total, nil
-}
-
 // RiskStat "风险等级和性别->数量"的映射
 type RiskStat struct {
 	Level  int32 `bson:"level" json:"level"`
 	Gender int32 `bson:"gender" json:"gender"`
 	Count  int32 `bson:"count" json:"count"`
-}
-
-// RiskDistributionStats 按风险等级和性别统计，预期返回长为8的切片（4种level*2种gender）
-// unitId传空值则统计所有单位的用户风险分布
-func (m *mongoMapper) RiskDistributionStats(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) ([]*RiskStat, error) {
-	match := bson.M{
-		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
-		cst.Role:   enum.UserRoleStudent,
-	}
-	if unitId != nil {
-		match[cst.UnitID] = *unitId
-	}
-	if !start.IsZero() || !end.IsZero() {
-		tf := bson.M{}
-		if !start.IsZero() {
-			tf["$gte"] = start
-		}
-		if !end.IsZero() {
-			tf["$lte"] = end
-		}
-		match[cst.UpdateTime] = tf
-	}
-
-	pipeline := []bson.M{
-		{"$match": match},
-		{"$group": bson.M{
-			cst.ID: bson.M{
-				"level":    "$" + cst.RiskLevel,
-				cst.Gender: "$" + cst.Gender,
-			},
-			"count": bson.M{"$sum": 1},
-		}},
-		{"$project": bson.M{
-			"level":  "$_id.level",
-			"gender": "$_id.gender",
-			"count":  "$count",
-		}},
-	}
-
-	var aggrResults []*RiskStat
-	if err := m.conn.Aggregate(ctx, &aggrResults, pipeline); err != nil {
-		logs.Errorf("[user mapper] aggregate risk distribution err:%s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-
-	return aggrResults, nil
 }
 
 type ClassTeachers map[int]map[int]*User
@@ -604,40 +429,6 @@ func (m *mongoMapper) CountStudentsByPeriodAndClassList(ctx context.Context, uni
 	return int32(count), nil
 }
 
-// CountHighRiskStudentsByClassList 按班级列表统计高风险学生数
-func (m *mongoMapper) CountHighRiskStudentsByClassList(ctx context.Context, grades, classes []int32, start, end time.Time) (int32, error) {
-	filter := bson.M{
-		cst.Role:      enum.UserRoleStudent,
-		cst.Status:    bson.M{cst.NE: enum.UserStatusDeleted},
-		cst.RiskLevel: enum.UserRiskLevelHigh,
-		cst.UpdateTime: bson.M{
-			cst.GTE: start,
-			cst.LTE: end,
-		},
-	}
-
-	if len(grades) > 0 || len(classes) > 0 {
-		andFilters := make([]bson.M, 0)
-		if len(grades) > 0 {
-			andFilters = append(andFilters, bson.M{cst.Grade: bson.M{cst.In: grades}})
-		}
-		if len(classes) > 0 {
-			andFilters = append(andFilters, bson.M{cst.Class: bson.M{cst.In: classes}})
-		}
-		if len(andFilters) > 0 {
-			filter[cst.And] = andFilters
-		}
-	}
-
-	count, err := m.conn.CountDocuments(ctx, filter)
-	if err != nil {
-		logs.Errorf("[user mapper] count high risk students by class list err: %s", errorx.ErrorWithoutStack(err))
-		return 0, err
-	}
-
-	return int32(count), nil
-}
-
 // FindManyByClassList 按班级列表查询用户
 func (m *mongoMapper) FindManyByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32) ([]*User, error) {
 	filter := bson.M{
@@ -662,7 +453,6 @@ func (m *mongoMapper) FindManyByClassList(ctx context.Context, unitId bson.Objec
 	return m.FindAllByFields(ctx, filter)
 }
 
-// GetRiskDistributionByClassList 按班级列表获取风险分布统计（按风险等级和性别分组）
 func (m *mongoMapper) GetRiskDistributionByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32, start, end time.Time) ([]*RiskStat, error) {
 	match := bson.M{
 		cst.UnitID: unitId,

@@ -64,8 +64,8 @@ func (s *AlarmService) Overview(ctx context.Context, req *core_api.DashboardGetA
 		unitOID = id
 	}
 
-	endTime := parseEndTime(req.GetEndTime())
-	startTime := parseStartTime(req.GetStartTime(), endTime)
+	endTime := util.ParseEndTime(req.GetEndTime())
+	startTime := util.ParseStartTime(req.GetStartTime(), endTime)
 	prevEndTime := startTime
 	prevStartTime := prevEndTime.AddDate(0, 0, -7)
 
@@ -124,7 +124,7 @@ func (s *AlarmService) ListRecords(ctx context.Context, req *core_api.DashboardL
 		}
 	}
 	if req.Emotion != nil {
-		filter[cst.Emotion] = int(req.GetEmotion())
+		filter[cst.Emotion] = req.GetEmotion()
 	}
 	if req.Status != nil {
 		filter[cst.Status] = int(req.GetStatus())
@@ -245,7 +245,7 @@ func (s *AlarmService) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alar
 			}
 			records[i] = &core_api.AlarmRecord{
 				Id:       al.ID.Hex(),
-				Emotion:  int32(al.Emotion),
+				Emotion:  al.Emotion,
 				Keywords: al.Keywords,
 				Status:   int32(al.Status),
 				User: &core_api.UserVO{

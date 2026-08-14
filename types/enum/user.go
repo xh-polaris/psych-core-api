@@ -1,5 +1,7 @@
 package enum
 
+import "strings"
+
 // UserGender
 const (
 	UserGenderMale   = 1
@@ -38,6 +40,21 @@ const (
 	UserRiskLevelLow    = 3
 	UserRiskLevelNormal = 4
 )
+
+// RiskLevelToInt 将报表的字符串风险等级映射为 1-4: High | Medium | Low | Normal
+func RiskLevelToInt(level string) int {
+	s := strings.TrimSpace(level)
+	switch {
+	case strings.Contains(s, "高危") || strings.Contains(s, "严重") || strings.Contains(s, "紧急"):
+		return UserRiskLevelHigh
+	case strings.Contains(s, "较高") || strings.Contains(s, "中"):
+		return UserRiskLevelMedium
+	case strings.Contains(s, "低"):
+		return UserRiskLevelLow
+	default:
+		return UserRiskLevelNormal
+	}
+}
 
 // UserStatus
 const (

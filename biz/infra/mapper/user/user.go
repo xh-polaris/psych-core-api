@@ -16,6 +16,7 @@ type User struct {
 	Birth       time.Time      `json:"birth,omitempty" bson:"birth,omitempty"`
 	Gender      int            `json:"gender,omitempty" bson:"gender,omitempty"`        // 1-3: Male | Female | Other
 	RiskLevel   int            `json:"riskLevel,omitempty" bson:"risk_level,omitempty"` // 1-4: High | Medium | Low | Normal
+	Emotion     string         `json:"emotion,omitempty" bson:"emotion,omitempty"`      // 当前情绪类型（报表 SimpleReport.Emotion.Type）
 	Status      int            `json:"status,omitempty" bson:"status,omitempty"`        //  1-2: Active | Deleted
 	EnrollYear  int            `json:"enrollYear,omitempty" bson:"enroll_year,omitempty"`
 	Role        int            `json:"role,omitempty" bson:"role,omitempty"` // 1-5: Student | Teacher | ClassTeacher | UnitAdmin | SuperAdmin

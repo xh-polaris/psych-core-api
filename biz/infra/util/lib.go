@@ -110,6 +110,14 @@ func Rate(cur, prev int32) float64 {
 	return 0
 }
 
+// RateF 计算 float64 增长率 (cur - prev) / prev
+func RateF(cur, prev float64) float64 {
+	if prev > 0 {
+		return Round2((cur - prev) / prev)
+	}
+	return 0
+}
+
 // Round2 四舍五入到小数点后两位
 func Round2(f float64) float64 { return math.Round(f*100) / 100 }
 
@@ -133,6 +141,33 @@ func RiskDistributionCnt2Ratio(cntMap map[int32]int32, total int32) map[int32]in
 	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 
 	ratio := make(map[int32]int32, len(cntMap))
+	var sum int32
+	last := keys[len(keys)-1]
+	for _, k := range keys {
+		if k == last {
+			ratio[k] = 100 - sum
+		} else {
+			r := (cntMap[k] * 100) / total
+			ratio[k] = r
+			sum += r
+		}
+	}
+	return ratio
+}
+
+// StrCnt2Ratio 将 string-key 的计数转为百分比（凑整，最后一项用 100-sum 保证总和为 100）
+func StrCnt2Ratio(cntMap map[string]int32, total int32) map[string]int32 {
+	if total <= 0 || len(cntMap) == 0 {
+		return make(map[string]int32, len(cntMap))
+	}
+
+	keys := make([]string, 0, len(cntMap))
+	for k := range cntMap {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	ratio := make(map[string]int32, len(cntMap))
 	var sum int32
 	last := keys[len(keys)-1]
 	for _, k := range keys {

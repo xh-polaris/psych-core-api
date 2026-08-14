@@ -20,6 +20,7 @@ var _ IMongoMapper = (*mongoMapper)(nil)
 
 const (
 	collection     = "report"
+	userCollection = "user"
 	cacheKeyPrefix = "cache:report:"
 )
 
@@ -36,6 +37,19 @@ type IMongoMapper interface {
 	// 词云相关接口
 	GetAllUnitsKW(ctx context.Context, start, end time.Time) (map[string]int32, error)
 	GetUnitKW(ctx context.Context, unitId bson.ObjectID, start, end time.Time) (map[string]int32, error)
+	GetUnitKWByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32, start, end time.Time) (map[string]int32, error)
+	// 心理趋势：取时间段内每个用户最后一份报表的情绪/风险等级/性别
+	GetUserPsychStats(ctx context.Context, unitOID *bson.ObjectID, start, end time.Time, grades, classes []int32) ([]*UserPsychStat, error)
+	// 批量取用户最新报表的风险等级字符串
+	BatchGetUserRiskLevel(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]string, error)
+}
+
+// UserPsychStat 用户心理状态（来自该用户时间段内最后一份报表）
+type UserPsychStat struct {
+	UserID    bson.ObjectID `bson:"_id"`
+	Emotion   string        `bson:"emotion"`   // SimpleReport.Emotion.Type
+	RiskLevel string        `bson:"riskLevel"` // SimpleReport.Summary.RiskLevel
+	Gender    int32         `bson:"gender"`    // user.gender
 }
 
 type mongoMapper struct {
@@ -300,6 +314,174 @@ func (m *mongoMapper) FindByConversationPreferSuccess(ctx context.Context, sessi
 		return nil, err
 	}
 	return report, nil
+}
+
+// GetUnitKWByClassList 按班级列表统计报表关键词
+func (m *mongoMapper) GetUnitKWByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32, start, end time.Time) (map[string]int32, error) {
+	if len(grades) == 0 && len(classes) == 0 {
+		return m.GetUnitKW(ctx, unitId, start, end)
+	}
+
+	matchFilter := bson.M{
+		cst.UnitID: unitId,
+		cst.Status: bson.M{cst.NE: enum.ReportStatusDeleted},
+		cst.Keywords: bson.M{
+			"$exists": true,
+			"$ne":     nil,
+		},
+	}
+	if !start.IsZero() || !end.IsZero() {
+		tf := bson.M{}
+		if !start.IsZero() {
+			tf["$gte"] = start
+		}
+		if !end.IsZero() {
+			tf["$lte"] = end
+		}
+		matchFilter[cst.CreateTime] = tf
+	}
+
+	pipeline := []bson.M{
+		{"$match": matchFilter},
+		{"$lookup": bson.M{
+			"from":         userCollection,
+			"localField":   cst.UserID,
+			"foreignField": cst.ID,
+			"as":           "userDoc",
+		}},
+		{"$unwind": "$userDoc"},
+	}
+
+	andFilters := make([]bson.M, 0)
+	if len(grades) > 0 {
+		andFilters = append(andFilters, bson.M{"userDoc.grade": bson.M{"$in": grades}})
+	}
+	if len(classes) > 0 {
+		andFilters = append(andFilters, bson.M{"userDoc.class": bson.M{"$in": classes}})
+	}
+	if len(andFilters) > 0 {
+		pipeline = append(pipeline, bson.M{"$match": bson.M{"$and": andFilters}})
+	}
+
+	pipeline = append(pipeline,
+		bson.M{"$project": bson.M{"keywords": bson.M{"$objectToArray": "$keywords"}}},
+		bson.M{"$unwind": "$keywords"},
+		bson.M{"$group": bson.M{"_id": "$keywords.k", "count": bson.M{"$sum": 1}}},
+		bson.M{"$project": bson.M{"_id": 0, "keyword": "$_id", "count": 1}},
+		bson.M{"$sort": bson.M{"count": -1}},
+	)
+
+	var results []struct {
+		Keyword string `bson:"keyword"`
+		Count   int32  `bson:"count"`
+	}
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
+		return nil, err
+	}
+
+	wordCloud := make(map[string]int32, len(results))
+	for _, result := range results {
+		wordCloud[result.Keyword] = result.Count
+	}
+	return wordCloud, nil
+}
+
+// GetUserPsychStats 取时间段 [start,end] 内每个用户最后一份报表的情绪类型/风险等级/性别
+// unitOID 传 nil 统计全部单位；grades/classes 用于按班级筛选
+func (m *mongoMapper) GetUserPsychStats(ctx context.Context, unitOID *bson.ObjectID, start, end time.Time, grades, classes []int32) ([]*UserPsychStat, error) {
+	match := bson.M{
+		cst.Status:      bson.M{cst.NE: enum.ReportStatusDeleted},
+		"simple_report": bson.M{"$exists": true},
+	}
+	if unitOID != nil {
+		match[cst.UnitID] = *unitOID
+	}
+	if !start.IsZero() || !end.IsZero() {
+		tf := bson.M{}
+		if !start.IsZero() {
+			tf["$gte"] = start
+		}
+		if !end.IsZero() {
+			tf["$lte"] = end
+		}
+		match[cst.CreateTime] = tf
+	}
+
+	pipeline := []bson.M{
+		{"$match": match},
+		{"$sort": bson.M{cst.CreateTime: -1}},
+		{"$group": bson.M{
+			"_id":       "$" + cst.UserID,
+			"emotion":   bson.M{"$first": "$simple_report.emotion.type"},
+			"riskLevel": bson.M{"$first": "$simple_report.summary.riskLevel"},
+		}},
+		{"$lookup": bson.M{
+			"from":         userCollection,
+			"localField":   "_id",
+			"foreignField": "_id",
+			"as":           "userDoc",
+		}},
+		{"$unwind": "$userDoc"},
+	}
+
+	if len(grades) > 0 || len(classes) > 0 {
+		andFilters := make([]bson.M, 0)
+		if len(grades) > 0 {
+			andFilters = append(andFilters, bson.M{"userDoc.grade": bson.M{"$in": grades}})
+		}
+		if len(classes) > 0 {
+			andFilters = append(andFilters, bson.M{"userDoc.class": bson.M{"$in": classes}})
+		}
+		if len(andFilters) > 0 {
+			pipeline = append(pipeline, bson.M{"$match": bson.M{"$and": andFilters}})
+		}
+	}
+
+	pipeline = append(pipeline, bson.M{"$project": bson.M{
+		"_id":       1,
+		"emotion":   1,
+		"riskLevel": 1,
+		"gender":    "$userDoc.gender",
+	}})
+
+	var results []*UserPsychStat
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+// BatchGetUserRiskLevel 批量取每个用户最新报表的 riskLevel（字符串）
+func (m *mongoMapper) BatchGetUserRiskLevel(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]string, error) {
+	if len(userIds) == 0 {
+		return make(map[bson.ObjectID]string), nil
+	}
+
+	pipeline := []bson.M{
+		{"$match": bson.M{
+			cst.UserID: bson.M{cst.In: userIds},
+			cst.Status: bson.M{cst.NE: enum.ReportStatusDeleted},
+		}},
+		{"$sort": bson.M{cst.CreateTime: -1}},
+		{"$group": bson.M{
+			"_id":       "$" + cst.UserID,
+			"riskLevel": bson.M{"$first": "$simple_report.summary.riskLevel"},
+		}},
+	}
+
+	var results []struct {
+		UserID    bson.ObjectID `bson:"_id"`
+		RiskLevel string        `bson:"riskLevel"`
+	}
+	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
+		return nil, err
+	}
+
+	out := make(map[bson.ObjectID]string, len(results))
+	for _, r := range results {
+		out[r.UserID] = r.RiskLevel
+	}
+	return out, nil
 }
 
 // BatchFindBySession 批量根据会话ID查找报表
