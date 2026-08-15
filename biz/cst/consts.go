@@ -122,8 +122,6 @@ const (
 
 // SMS告警相关常量
 const (
-	//AlertSmsMarker      = "\uE000$$\uE000"                 // LLM 流中检测到此串时触发 SMS 告警
-	AlertSmsMarker      = "alert-test"
 	AlertSmsLimitPrefix = "alert:sms"                      // 限流 Redis key 前缀: alert:sms:{date}:{userId}
 	AdminURL            = "https://psych-admin.aiecnu.net" // 管理端网址
 )
