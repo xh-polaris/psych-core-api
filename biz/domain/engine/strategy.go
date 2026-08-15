@@ -7,19 +7,28 @@ import (
 	"time"
 
 	"github.com/cloudwego/eino/schema"
+	"github.com/xh-polaris/psych-core-api/biz/cst"
+	"github.com/xh-polaris/psych-core-api/biz/domain/alert"
 	"github.com/xh-polaris/psych-core-api/biz/domain/llm"
 	"github.com/xh-polaris/psych-core-api/biz/domain/prompt"
 	"github.com/xh-polaris/psych-core-api/pkg/app"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/errno"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-// strategyPlan 策略 agent 输出 JSON 的最小解析结构, 仅用于提取微技能名
+// strategyPlan 策略 agent 输出 JSON 的解析结构
 type strategyPlan struct {
 	MicroSkills []struct {
 		Skill string `json:"skill"`
 	} `json:"micro_skills"`
+	SafetyPlan struct {
+		RealTimeSafetyAction     string `json:"real_time_safety_action"`
+		TrustedAdultNeeded       bool   `json:"trusted_adult_needed"`
+		SchoolReferralNeeded     bool   `json:"school_referral_needed"`
+		EmergencyProcedureNeeded bool   `json:"emergency_procedure_needed"`
+	} `json:"safety_plan"`
 }
 
 // strategyAgent 策略 agent (意图识别), 仅 DeepSeek 支持 Generate.
@@ -91,13 +100,21 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 		return "", ""
 	}
 
-	names, ok := e.parseStrategySkills(plan)
+	sp, ok := e.parseStrategyPlan(plan)
 	if !ok {
 		logs.Errorf("[engine] [strategy] parse plan err, plan: %s", plan)
 		return "", ""
 	}
 	e.strategy.lastPlan = plan
+	// 短信告警: 直接按策略 agent 的 safety_plan 触发, 不再监测对话 agent 回复
+	e.execAlertSms(ctx, sp)
 
+	names := make([]string, 0, len(sp.MicroSkills))
+	for _, ms := range sp.MicroSkills {
+		if ms.Skill != "" {
+			names = append(names, ms.Skill)
+		}
+	}
 	skills, err := prompt.Mgr.GetSkills(ctx, names...)
 	if err != nil {
 		logs.Errorf("[engine] [strategy] get skills err: %v", err)
@@ -108,9 +125,8 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 	return plan, e.joinSkills(names, skills)
 }
 
-// parseStrategySkills 解析策略 JSON 中的微技能名 (容忍 markdown fence).
-// ok=false 表示 JSON 解析失败; names 可能为空 (合法策略但未指定微技能).
-func (e *Engine) parseStrategySkills(plan string) (names []string, ok bool) {
+// parseStrategyPlan 解析策略 JSON (容忍 markdown fence). ok=false 表示 JSON 解析失败.
+func (e *Engine) parseStrategyPlan(plan string) (*strategyPlan, bool) {
 	plan = strings.TrimSpace(plan)
 	plan = strings.TrimPrefix(plan, "```json")
 	plan = strings.TrimPrefix(plan, "```")
@@ -121,12 +137,38 @@ func (e *Engine) parseStrategySkills(plan string) (names []string, ok bool) {
 	if err := json.Unmarshal([]byte(plan), &sp); err != nil {
 		return nil, false
 	}
-	for _, ms := range sp.MicroSkills {
-		if ms.Skill != "" {
-			names = append(names, ms.Skill)
-		}
+	return &sp, true
+}
+
+// execAlertSms 按策略 agent 的 safety_plan 触发告警短信.
+// 后台 goroutine 执行 (context.WithoutCancel + WithTimeout), 不阻塞主流程, 由 llmWg 追踪.
+func (e *Engine) execAlertSms(ctx context.Context, sp *strategyPlan) {
+	if !sp.SafetyPlan.TrustedAdultNeeded && !sp.SafetyPlan.SchoolReferralNeeded && !sp.SafetyPlan.EmergencyProcedureNeeded {
+		return
 	}
-	return names, true
+
+	unitIdHex, _ := e.info[cst.JsonUnitID].(string)
+	userIdHex, _ := e.info[cst.JsonUserID].(string)
+	unitId, _ := bson.ObjectIDFromHex(unitIdHex)
+	userId, _ := bson.ObjectIDFromHex(userIdHex)
+	convId, _ := bson.ObjectIDFromHex(e.uSession)
+	if unitId.IsZero() || userId.IsZero() || convId.IsZero() {
+		logs.Errorf("[engine] [strategy] alert ids invalid, unit=%s user=%s conv=%s", unitIdHex, userIdHex, e.uSession)
+		return
+	}
+
+	e.llmWg.Add(1)
+	go func() {
+		defer e.llmWg.Done()
+		bgCtx := context.WithoutCancel(ctx)
+		sendCtx, cancel := context.WithTimeout(bgCtx, 10*time.Second)
+		defer cancel()
+		logs.Infof("[engine] [strategy] safety plan triggers alert for user %s, action=%s",
+			userId.Hex(), sp.SafetyPlan.RealTimeSafetyAction)
+		if err := alert.Mgr.Send(sendCtx, unitId, userId, convId); err != nil {
+			logs.Errorf("[engine] [strategy] alert send err: %v", err)
+		}
+	}()
 }
 
 // joinSkills 按策略给出的顺序拼接微技能内容

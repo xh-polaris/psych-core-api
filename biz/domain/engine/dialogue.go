@@ -84,7 +84,6 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 
 	// 过滤流并拷贝以用作不同用途
 	stream = e.checkBracket(subctx, stream)
-	stream = e.checkAlertSms(subctx, stream)
 	streams := stream.Copy(2)
 	ret, tts := streams[0], streams[1] // 分别用于返回给前端与TTS音频生成
 	// 返回给前端
