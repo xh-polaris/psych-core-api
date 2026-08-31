@@ -58,6 +58,12 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 		return "", ""
 	}
 
+	intentStart := time.Now()
+	defer func() {
+		logs.Infof("[engine] [strategy] intent phase done in %dms", time.Since(intentStart).Milliseconds())
+	}()
+
+	tplStart := time.Now()
 	tpl, err := prompt.Mgr.GetTemplate(ctx, "strategy", nil)
 	if err != nil {
 		logs.Errorf("[engine] [strategy] get strategy template err: %v", err)
@@ -67,6 +73,7 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 		logs.Errorf("[engine] [strategy] strategy template empty")
 		return "", ""
 	}
+	logs.Infof("[engine] [strategy] get strategy template in %dms", time.Since(tplStart).Milliseconds())
 
 	var sb strings.Builder
 	sb.WriteString(tpl)
@@ -80,6 +87,7 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 
 	sctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
+	genStart := time.Now()
 	msg, err := e.strategy.app.Generate(sctx, msgs)
 	if err != nil {
 		logs.Errorf("[engine] [strategy] generate err: %v", err)
@@ -95,6 +103,12 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 		e.llmUsage(msg.ResponseMeta) // 策略调用 token 用量
 	}
 	plan := strings.TrimSpace(msg.Content)
+	outTokens := 0
+	if msg.ResponseMeta != nil && msg.ResponseMeta.Usage != nil {
+		outTokens = msg.ResponseMeta.Usage.CompletionTokens
+	}
+	logs.Infof("[engine] [strategy] generate done in %dms, plan_chars=%d, out_tokens=%d",
+		time.Since(genStart).Milliseconds(), len(plan), outTokens)
 	if plan == "" {
 		logs.Errorf("[engine] [strategy] empty plan")
 		return "", ""
@@ -115,12 +129,13 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 			names = append(names, ms.Skill)
 		}
 	}
+	skillsStart := time.Now()
 	skills, err := prompt.Mgr.GetSkills(ctx, names...)
 	if err != nil {
 		logs.Errorf("[engine] [strategy] get skills err: %v", err)
 		return plan, ""
 	} else {
-		logs.Infof("[engine] [strategy] loaded skills: %v", names)
+		logs.Infof("[engine] [strategy] loaded skills in %dms: %v", time.Since(skillsStart).Milliseconds(), names)
 	}
 	return plan, e.joinSkills(names, skills)
 }
