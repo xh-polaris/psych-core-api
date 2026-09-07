@@ -51,11 +51,18 @@ func (e *Engine) buildStrategyApp(cfg *app.ChatSetting) error {
 	return nil
 }
 
+// strategyOutput 策略 agent 的执行结果, 无论绑定成功与否都保留原始输出 (供入库)
+type strategyOutput struct {
+	Raw   string // 策略 agent 原始输出 (JSON 文本)
+	Bound bool   // 是否成功绑定到 strategyPlan
+}
+
 // execIntention 意图识别阶段: 用策略 agent 生成 Conversation Strategy Plan JSON,
 // 并按其中 micro_skills 加载微技能文本. 任何失败都降级为空 (纯对话), 不阻塞主流程.
-func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) (strategyJSON, skillsText string) {
+// 策略输出不依赖 JSON 绑定成功与否都会返回, 由调用方决定是否入库.
+func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) (*strategyOutput, string) {
 	if e.strategy == nil {
-		return "", ""
+		return nil, ""
 	}
 
 	intentStart := time.Now()
@@ -67,11 +74,11 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 	tpl, err := prompt.Mgr.GetTemplate(ctx, "strategy", nil)
 	if err != nil {
 		logs.Errorf("[engine] [strategy] get strategy template err: %v", err)
-		return "", ""
+		return nil, ""
 	}
 	if tpl == "" {
 		logs.Errorf("[engine] [strategy] strategy template empty")
-		return "", ""
+		return nil, ""
 	}
 	logs.Infof("[engine] [strategy] get strategy template in %dms", time.Since(tplStart).Milliseconds())
 
@@ -91,11 +98,11 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 	msg, err := e.strategy.app.Generate(sctx, msgs)
 	if err != nil {
 		logs.Errorf("[engine] [strategy] generate err: %v", err)
-		return "", ""
+		return nil, ""
 	}
 	if msg == nil {
 		logs.Errorf("[engine] [strategy] nil response")
-		return "", ""
+		return nil, ""
 	}
 	if msg.ResponseMeta != nil && msg.ResponseMeta.Usage != nil {
 		e.llmUsage(msg.ResponseMeta) // 策略调用 token 用量
@@ -109,13 +116,13 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 		time.Since(genStart).Milliseconds(), len(plan), outTokens)
 	if plan == "" {
 		logs.Errorf("[engine] [strategy] empty plan")
-		return "", ""
+		return nil, ""
 	}
 
 	sp, ok := e.parseStrategyPlan(plan)
 	if !ok {
-		logs.Errorf("[engine] [strategy] parse plan err, plan: %s", plan)
-		return "", ""
+		logs.Errorf("[engine] [strategy] parse plan err")
+		return &strategyOutput{Raw: plan}, ""
 	}
 	e.strategy.lastPlan = plan
 	// 短信告警: 直接按策略 agent 的 safety_plan 触发, 不再监测对话 agent 回复
@@ -131,11 +138,11 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 	skills, err := prompt.Mgr.GetSkills(ctx, names...)
 	if err != nil {
 		logs.Errorf("[engine] [strategy] get skills err: %v", err)
-		return plan, ""
+		return &strategyOutput{Raw: plan, Bound: true}, ""
 	} else {
 		logs.Infof("[engine] [strategy] loaded skills in %dms: %v", time.Since(skillsStart).Milliseconds(), names)
 	}
-	return plan, e.joinSkills(names, skills)
+	return &strategyOutput{Raw: plan, Bound: true}, e.joinSkills(names, skills)
 }
 
 // parseStrategyPlan 解析策略 JSON (容忍 markdown fence). ok=false 表示 JSON 解析失败.
