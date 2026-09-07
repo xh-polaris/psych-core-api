@@ -38,6 +38,7 @@ type Ext struct {
 	//ContentWithCite *string       `json:"-" bson:"-"`                                         // 模型用到的引用, 会替换模型域的消息
 	//Sensitive       bool          `json:"sensitive,omitempty" bson:"sensitive,omitempty"`     // 是否触发违禁词
 	//AttachInfo      []*AttachInfo `json:"attach_info,omitempty" bson:"attach_info,omitempty"` // 附件信息
+	Strategy string `json:"strategy,omitempty" bson:"strategy,omitempty"` // 策略 agent 输出的策略 JSON 文本
 }
 
 type Cite struct {
