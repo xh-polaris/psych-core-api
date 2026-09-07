@@ -77,6 +77,7 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 
 	// 意图识别阶段: 策略 agent 生成策略 JSON + 加载微技能 (失败自动降级为空)
 	strategyJSON, skillsText := e.execIntention(ctx, eMsgs)
+	astMsg.Ext.Strategy = strategyJSON
 	// 拼装对话 system prompt (DS 注入, Coze 不注入)
 	eMsgs = e.buildDialogueMsgs(ctx, eMsgs, strategyJSON, skillsText)
 	// 建立流前的总耗时 (历史加载 + 意图识别 + system 拼接)

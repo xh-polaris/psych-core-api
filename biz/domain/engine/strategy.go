@@ -96,8 +96,6 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 	if msg == nil {
 		logs.Errorf("[engine] [strategy] nil response")
 		return "", ""
-	} else {
-		logs.Infof("[engine] [strategy] response: %s", msg.Content)
 	}
 	if msg.ResponseMeta != nil && msg.ResponseMeta.Usage != nil {
 		e.llmUsage(msg.ResponseMeta) // 策略调用 token 用量
