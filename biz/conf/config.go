@@ -46,10 +46,15 @@ type COS struct {
 	SecretKey string
 }
 
+type PostProcess struct {
+	Enabled bool
+}
+
 type Config struct {
 	service.ServiceConf
 	ListenOn    string
 	State       string
+	PostProcess *PostProcess
 	Auth        Auth
 	Cache       *Cache
 	CacheConf   cache.CacheConf
@@ -59,6 +64,10 @@ type Config struct {
 	Synapse     *Synapse
 	SMS         *SMS
 	COS         *COS
+}
+
+func (c *Config) PostProcessEnabled() bool {
+	return c.State != "test" || (c.PostProcess != nil && c.PostProcess.Enabled)
 }
 
 func NewConfig() (*Config, error) {
