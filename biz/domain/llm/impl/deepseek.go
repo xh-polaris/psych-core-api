@@ -24,6 +24,8 @@ type deepseekChatReq struct {
 	Model          string             `json:"model"`
 	Messages       []*deepseekMessage `json:"messages"`
 	Stream         bool               `json:"stream"`
+	MaxTokens      int                `json:"max_tokens,omitempty"`
+	Temperature    *float32           `json:"temperature,omitempty"`
 	ResponseFormat *chatRespFormat    `json:"response_format,omitempty"`
 	Thinking       *chatThinking      `json:"thinking,omitempty"`
 }
@@ -37,8 +39,9 @@ type chatThinking struct {
 }
 
 type deepseekMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role             string `json:"role"`
+	Content          string `json:"content"`
+	ReasoningContent string `json:"reasoning_content,omitempty"`
 }
 
 type deepseekChatResp struct {
@@ -73,16 +76,33 @@ func NewDeepSeekModel(ctx context.Context, url, apiKey, modelName string) (_ mod
 	}, nil
 }
 
+func buildChatReq(modelName string, msgs []*deepseekMessage, stream bool, opts []model.Option) *deepseekChatReq {
+	common := model.GetCommonOptions(&model.Options{}, opts...)
+	body := &deepseekChatReq{
+		Model:    modelName,
+		Messages: msgs,
+		Stream:   stream,
+	}
+	// 不额外声明用量选项：DeepSeek 会在最后一个数据块返回用量
+	// 该选项仅为兼容标准接口而保留；若实际响应不含用量，再按上游要求补充
+	if common.MaxTokens != nil && *common.MaxTokens > 0 {
+		body.MaxTokens = *common.MaxTokens
+	}
+	// 温度参数由开放接口透传；取值范围在开放接口参数层校验
+	if common.Temperature != nil {
+		t := *common.Temperature
+		body.Temperature = &t
+	}
+	return body
+}
+
 func (d *DeepSeekModel) Generate(ctx context.Context, in []*schema.Message, opts ...model.Option) (*schema.Message, error) {
 	msgs := e2ds(in)
-	body := &deepseekChatReq{
-		Model:    d.model,
-		Messages: msgs,
-		Stream:   false,
-		// 策略 agent 固定输出 JSON, 并关闭思考模式以更快更稳
-		ResponseFormat: &chatRespFormat{Type: "json_object"},
-		Thinking:       &chatThinking{Type: "disabled"},
-	}
+	body := buildChatReq(d.model, msgs, false, opts)
+	// 策略模型固定输出 JSON，并关闭思考模式以缩短响应时间
+	body.ResponseFormat = &chatRespFormat{Type: "json_object"}
+	body.Thinking = &chatThinking{Type: "disabled"}
+
 	reqBytes, err := sonic.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -99,6 +119,10 @@ func (d *DeepSeekModel) Generate(ctx context.Context, in []*schema.Message, opts
 		return nil, err
 	}
 	defer resp.Body.Close()
+	// 记录上游请求标识，便于排查调用和计费问题
+	if rid := resp.Header.Get("X-Request-Id"); rid != "" {
+		logs.Infof("[deepseek] generate provider request_id: %s", rid)
+	}
 	if resp.StatusCode != http.StatusOK {
 		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return nil, fmt.Errorf("deepseek generate status %d: %s", resp.StatusCode, string(data))
@@ -116,6 +140,7 @@ func (d *DeepSeekModel) Generate(ctx context.Context, in []*schema.Message, opts
 	if len(chatResp.Choices) > 0 {
 		if chatResp.Choices[0].Message != nil {
 			msg.Content = chatResp.Choices[0].Message.Content
+			msg.ReasoningContent = chatResp.Choices[0].Message.ReasoningContent
 		}
 		msg.ResponseMeta = &schema.ResponseMeta{}
 		if chatResp.Choices[0].FinishReason != nil {
@@ -139,11 +164,7 @@ func (d *DeepSeekModel) Generate(ctx context.Context, in []*schema.Message, opts
 
 func (d *DeepSeekModel) Stream(ctx context.Context, in []*schema.Message, opts ...model.Option) (sr *schema.StreamReader[*schema.Message], err error) {
 	msgs := e2ds(in)
-	body := &deepseekChatReq{
-		Model:    d.model,
-		Messages: msgs,
-		Stream:   true,
-	}
+	body := buildChatReq(d.model, msgs, true, opts)
 	reqBytes, err := sonic.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -159,22 +180,28 @@ func (d *DeepSeekModel) Stream(ctx context.Context, in []*schema.Message, opts .
 	if err != nil {
 		return nil, err
 	}
+	// 非成功响应不是 SSE 数据，必须直接返回错误，不能交给流解析器静默处理。
+	if resp.StatusCode != http.StatusOK {
+		defer resp.Body.Close()
+		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return nil, fmt.Errorf("deepseek stream status %d: %s", resp.StatusCode, string(data))
+	}
+	// 记录上游请求标识，便于排查调用和计费问题。
+	if rid := resp.Header.Get("X-Request-Id"); rid != "" {
+		logs.Infof("[deepseek] stream provider request_id: %s", rid)
+	}
 	sr, sw := schema.Pipe[*schema.Message](5)
-	go d.processStream(ctx, resp.Body, sw)
+	go d.processStream(resp.Body, sw)
 	return sr, nil
 }
 
-func (d *DeepSeekModel) processStream(ctx context.Context, body io.ReadCloser, sw *schema.StreamWriter[*schema.Message]) {
+func (d *DeepSeekModel) processStream(body io.ReadCloser, sw *schema.StreamWriter[*schema.Message]) {
 	defer body.Close()
 	defer sw.Close()
 	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 4*1024), 1024*1024)
 
 	for scanner.Scan() {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
 		line := scanner.Text()
 		if line == "" || !strings.HasPrefix(line, "data: ") {
 			continue
@@ -207,7 +234,9 @@ func (d *DeepSeekModel) processStream(ctx context.Context, body io.ReadCloser, s
 			}
 		}
 
-		sw.Send(msg, nil)
+		if closed := sw.Send(msg, nil); closed {
+			return
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		sw.Send(nil, err)
@@ -235,9 +264,10 @@ func ds2e(resp *deepseekChatResp) *schema.Message {
 	}
 	if resp.Choices[0].Message != nil {
 		msg.Content = resp.Choices[0].Message.Content
-		msg.ReasoningContent = resp.Choices[0].Message.Content
+		msg.ReasoningContent = resp.Choices[0].Message.ReasoningContent
 	} else if resp.Choices[0].Delta != nil {
 		msg.Content = resp.Choices[0].Delta.Content
+		msg.ReasoningContent = resp.Choices[0].Delta.ReasoningContent
 	}
 	return msg
 }
