@@ -46,6 +46,24 @@ type COS struct {
 	SecretKey string
 }
 
+type OpenApiKey struct {
+	Prefix string   // 密钥格式中的前缀，可用于日志关联
+	Digest string   // 密钥随机部分的 HMAC-SHA256 十六进制摘要
+	Status string   // 启用或吊销
+	Scopes []string // 例如 psych:chat
+}
+
+type OpenApi struct {
+	Pepper               string
+	Keys                 []OpenApiKey
+	MaxMessages          int    // 消息最大条数
+	MaxMessageChars      int    // 单条消息最大字符数
+	MaxTotalChars        int    // 全部消息总字符数
+	ReportInternalURL    string // psych-post 集群内私有报告接口地址
+	ReportInternalToken  string // 调用私有接口的 Bearer Token
+	ReportTimeoutSeconds int    // 私有调用超时秒数
+}
+
 type Config struct {
 	service.ServiceConf
 	ListenOn    string
@@ -59,6 +77,7 @@ type Config struct {
 	Synapse     *Synapse
 	SMS         *SMS
 	COS         *COS
+	OpenApi     *OpenApi `json:",optional"`
 }
 
 func NewConfig() (*Config, error) {

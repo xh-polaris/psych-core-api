@@ -67,4 +67,15 @@ func Register(r *server.Hertz) {
 		_user.POST("/update_info", append(_userupdateinfoMw(), core_api.UserUpdateInfo)...)
 		_user.POST("/update_password", append(_userupdatepasswordMw(), core_api.UserUpdatePassword)...)
 	}
+	{
+		_v1 := root.Group("/v1", _v1Mw()...)
+		{
+			_chat := _v1.Group("/chat", _chatMw()...)
+			_chat.POST("/completions", append(_openapichatcompletionMw(), core_api.OpenApiChatCompletion)...)
+		}
+		{
+			_psych := _v1.Group("/psych", _psychMw()...)
+			_psych.POST("/reports", append(_openapigeneratereportMw(), core_api.OpenApiGenerateReport)...)
+		}
+	}
 }

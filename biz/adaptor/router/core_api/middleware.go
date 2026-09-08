@@ -320,3 +320,25 @@ func _configupdatecharacterMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _v1Mw() []app.HandlerFunc {
+	return nil
+}
+
+func _chatMw() []app.HandlerFunc {
+	return nil
+}
+
+func _openapichatcompletionMw() []app.HandlerFunc {
+	return nil
+}
+
+func _psychMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _openapigeneratereportMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
