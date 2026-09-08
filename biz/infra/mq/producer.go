@@ -107,8 +107,8 @@ func (p *PostProducer) Produce(ctx context.Context, msg *core.PostNotify) (err e
 		logs.Error("[mq producer] marshal post notify failed, err:%v", err.Error())
 		return err
 	}
-	if conf.GetConfig().State == "test" { // debug 测试时不实践发布消息
-		logs.Info("[mq producer] post notify :", string(payload))
+	if !conf.GetConfig().PostProcessEnabled() {
+		logs.Infof("[mq producer] post process disabled, session: %s", msg.Session)
 		return nil
 	}
 

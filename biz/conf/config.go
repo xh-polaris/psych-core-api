@@ -64,10 +64,15 @@ type OpenApi struct {
 	ReportTimeoutSeconds int    // 私有调用超时秒数
 }
 
+type PostProcess struct {
+	Enabled bool
+}
+
 type Config struct {
 	service.ServiceConf
 	ListenOn    string
 	State       string
+	PostProcess *PostProcess
 	Auth        Auth
 	Cache       *Cache
 	CacheConf   cache.CacheConf
@@ -78,6 +83,10 @@ type Config struct {
 	SMS         *SMS
 	COS         *COS
 	OpenApi     *OpenApi `json:",optional"`
+}
+
+func (c *Config) PostProcessEnabled() bool {
+	return c.State != "test" || (c.PostProcess != nil && c.PostProcess.Enabled)
 }
 
 func NewConfig() (*Config, error) {
