@@ -186,11 +186,11 @@ func (h *HistoryManager) AddMessage(ctx context.Context, userId, date string, ms
 
 	convIdHex := msg.ConversationId.Hex()
 
-	if msg.Index == 0 {
-		_ = h.CacheConvDate(ctx, convIdHex, userId)
-		if err := h.convMapper.SetActive(ctx, msg.ConversationId); err != nil {
-			logs.Errorf("[his] activate conversation err: %s", err)
-		}
+	// 消息序号按用户当日全量历史递增，不能用 Index==0 判断是否为新会话。
+	// 任一消息成功写入后都应确保会话可见，并缓存其日期归属。
+	_ = h.CacheConvDate(ctx, convIdHex, userId)
+	if err := h.convMapper.SetActive(ctx, msg.ConversationId); err != nil {
+		logs.Errorf("[his] activate conversation err: %s", err)
 	}
 
 	_ = h.CacheDailyMessages(ctx, userId, date, []*message.Message{msg})
