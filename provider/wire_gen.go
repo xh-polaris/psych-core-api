@@ -40,17 +40,9 @@ func NewProvider() (*Provider, error) {
 		UserMapper: iMongoMapper,
 		UnitMapper: unitIMongoMapper,
 	}
-	alarmIMongoMapper := alarm.NewAlarmMongoMapper(confConfig)
 	conversationIMongoMapper := conversation.NewConversationMongoMapper(confConfig)
+	alarmIMongoMapper := alarm.NewAlarmMongoMapper(confConfig)
 	reportIMongoMapper := report.NewReportMongoMapper(confConfig)
-	alarmService := service.AlarmService{
-		AuthDomain:         authDomain,
-		AlarmMapper:        alarmIMongoMapper,
-		UserMapper:         iMongoMapper,
-		UnitMapper:         unitIMongoMapper,
-		ConversationMapper: conversationIMongoMapper,
-		ReportMapper:       reportIMongoMapper,
-	}
 	dashboardDomain := &dashboard.DashboardDomain{
 		UserMapper:         iMongoMapper,
 		UnitMapper:         unitIMongoMapper,
@@ -62,6 +54,7 @@ func NewProvider() (*Provider, error) {
 		AuthDomain:         authDomain,
 		UserMapper:         iMongoMapper,
 		ConversationMapper: conversationIMongoMapper,
+		AlarmMapper:        alarmIMongoMapper,
 		DashboardDomain:    dashboardDomain,
 	}
 	configIMongoMapper := config.NewConfigMongoMapper(confConfig)
@@ -114,7 +107,6 @@ func NewProvider() (*Provider, error) {
 	promptIMongoMapper := prompt.NewPromptMongoMapper(confConfig)
 	providerProvider := &Provider{
 		Config:              confConfig,
-		AlarmService:        alarmService,
 		DashboardService:    dashboardService,
 		ConfigService:       configService,
 		UserService:         userService,

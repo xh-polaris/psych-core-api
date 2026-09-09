@@ -35,7 +35,6 @@ func Init() {
 // Provider 依赖的对象
 type Provider struct {
 	Config              *conf.Config
-	AlarmService        service.AlarmService
 	DashboardService    service.DashboardService
 	ConfigService       service.ConfigService
 	UserService         service.UserService
@@ -61,7 +60,6 @@ func Get() *Provider {
 var RpcSet = wire.NewSet()
 
 var ApplicationSet = wire.NewSet(
-	service.AlarmServiceSet,
 	service.DashboardServiceSet,
 	service.ConfigServiceSet,
 	service.UserServiceSet,

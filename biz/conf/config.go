@@ -72,7 +72,7 @@ type Config struct {
 	service.ServiceConf
 	ListenOn    string
 	State       string
-	PostProcess *PostProcess
+	PostProcess *PostProcess `json:",optional"`
 	Auth        Auth
 	Cache       *Cache
 	CacheConf   cache.CacheConf
