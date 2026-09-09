@@ -40,13 +40,16 @@ func (e *Engine) buildDialogueApp(cfg *app.ChatSetting) error {
 // execLLM 调用大模型回复 [engine]:
 // 先执行意图识别 (策略 agent), 再拼装对话 system prompt, 最后流式返回给前端与 TTS
 func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
+	execStart := time.Now()
 	userId := e.info[cst.JsonUserID].(string)
 	todayDate := util.FormatDateUTC8(time.Now())
 
+	hisStart := time.Now()
 	mMsgs, err := his.Mgr.GetUserDailyMessages(ctx, userId, todayDate)
 	if err != nil {
 		return errorx.WrapByCode(err, errno.RetrieveHisErr)
 	}
+	logs.Infof("[engine] [dialogue] GetUserDailyMessages in %dms, msgs=%d", time.Since(hisStart).Milliseconds(), len(mMsgs))
 
 	e.count++
 
@@ -59,21 +62,34 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 		index = int(mMsgs[0].Index) + 1
 	}
 	usrMsg := convert.UserMMsg(oids[0], oids[1], cmd.Content.(string), index)
-	if err = his.Mgr.AddMessage(ctx, userId, todayDate, usrMsg); err != nil {
+	hisStart = time.Now()
+	err = his.Mgr.AddMessage(ctx, userId, todayDate, usrMsg)
+	if err != nil {
 		return errorx.WrapByCode(err, errno.AddUserMsgErr)
 	}
+	logs.Infof("[engine] [dialogue] AddMessage in %dms", time.Since(hisStart).Milliseconds())
 	mMsgs = append([]*message.Message{usrMsg}, mMsgs...)
 	// 创建模型消息
 	astMsg := convert.AssistantMMsg(oids[0], oids[1], "", index+1)
 
-	logs.Infof("mMsgs:%+v", mMsgs)
 	// 存储域消息转模型域 (最新在前)
 	eMsgs := convert.MMsgToEMsgList(mMsgs)
 
 	// 意图识别阶段: 策略 agent 生成策略 JSON + 加载微技能 (失败自动降级为空)
-	strategyJSON, skillsText := e.execIntention(ctx, eMsgs)
+	out, skillsText := e.execIntention(ctx, eMsgs)
+	var strategyJSON string
+	if out != nil {
+		astMsg.Ext.Strategy = out.Raw
+		astMsg.Ext.StrategyOK = out.Bound
+		if out.Bound { // 仅绑定成功的策略 JSON 注入对话 system prompt
+			strategyJSON = out.Raw
+		}
+	}
 	// 拼装对话 system prompt (DS 注入, Coze 不注入)
 	eMsgs = e.buildDialogueMsgs(ctx, eMsgs, strategyJSON, skillsText)
+	// 建立流前的总耗时 (历史加载 + 意图识别 + system 拼接)
+	logs.Infof("[engine] [dialogue] stream setup in %dms, hist_msgs=%d",
+		time.Since(execStart).Milliseconds(), len(mMsgs))
 
 	var subctx context.Context
 	subctx, e.llmCancel = context.WithCancel(ctx)
@@ -84,11 +100,10 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 
 	// 过滤流并拷贝以用作不同用途
 	stream = e.checkBracket(subctx, stream)
-	stream = e.checkAlertSms(subctx, stream)
 	streams := stream.Copy(2)
 	ret, tts := streams[0], streams[1] // 分别用于返回给前端与TTS音频生成
 	// 返回给前端
-	go e.execLLMResponse(subctx, cmd.ID, ret, astMsg)
+	go e.execLLMResponse(subctx, cmd.ID, ret, astMsg, execStart)
 	// 启用tts发送
 	go e.execTTS(subctx, cmd.ID, tts)
 	e.llmWg.Add(3) // 模型, tts发送, tts响应三个子线程
@@ -103,11 +118,13 @@ func (e *Engine) buildDialogueMsgs(ctx context.Context, baseMsgs []*schema.Messa
 		return baseMsgs
 	}
 
+	tplStart := time.Now()
 	tpl, err := prompt.Mgr.GetTemplate(ctx, "dialogue", nil)
 	if err != nil || tpl == "" {
 		logs.Errorf("[engine] [dialogue] get dialogue template err: %v", err)
 		return baseMsgs
 	}
+	logs.Infof("[engine] [dialogue] get dialogue template in %dms", time.Since(tplStart).Milliseconds())
 
 	var sb strings.Builder
 	sb.WriteString(tpl)
@@ -128,10 +145,11 @@ func (e *Engine) buildDialogueMsgs(ctx context.Context, baseMsgs []*schema.Messa
 }
 
 // execLLMResponse 负责将大模型响应返回给前端 [task]
-func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.StreamReader[*schema.Message], astMsg *message.Message) {
+func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.StreamReader[*schema.Message], astMsg *message.Message, execStart time.Time) {
 	defer e.llmWg.Done()
 	defer stream.Close()
 	var collect strings.Builder
+	streamStart := time.Now()
 	defer func(collect *strings.Builder, astMsg *message.Message) {
 		astMsg.Usage = e.usage.LLMUsage
 		now := time.Now()
@@ -145,6 +163,7 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 
 	var finish string
 	var index uint64
+	first := true
 	for {
 		select {
 		case <-ctx.Done():
@@ -167,6 +186,12 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 				e.llmUsage(msg.ResponseMeta) // 记录用量
 			}
 			logs.Infof("llm msg:%v", msg.Content)
+			if first && msg.Content != "" {
+				first = false
+				// 首 token 耗时: 相对 execLLM 入口 (用户可感知) 与流建立 (网络+prefill) 两个口径
+				logs.Infof("[engine] [dialogue] first token in %dms (%dms from stream)",
+					time.Since(execStart).Milliseconds(), time.Since(streamStart).Milliseconds())
+			}
 			frame := &app.ChatFrame{Id: index, Content: msg.Content, SessionId: e.uSession, Timestamp: time.Now().Unix(), Finish: finish}
 			// 写回给前端
 			if err = e.MWrite(core.MResp, &core.Resp{ID: id, Type: core.RModelText, Content: frame}); err != nil {
@@ -177,6 +202,8 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 			// 收集消息
 			collect.WriteString(msg.Content)
 			if finish == "stop" {
+				logs.Infof("[engine] [dialogue] stream done in %dms, out_chars=%d",
+					time.Since(streamStart).Milliseconds(), collect.Len())
 				return
 			}
 		}

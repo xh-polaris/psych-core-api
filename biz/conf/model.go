@@ -69,7 +69,15 @@ func (c *Config) ChatConf(chat *core_api.ChatApp) (*app.ChatSetting, error) {
 		return nil, errorx.New(errno.ConfigErr, errorx.KV("app", "chat"))
 	}
 	if cc, ok := c.ModelConfig.Chat[chat.Provider]; ok {
-		return &app.ChatSetting{Provider: chat.Provider, Url: cc.URL, Model: cc.Model,
+		model := cc.Model
+		// DeepSeek: 单位配置的 botId 可指定模型 (deepseek-v4-flash / deepseek-v4-pro);
+		// 非上述两项或非法时回退到全局 ModelConfig.Chat.deepseek.Model
+		if chat.Provider == "deepseek" {
+			if chat.AppId == "deepseek-v4-flash" || chat.AppId == "deepseek-v4-pro" {
+				model = chat.AppId
+			}
+		}
+		return &app.ChatSetting{Provider: chat.Provider, Url: cc.URL, Model: model,
 			BotId: chat.AppId, UserId: "", AccessKey: cc.AccessKey}, nil
 	}
 	return nil, errorx.New(errno.ConfigErr, errorx.KV("app", "chat"))
