@@ -21,6 +21,7 @@ type Report struct {
 	Round          int                    `bson:"round" json:"round"`                                        // 对话中的消息总数
 	Start          time.Time              `bson:"start" json:"start"`                                        // 对话开始时间
 	End            time.Time              `bson:"end" json:"end"`                                            // 对话结束时间
+	CreateTime     time.Time              `bson:"create_time,omitempty" json:"createTime,omitempty"`         // 报表创建时间
 	Config         *config.Report         `bson:"config" json:"config,omitempty"`                            // 对话配置
 	Info           map[string]interface{} `bson:"info" json:"info,omitempty"`                                // 额外信息
 	Character      *config.Character      `bson:"character,omitempty" json:"character,omitempty"`            // 心理老师形象
