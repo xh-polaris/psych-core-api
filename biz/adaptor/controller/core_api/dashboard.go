@@ -94,7 +94,7 @@ func DashboardGetAlarmOverview(ctx context.Context, c *app.RequestContext) {
 
 	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
-	resp, err := p.AlarmService.Overview(ctx, &req)
+	resp, err := p.DashboardService.DashboardGetAlarmOverview(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
@@ -111,7 +111,7 @@ func DashboardListAlarmRecords(ctx context.Context, c *app.RequestContext) {
 
 	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
-	resp, err := p.AlarmService.ListRecords(ctx, &req)
+	resp, err := p.DashboardService.DashboardListAlarmRecords(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
@@ -128,7 +128,7 @@ func DashboardUpdateAlarm(ctx context.Context, c *app.RequestContext) {
 
 	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
-	resp, err := p.AlarmService.UpdateAlarm(ctx, &req)
+	resp, err := p.DashboardService.DashboardUpdateAlarm(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
 
