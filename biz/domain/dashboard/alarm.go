@@ -12,7 +12,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
-	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
@@ -208,7 +208,7 @@ func (d *DashboardDomain) completeAlarm(ctx context.Context, dbAlarms []*alarm.A
 	}
 
 	var userInfo map[bson.ObjectID]*user.User
-	var msgStats map[bson.ObjectID]*conversation.ConvStats
+	var msgStats map[bson.ObjectID]*message.MsgStats
 	var userErr, msgErr error
 
 	var wg sync.WaitGroup
@@ -222,7 +222,7 @@ func (d *DashboardDomain) completeAlarm(ctx context.Context, dbAlarms []*alarm.A
 	}()
 	go func() {
 		defer wg.Done()
-		msgStats, msgErr = d.ConversationMapper.BatchConvStats(ctx, userIds)
+		msgStats, msgErr = d.MessageMapper.BatchMessageStats(ctx, userIds)
 		if msgErr != nil {
 			logs.Errorf("查询对话统计失败: %v", errorx.ErrorWithoutStack(msgErr))
 		}
