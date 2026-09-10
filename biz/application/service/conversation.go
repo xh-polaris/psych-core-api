@@ -51,7 +51,7 @@ func (c *ConversationService) CreateConversation(ctx context.Context, req *core_
 	if err := c.ConversationMapper.Insert(ctx, &conversation.Conversation{
 		ID:         temp,
 		UserID:     userOID,
-		Status:     enum.ConversationStatusDeleted,
+		Status:     enum.ConversationStatusPending,
 		CreateTime: time.Now(),
 		UpdateTime: time.Now(),
 	}); err != nil {

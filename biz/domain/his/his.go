@@ -179,6 +179,14 @@ func (h *HistoryManager) CacheConvDate(ctx context.Context, convId, userId strin
 
 // AddMessage 新增消息到存储并更新缓存 (userId:date 维度)
 func (h *HistoryManager) AddMessage(ctx context.Context, userId, date string, msg *message.Message) error {
+	writable, err := h.convMapper.Exists(ctx, msg.ConversationId)
+	if err != nil {
+		return err
+	}
+	if !writable {
+		return fmt.Errorf("conversation is deleted or does not exist: %s", msg.ConversationId.Hex())
+	}
+
 	if err := h.msgMapper.Insert(ctx, msg); err != nil {
 		logs.Errorf("[his] add message err: %s", err)
 		return err
@@ -187,9 +195,9 @@ func (h *HistoryManager) AddMessage(ctx context.Context, userId, date string, ms
 	convIdHex := msg.ConversationId.Hex()
 
 	// 消息序号按用户当日全量历史递增，不能用 Index==0 判断是否为新会话。
-	// 任一消息成功写入后都应确保会话可见，并缓存其日期归属。
+	// 任一消息成功写入后，只允许将 Pending 会话变为 Active；Deleted 会话不会被恢复。
 	_ = h.CacheConvDate(ctx, convIdHex, userId)
-	if err := h.convMapper.SetActive(ctx, msg.ConversationId); err != nil {
+	if err := h.convMapper.ActivatePending(ctx, msg.ConversationId); err != nil {
 		logs.Errorf("[his] activate conversation err: %s", err)
 	}
 
