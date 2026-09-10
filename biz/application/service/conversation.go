@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/wire"
@@ -15,6 +16,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/types/enum"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type IConversationService interface {
@@ -47,19 +49,42 @@ func (c *ConversationService) CreateConversation(ctx context.Context, req *core_
 		return nil, errorx.New(errno.ErrInvalidParams)
 	}
 
-	temp := bson.NewObjectID()
-	if err := c.ConversationMapper.Insert(ctx, &conversation.Conversation{
-		ID:         temp,
+	now := time.Now()
+	chatDate := util.FormatDateUTC8(now)
+	if existing, findErr := c.ConversationMapper.FindWritableByUserAndDate(ctx, userOID, chatDate); findErr == nil {
+		return &core_api.CreateConversationResp{
+			ConversationId: existing.ID.Hex(),
+			Code:           0,
+			Msg:            "success",
+		}, nil
+	} else if !errors.Is(findErr, mongo.ErrNoDocuments) {
+		return nil, errorx.New(errno.ErrCreateConversation)
+	}
+	created := &conversation.Conversation{
+		ID:         bson.NewObjectID(),
 		UserID:     userOID,
+		ChatDate:   chatDate,
 		Status:     enum.ConversationStatusPending,
-		CreateTime: time.Now(),
-		UpdateTime: time.Now(),
-	}); err != nil {
+		CreateTime: now,
+		UpdateTime: now,
+	}
+	if err := c.ConversationMapper.Insert(ctx, created); err != nil {
+		// 唯一索引决定唯一会话后，返回已创建的会话
+		if mongo.IsDuplicateKeyError(err) {
+			existing, findErr := c.ConversationMapper.FindWritableByUserAndDate(ctx, userOID, chatDate)
+			if findErr == nil {
+				return &core_api.CreateConversationResp{
+					ConversationId: existing.ID.Hex(),
+					Code:           0,
+					Msg:            "success",
+				}, nil
+			}
+		}
 		return nil, errorx.New(errno.ErrCreateConversation)
 	}
 
 	return &core_api.CreateConversationResp{
-		ConversationId: temp.Hex(),
+		ConversationId: created.ID.Hex(),
 		Code:           0,
 		Msg:            "success",
 	}, nil

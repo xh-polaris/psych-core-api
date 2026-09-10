@@ -32,6 +32,7 @@ type IMongoMapper interface {
 	CountByUserIds(ctx context.Context, userIds []bson.ObjectID) (int32, error)
 	FindManyByUserId(ctx context.Context, userId bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
 	FindManyByUserIds(ctx context.Context, userIds []bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
+	FindWritableByUserAndDate(ctx context.Context, userId bson.ObjectID, chatDate string) (*Conversation, error)
 	FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error)
 	FindByUserIdAndTimeRange(ctx context.Context, userId bson.ObjectID, start, end time.Time) ([]*Conversation, error)
 	FindDistinctDatesByUserId(ctx context.Context, userId bson.ObjectID, start, end time.Time) ([]string, error)
@@ -98,6 +99,23 @@ func (m *mongoMapper) Exists(ctx context.Context, conversationId bson.ObjectID) 
 		return false, err
 	}
 	return count > 0, nil
+}
+
+// FindWritableByUserAndDate 查询用户当天可继续写入的会话。当天只允许一条 Pending 或 Active 会话。
+func (m *mongoMapper) FindWritableByUserAndDate(ctx context.Context, userId bson.ObjectID, chatDate string) (*Conversation, error) {
+	conv := &Conversation{}
+	filter := bson.M{
+		cst.UserID:   userId,
+		cst.ChatDate: chatDate,
+		cst.Status: bson.M{cst.In: []int{
+			enum.ConversationStatusPending,
+			enum.ConversationStatusActive,
+		}},
+	}
+	if err := m.conn.FindOneNoCache(ctx, conv, filter, options.FindOne().SetSort(bson.M{cst.UpdateTime: -1})); err != nil {
+		return nil, err
+	}
+	return conv, nil
 }
 
 // CountByUnit 统计对话数量，unitId 为空表示全平台
