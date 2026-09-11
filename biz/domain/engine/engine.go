@@ -226,7 +226,7 @@ func (e *Engine) buildPostNotify(end time.Time) *core.PostNotify {
 		Usage:     e.usage,
 		Info:      e.info,
 		Start:     e.start.Unix(),
-		End:       end.Unix(),
+		End:       end.Unix() + 1, // +1 秒补偿：End 精确到最后一条消息，但 Unix() 丢毫秒，+1 保证不漏最后一条
 		Config:    e.conf,
 		Date:      util.FormatDateUTC8(end),
 		Character: e.Character,
@@ -258,6 +258,10 @@ func (e *Engine) Close() (err error) {
 		pCtx, pCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer pCancel()
 
+		// 本次对话结束时间默认取断开时刻；有新消息时改为最后一条消息的精确时间
+		// 作为报告段的右边界，避免把断开后、下一次连接的消息误算进本段
+		endTime := time.Now()
+
 		// 检查数据库中会话是否依然有效
 		if oid, err := bson.ObjectIDFromHex(e.uSession); err == nil {
 			active, _ := e.convMapper.IsActive(pCtx, oid)
@@ -276,10 +280,15 @@ func (e *Engine) Close() (err error) {
 				return
 			}
 
+			// 报告段右边界 = 最后一条消息的精确创建时间（latestMsgs 按 create_time 倒序）
+			if currentTotal > 0 {
+				endTime = latestMsgs[0].CreateTime
+			}
+
 			// 更新会话信息 (时间、角色)
 			update := bson.M{
 				cst.StartTime: e.start,
-				cst.EndTime:   time.Now(),
+				cst.EndTime:   endTime,
 			}
 			if e.Character != nil && e.Character.Id != "" {
 				if charOID, err := bson.ObjectIDFromHex(e.Character.Id); err == nil {
@@ -292,9 +301,9 @@ func (e *Engine) Close() (err error) {
 		}
 
 		// 发布 MQ 通知
-		if err = mq.GetPostProducer().Produce(pCtx, e.buildPostNotify(time.Now())); err != nil {
+		if err = mq.GetPostProducer().Produce(pCtx, e.buildPostNotify(endTime)); err != nil {
 			// 发送失败需要详细记录日志, 以进行后续托底
-			logs.Error("[engine] produce notify error: %s with such state: session:%s start: %d end:%d info:%+v config:%+v", err, e.uSession, e.start, time.Now(), e.info, e.conf)
+			logs.Error("[engine] produce notify error: %s with such state: session:%s start: %d end:%d info:%+v config:%+v", err, e.uSession, e.start, endTime, e.info, e.conf)
 			return
 		}
 	})
