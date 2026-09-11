@@ -154,7 +154,7 @@ func (h *HistoryManager) AddMessage(ctx context.Context, msg *message.Message) e
 	// 消息序号按会话内历史递增，不能用 Index==0 判断是否为新会话。
 	// 任一消息成功写入后，只允许将 Pending 会话变为 Active；Deleted 会话不会被恢复
 	_ = h.CacheConvDate(ctx, convIdHex, msg.UserId.Hex())
-	if err := h.convMapper.ActivatePending(ctx, msg.ConversationId); err != nil {
+	if err := h.convMapper.SetActive(ctx, msg.ConversationId); err != nil {
 		logs.Errorf("[his] activate conversation err: %s", err)
 	}
 

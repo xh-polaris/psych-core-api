@@ -44,6 +44,7 @@ const (
 	RiskLevel      = "risk_level"
 	Remark         = "remark"
 	URI            = "uri"
+	MessageCount   = "message_count"
 	CharacterID    = "character_id"
 	VoiceType      = "voice_type"
 

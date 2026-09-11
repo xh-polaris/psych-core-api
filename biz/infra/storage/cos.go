@@ -46,7 +46,7 @@ func NewCOS(cfg *conf.Config) Provider {
 
 func (p *cosProvider) GetAccessURL(_ context.Context, key string) (string, error) {
 	if p.cdnURL != "" {
-		return p.cdnURL + "/" + key, nil
+		return normalizeCDNBase(p.cdnURL) + "/" + key, nil
 	}
 	return p.client.Object.GetObjectURL(key).String(), nil
 }
@@ -62,9 +62,17 @@ func (p *cosProvider) Upload(ctx context.Context, key string, r io.Reader, size 
 		return "", fmt.Errorf("cos upload failed key=%s: %w", key, err)
 	}
 	if p.cdnURL != "" {
-		return p.cdnURL + "/" + key, nil
+		return normalizeCDNBase(p.cdnURL) + "/" + key, nil
 	}
 	return p.client.Object.GetObjectURL(key).String(), nil
+}
+
+func normalizeCDNBase(raw string) string {
+	base := strings.TrimRight(strings.TrimSpace(raw), "/")
+	if base != "" && !strings.HasPrefix(base, "http://") && !strings.HasPrefix(base, "https://") {
+		base = "https://" + base
+	}
+	return base
 }
 
 func (p *cosProvider) GenPresignUploadURL(ctx context.Context, key string) (string, error) {

@@ -38,7 +38,8 @@ type IMongoMapper interface {
 	FindDistinctDatesByUserId(ctx context.Context, userId bson.ObjectID, start, end time.Time) ([]string, error)
 	FindManyByUnitId(ctx context.Context, unitId *bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
 	// 修改
-	ActivatePending(ctx context.Context, conversationId bson.ObjectID) error
+	SetActive(ctx context.Context, conversationId bson.ObjectID) error
+	SetCharacter(ctx context.Context, conversationId, characterId bson.ObjectID) error
 	// 聚合统计
 	CountUnitConvByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 	CountUserDailyConv(ctx context.Context, userId bson.ObjectID) (map[int32]int32, error)
@@ -130,10 +131,10 @@ func (m *mongoMapper) CountByUnit(ctx context.Context, unitId *bson.ObjectID) (i
 }
 
 func (m *mongoMapper) CountByUser(ctx context.Context, userId bson.ObjectID) (int32, error) {
-	cnt, err := m.conn.CountDocuments(ctx, bson.M{cst.Status: enum.ConversationStatusActive})
-	if err != nil {
-		return 0, err
-	}
+	cnt, err := m.conn.CountDocuments(ctx, bson.M{
+		cst.UserID: userId,
+		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+	})
 	return int32(cnt), err
 }
 
@@ -471,8 +472,11 @@ func (m *mongoMapper) BatchConvStats(ctx context.Context, userIds []bson.ObjectI
 // 返回一个map[int32]int32 (周1~7 → conv count的映射)
 func (m *mongoMapper) CountUserDailyConv(ctx context.Context, userId bson.ObjectID) (map[int32]int32, error) {
 	now := time.Now()
-	// 获取一周前的时间
-	oneWeekAgo := now.AddDate(0, 0, -7)
+	// 最近七个自然日：六天前 00:00（含）至明天 00:00（不含）。
+	// 这样每个星期只会出现一次，也不会漏掉今天稍晚创建的记录。
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	sevenDayStart := today.AddDate(0, 0, -6)
+	sevenDayEnd := today.AddDate(0, 0, 1)
 
 	// 聚合管道
 	pipeline := []bson.M{
@@ -481,13 +485,16 @@ func (m *mongoMapper) CountUserDailyConv(ctx context.Context, userId bson.Object
 			cst.UserID: userId,
 			cst.Status: enum.ConversationStatusActive,
 			cst.CreateTime: bson.M{
-				"$gte": oneWeekAgo,
-				"$lte": now,
+				"$gte": sevenDayStart,
+				"$lt":  sevenDayEnd,
 			},
 		}},
 		// 按照星期几分组并计数
 		{"$group": bson.M{
-			"_id":   bson.M{"$dayOfWeek": "$" + cst.CreateTime}, // 提取星期几 (1=周日, 2=周一, ..., 7=周六)
+			"_id": bson.M{"$dayOfWeek": bson.M{
+				"date":     "$" + cst.CreateTime,
+				"timezone": "Asia/Shanghai",
+			}}, // 提取星期几 (1=周日, 2=周一, ..., 7=周六)
 			"count": bson.M{"$sum": 1},
 		}},
 		// 排序
@@ -766,8 +773,8 @@ func (m *mongoMapper) ConvDurationByGrade(ctx context.Context, unitId *bson.Obje
 	return ratioMap, totalDuration, nil
 }
 
-// ActivatePending 仅允许待激活会话进入活跃状态，已删除会话不可被消息写入流程恢复。
-func (m *mongoMapper) ActivatePending(ctx context.Context, cid bson.ObjectID) error {
+// SetActive 仅允许待激活会话进入活跃状态，已删除会话不可被消息写入流程恢复。
+func (m *mongoMapper) SetActive(ctx context.Context, cid bson.ObjectID) error {
 	_, err := m.conn.UpdateOneNoCache(ctx,
 		bson.M{cst.ID: cid, cst.Status: enum.ConversationStatusPending},
 		bson.M{"$set": bson.M{
@@ -776,6 +783,10 @@ func (m *mongoMapper) ActivatePending(ctx context.Context, cid bson.ObjectID) er
 		}},
 	)
 	return err
+}
+
+func (m *mongoMapper) SetCharacter(ctx context.Context, cid, characterId bson.ObjectID) error {
+	return m.UpdateFields(ctx, cid, bson.M{cst.CharacterID: characterId})
 }
 
 // CountConversationsByClassList 按班级列表统计对话数量

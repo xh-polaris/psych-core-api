@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
@@ -293,7 +294,7 @@ func (d *DashboardDomain) getUserConvTrend(ctx context.Context, userOID bson.Obj
 	}
 
 	return &core_api.UserConvTrend{
-		TrendPoints: buildTrendPoints(dailyStats),
+		TrendPoints: buildRecentWeekTrendPoints(dailyStats, time.Now()),
 	}, nil
 }
 
