@@ -13,6 +13,15 @@ import (
 	"github.com/xh-polaris/psych-core-api/provider"
 )
 
+type finishConversationReq struct {
+	ConversationId string `json:"conversationId" vd:"len($)>0"`
+}
+
+type finishConversationResp struct {
+	Code int32  `json:"code"`
+	Msg  string `json:"msg"`
+}
+
 // CreateConversation .
 // @router /conversation/create [POST]
 func CreateConversation(ctx context.Context, c *app.RequestContext) {
@@ -62,6 +71,19 @@ func GetSingleConv(ctx context.Context, c *app.RequestContext) {
 	p := provider.Get()
 	resp, err := p.ConversationService.GetSingleConv(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// FinishConversation 显式完成并归档一次学生会话。
+func FinishConversation(ctx context.Context, c *app.RequestContext) {
+	var req finishConversationReq
+	if err := c.BindAndValidate(&req); err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+	middleware.StoreToken(ctx, c, &req)
+	p := provider.Get()
+	err := p.ConversationService.FinishConversation(ctx, req.ConversationId)
+	httpx.PostProcess(ctx, c, &req, &finishConversationResp{Code: 0, Msg: "success"}, err)
 }
 
 // GetConvByDate .

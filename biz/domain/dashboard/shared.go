@@ -23,6 +23,21 @@ func buildTrendPoints(cnt map[int32]int32) []*core_api.TrendPoint {
 	return points
 }
 
+// buildRecentWeekTrendPoints 按时间先后返回最近七天（最早一天 -> 今天）。
+// Week 使用 1=Mon ... 7=Sun，前端可据此显示正确的星期标签。
+func buildRecentWeekTrendPoints(cnt map[int32]int32, today time.Time) []*core_api.TrendPoint {
+	points := make([]*core_api.TrendPoint, 0, 7)
+	start := today.AddDate(0, 0, -6)
+	for i := 0; i < 7; i++ {
+		weekday := int32(start.AddDate(0, 0, i).Weekday())
+		if weekday == 0 {
+			weekday = 7
+		}
+		points = append(points, &core_api.TrendPoint{Week: weekday, Hour: 0, Count: cnt[weekday]})
+	}
+	return points
+}
+
 // fullDayWindow 将起讫时间规整为整日窗口（起始日 0 点 ~ 结束日 24 点）
 func fullDayWindow(start, end time.Time) (time.Time, time.Time) {
 	days := dayRange(start, end)

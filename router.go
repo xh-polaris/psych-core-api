@@ -5,6 +5,7 @@ package main
 import (
 	"github.com/cloudwego/hertz/pkg/app/server"
 	handler "github.com/xh-polaris/psych-core-api/biz/adaptor/controller"
+	coreAPIHandler "github.com/xh-polaris/psych-core-api/biz/adaptor/controller/core_api"
 )
 
 // customizeRegister registers customize routers.
@@ -12,6 +13,10 @@ func customizedRegister(r *server.Hertz) {
 	r.GET("/ping", handler.Ping)
 	r.GET("/chat", handler.Chat)
 	r.POST("/file/upload", handler.UploadImage)
+	r.POST("/student/avatar/upload", handler.UploadAvatar)
+	r.POST("/conversation/finish", coreAPIHandler.FinishConversation)
+	r.GET("/student/profile", coreAPIHandler.GetStudentProfile)
+	r.POST("/student/profile", coreAPIHandler.UpdateStudentProfile)
 	// your code ...
 	r.GET("healthz", handler.Healthz)
 }

@@ -39,6 +39,27 @@ type IUserService interface {
 	SendVerifyCode(ctx context.Context, req *core_api.SendVerifyCodeReq) (*basic.Response, error)
 }
 
+// StudentProfile 是学生端自己的可见资料。独立于后台 UserVO，避免学生端
+// 的头像和个人资料编辑能力影响单位管理员、超级管理员的用户管理接口。
+type StudentProfile struct {
+	ID         string `json:"id"`
+	Code       string `json:"code"`
+	Name       string `json:"name"`
+	Avatar     string `json:"avatar"`
+	Birth      int64  `json:"birth"`
+	Gender     int    `json:"gender"`
+	EnrollYear int    `json:"enrollYear"`
+	Grade      int    `json:"grade"`
+	Class      int    `json:"class"`
+}
+
+type UpdateStudentProfileInput struct {
+	Name   string `json:"name"`
+	Avatar string `json:"avatar"`
+	Birth  int64  `json:"birth"`
+	Gender int    `json:"gender"`
+}
+
 type UserService struct {
 	UserDomain usr.IUserDomainSVC
 	UserMapper user.IMongoMapper
@@ -159,6 +180,68 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 	}, nil
 }
 
+func (u *UserService) GetStudentProfile(ctx context.Context) (*StudentProfile, error) {
+	meta, err := u.AuthDomain.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	userID, err := bson.ObjectIDFromHex(meta.UserId)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams)
+	}
+	student, err := u.UserMapper.FindOneById(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	unitDAO, err := u.UnitMapper.FindOneById(ctx, student.UnitID)
+	if err != nil {
+		return nil, err
+	}
+	birth := int64(0)
+	if !student.Birth.IsZero() {
+		birth = student.Birth.Unix()
+	}
+	avatar := strings.TrimSpace(student.Avatar)
+	if avatar != "" && !strings.HasPrefix(avatar, "http://") && !strings.HasPrefix(avatar, "https://") {
+		avatar = "https://" + strings.TrimLeft(avatar, "/")
+	}
+	return &StudentProfile{
+		ID: student.ID.Hex(), Code: student.Code, Name: student.Name,
+		Avatar: avatar, Birth: birth, Gender: student.Gender,
+		EnrollYear: student.EnrollYear, Grade: student.CalculateGrade(unitDAO.StartGrade),
+		Class: student.Class,
+	}, nil
+}
+
+func (u *UserService) UpdateStudentProfile(ctx context.Context, input *UpdateStudentProfileInput) (*StudentProfile, error) {
+	meta, err := u.AuthDomain.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	userID, err := bson.ObjectIDFromHex(meta.UserId)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams)
+	}
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "姓名"))
+	}
+	if input.Gender < 0 || input.Gender > 3 {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "性别"))
+	}
+	update := bson.M{
+		cst.Name: name, "avatar": strings.TrimSpace(input.Avatar),
+		cst.Gender: input.Gender, cst.UpdateTime: time.Now(),
+	}
+	if input.Birth > 0 {
+		update[cst.Birth] = time.Unix(input.Birth, 0)
+	}
+	if err = u.UserMapper.UpdateFields(ctx, userID, update); err != nil {
+		return nil, err
+	}
+	return u.GetStudentProfile(ctx)
+}
+
 func (u *UserService) UserUpdateInfo(ctx context.Context, req *core_api.UserUpdateInfoReq) (*basic.Response, error) {
 	// 参数校验
 	if req.User.Id == "" {
@@ -197,7 +280,7 @@ func (u *UserService) UserUpdateInfo(ctx context.Context, req *core_api.UserUpda
 		}
 		update[cst.Options] = optionsAnypb
 	}
-	update[cst.UpdateTime] = time.Now().Unix()
+	update[cst.UpdateTime] = time.Now()
 
 	// 一次更新所有字段
 	if len(update) > 0 {
