@@ -267,7 +267,7 @@ func (e *Engine) Close() (err error) {
 			}
 
 			// 再次查询最新的消息总数以确定是否有变化
-			latestMsgs, _ := his.Mgr.GetUserDailyMessages(pCtx, e.uSession, -1)
+			latestMsgs, _ := his.Mgr.GetConversationMessages(pCtx, e.uSession, -1)
 			currentTotal := len(latestMsgs)
 
 			// 只有消息数增加了，才执行更新和 MQ

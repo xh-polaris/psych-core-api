@@ -44,11 +44,11 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	userId := e.info[cst.JsonUserID].(string)
 
 	hisStart := time.Now()
-	mMsgs, err := his.Mgr.GetUserDailyMessages(ctx, e.uSession, -1)
+	mMsgs, err := his.Mgr.GetConversationMessages(ctx, e.uSession, -1)
 	if err != nil {
 		return errorx.WrapByCode(err, errno.RetrieveHisErr)
 	}
-	logs.Infof("[engine] [dialogue] GetUserDailyMessages in %dms, msgs=%d", time.Since(hisStart).Milliseconds(), len(mMsgs))
+	logs.Infof("[engine] [dialogue] GetConversationMessages in %dms, msgs=%d", time.Since(hisStart).Milliseconds(), len(mMsgs))
 
 	e.count++
 

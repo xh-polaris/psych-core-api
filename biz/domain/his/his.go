@@ -53,7 +53,8 @@ func hashField(index int) string {
 	return strconv.Itoa(index)
 }
 
-func (h *HistoryManager) GetUserDailyMessages(ctx context.Context, convId string, size int) ([]*message.Message, error) {
+// GetConversationMessages 获取单个会话的历史消息
+func (h *HistoryManager) GetConversationMessages(ctx context.Context, convId string, size int) ([]*message.Message, error) {
 	key := msgCacheKey(convId)
 	if msgs, err := h.RetrieveMessageFromCache(ctx, key); err == nil {
 		if size > 0 && len(msgs) > size {
