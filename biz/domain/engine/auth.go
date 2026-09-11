@@ -1,8 +1,6 @@
 package engine
 
 import (
-	"time"
-
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/domain/his"
@@ -36,10 +34,8 @@ func (e *Engine) auth(auth *core.Auth) (bool, error) {
 		e.uSession = bson.NewObjectID().Hex()
 	}
 
-	// 记录初始消息总数，用于后续对比是否有新消息产生
-	userId := e.info[cst.JsonUserID].(string)
-	todayDate := util.FormatDateUTC8(time.Now())
-	if msgs, err := his.Mgr.GetUserDailyMessages(e.ctx, userId, todayDate); err == nil {
+	// 记录当前 conversation 的初始消息数，用于后续判断本次会话是否有新增。
+	if msgs, err := his.Mgr.RetrieveMessage(e.ctx, e.uSession, -1); err == nil {
 		e.initialCount = len(msgs)
 	}
 

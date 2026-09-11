@@ -12,6 +12,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/enum"
 	"github.com/xh-polaris/psych-core-api/types/errno"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // config 配置app与workflow
@@ -33,6 +34,16 @@ func (e *Engine) config() error {
 		return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "llm"))
 	}
 	e.Character = e.pickCharacter(vo.Characters)
+	if e.Character != nil {
+		conversationID, conversationErr := bson.ObjectIDFromHex(e.uSession)
+		characterID, characterErr := bson.ObjectIDFromHex(e.Character.Id)
+		if conversationErr == nil && characterErr == nil {
+			if err = e.convMapper.SetCharacter(e.ctx, conversationID, characterID); err != nil {
+				logs.Errorf("[engine] [config] bind character to conversation err: %v", err)
+				return errorx.WrapByCode(err, errno.AppConfigErr, errorx.KV("app", "character"))
+			}
+		}
+	}
 	logs.Infof("[engine] [config] chat=%s/%s tts=%s/%s asr=%s type=%d",
 		wfc.ChatConfig.Provider, wfc.ChatConfig.BotId,
 		wfc.TTSConfig.Provider, wfc.TTSConfig.Speaker,

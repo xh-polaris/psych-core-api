@@ -45,11 +45,12 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	todayDate := util.FormatDateUTC8(time.Now())
 
 	hisStart := time.Now()
-	mMsgs, err := his.Mgr.GetUserDailyMessages(ctx, userId, todayDate)
+	// 对话上下文严格限定在当前 conversation，避免切换老师时带入上一段会话。
+	mMsgs, err := his.Mgr.RetrieveMessage(ctx, e.uSession, -1)
 	if err != nil {
 		return errorx.WrapByCode(err, errno.RetrieveHisErr)
 	}
-	logs.Infof("[engine] [dialogue] GetUserDailyMessages in %dms, msgs=%d", time.Since(hisStart).Milliseconds(), len(mMsgs))
+	logs.Infof("[engine] [dialogue] RetrieveMessage in %dms, msgs=%d", time.Since(hisStart).Milliseconds(), len(mMsgs))
 
 	e.count++
 

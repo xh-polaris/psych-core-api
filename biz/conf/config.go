@@ -2,6 +2,7 @@ package conf
 
 import (
 	"os"
+	"strconv"
 
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"
@@ -98,6 +99,31 @@ func NewConfig() (*Config, error) {
 	err := conf.Load(path, c)
 	if err != nil {
 		return nil, err
+	}
+	// 本地联调可通过环境变量覆盖集群内地址，无需复制含密钥的配置文件。
+	if value := os.Getenv("PSYCH_LISTEN_ON"); value != "" {
+		c.ListenOn = value
+	}
+	if value := os.Getenv("PSYCH_MONGO_URL"); value != "" && c.Mongo != nil {
+		c.Mongo.URL = value
+	}
+	if value := os.Getenv("PSYCH_REDIS_ADDR"); value != "" {
+		if c.Cache != nil {
+			c.Cache.Addr = value
+		}
+		for i := range c.CacheConf {
+			cacheDB := 0
+			if c.Cache != nil {
+				cacheDB = c.Cache.DB
+			}
+			c.CacheConf[i].Host = value + "/" + strconv.Itoa(cacheDB)
+		}
+	}
+	if value := os.Getenv("PSYCH_RABBITMQ_URL"); value != "" && c.RabbitMQ != nil {
+		c.RabbitMQ.URL = value
+	}
+	if os.Getenv("PSYCH_DISABLE_TELEMETRY") == "1" {
+		c.Telemetry.Disabled = true
 	}
 	err = c.SetUp()
 	if err != nil {

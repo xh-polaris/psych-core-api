@@ -251,10 +251,8 @@ func (e *Engine) Close() (err error) {
 				return
 			}
 
-			// 再次查询最新的消息总数以确定是否有变化
-			userId := e.info[cst.JsonUserID].(string)
-			todayDate := util.FormatDateUTC8(time.Now())
-			latestMsgs, _ := his.Mgr.GetUserDailyMessages(pCtx, userId, todayDate)
+			// 只统计当前 conversation 的消息，避免把同一天其他老师的消息算进来。
+			latestMsgs, _ := his.Mgr.RetrieveMessage(pCtx, e.uSession, -1)
 			currentTotal := len(latestMsgs)
 
 			// 只有消息数增加了，才执行更新和 MQ
