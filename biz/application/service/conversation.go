@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/google/wire"
@@ -22,7 +23,7 @@ type IConversationService interface {
 	CreateConversation(ctx context.Context, req *core_api.CreateConversationReq) (resp *core_api.CreateConversationResp, err error)
 	ListConversations(ctx context.Context, req *core_api.ListConversationsReq) (resp *core_api.ListConversationsResp, err error)
 	GetSingleConv(ctx context.Context, req *core_api.GetSingleConvReq) (resp *core_api.GetSingleConvResp, err error)
-	GetConvByDate(ctx context.Context, req *core_api.GetConvByDateReq) (resp *core_api.GetConvByDateResp, err error)
+	GetConvByDate(ctx context.Context, req *core_api.GetConvByDateReq, characterId string) (resp *core_api.GetConvByDateResp, err error)
 	ArchiveConversation(ctx context.Context, conversationId string) error
 }
 
@@ -106,9 +107,36 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 		return nil, errorx.New(errno.ErrListConversation)
 	}
 
-	// 历史记录按会话分页。旧逻辑先按日期去重，会导致同一天的多次会话
-	// 只显示最后一条，看起来像记录没有生成。
-	total := int32(len(convs))
+	// 学生历史按「日期 + 对话角色」组织。同一天与同一老师的多场会话
+	// 在列表中只占一项，详情通过 get_by_date 合并展示。
+	type dailyConversation struct {
+		date        string
+		characterId string
+		first       *conversation.Conversation
+	}
+	dailyMap := make(map[string]*dailyConversation)
+	for _, conv := range convs {
+		date := util.FormatDateUTC8(conv.CreateTime)
+		characterId := conv.CharacterID.Hex()
+		key := date + ":" + characterId
+		group := dailyMap[key]
+		if group == nil {
+			dailyMap[key] = &dailyConversation{date: date, characterId: characterId, first: conv}
+			continue
+		}
+		if conv.UpdateTime.After(group.first.UpdateTime) {
+			group.first = conv
+		}
+	}
+	daily := make([]*dailyConversation, 0, len(dailyMap))
+	for _, group := range dailyMap {
+		daily = append(daily, group)
+	}
+	sort.Slice(daily, func(i, j int) bool {
+		return daily[i].first.UpdateTime.After(daily[j].first.UpdateTime)
+	})
+
+	total := int32(len(daily))
 	if total == 0 {
 		return &core_api.ListConversationsResp{
 			Pagination: util.PaginationRes(0, pg),
@@ -119,14 +147,15 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 
 	startIdx, endIdx := util.PagedIndex(total, pg)
 	result := make([]*core_api.ConversationVO, 0, endIdx-startIdx)
-	for _, conv := range convs[startIdx:endIdx] {
+	for _, group := range daily[startIdx:endIdx] {
+		conv := group.first
 		result = append(result, &core_api.ConversationVO{
 			ConversationId: conv.ID.Hex(),
-			Brief:          conv.Title,
+			Brief:          group.date,
 			CreateTime:     conv.CreateTime.Unix(),
 			UpdateTime:     conv.UpdateTime.Unix(),
-			Date:           util.FormatDateUTC8(conv.CreateTime),
-			CharacterId:    conv.CharacterID.Hex(),
+			Date:           group.date,
+			CharacterId:    group.characterId,
 		})
 	}
 
@@ -139,7 +168,7 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 }
 
 // GetConvByDate 返回用户指定日期的对话消息
-func (c *ConversationService) GetConvByDate(ctx context.Context, req *core_api.GetConvByDateReq) (resp *core_api.GetConvByDateResp, err error) {
+func (c *ConversationService) GetConvByDate(ctx context.Context, req *core_api.GetConvByDateReq, characterId string) (resp *core_api.GetConvByDateResp, err error) {
 	// 提取当前用户userId
 	userMeta, err := c.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
@@ -164,6 +193,39 @@ func (c *ConversationService) GetConvByDate(ctx context.Context, req *core_api.G
 	msgs, err := his.Mgr.GetUserDailyMessages(ctx, userId, req.Date)
 	if err != nil {
 		return nil, errorx.New(errno.ErrFetchMessages)
+	}
+
+	// 学生端按老师隔离每日记录，防止同一天切换老师后消息混在一起。
+	if characterId != "" {
+		characterOID, parseErr := bson.ObjectIDFromHex(characterId)
+		if parseErr != nil {
+			return nil, errorx.New(errno.ErrInvalidParams)
+		}
+		userOID, parseErr := bson.ObjectIDFromHex(userId)
+		if parseErr != nil {
+			return nil, errorx.New(errno.ErrInvalidParams)
+		}
+		start, end, rangeErr := util.DayToUTCRange(req.Date)
+		if rangeErr != nil {
+			return nil, errorx.New(errno.ErrInvalidParams)
+		}
+		convs, findErr := c.ConversationMapper.FindByUserIdAndTimeRange(ctx, userOID, start, end)
+		if findErr != nil {
+			return nil, errorx.New(errno.ErrFetchMessages)
+		}
+		allowed := make(map[bson.ObjectID]struct{})
+		for _, conv := range convs {
+			if conv.CharacterID == characterOID {
+				allowed[conv.ID] = struct{}{}
+			}
+		}
+		filtered := make([]*message.Message, 0, len(msgs))
+		for _, msg := range msgs {
+			if _, ok := allowed[msg.ConversationId]; ok {
+				filtered = append(filtered, msg)
+			}
+		}
+		msgs = filtered
 	}
 
 	// 分页并重新排序
