@@ -14,7 +14,7 @@ func customizedRegister(r *server.Hertz) {
 	r.GET("/chat", handler.Chat)
 	r.POST("/file/upload", handler.UploadImage)
 	r.POST("/student/avatar/upload", handler.UploadAvatar)
-	r.POST("/conversation/finish", coreAPIHandler.FinishConversation)
+	r.POST("/conversation/archive", coreAPIHandler.ArchiveConversation)
 	r.GET("/student/profile", coreAPIHandler.GetStudentProfile)
 	r.POST("/student/profile", coreAPIHandler.UpdateStudentProfile)
 	// your code ...

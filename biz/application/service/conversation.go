@@ -23,7 +23,7 @@ type IConversationService interface {
 	ListConversations(ctx context.Context, req *core_api.ListConversationsReq) (resp *core_api.ListConversationsResp, err error)
 	GetSingleConv(ctx context.Context, req *core_api.GetSingleConvReq) (resp *core_api.GetSingleConvResp, err error)
 	GetConvByDate(ctx context.Context, req *core_api.GetConvByDateReq) (resp *core_api.GetConvByDateResp, err error)
-	FinishConversation(ctx context.Context, conversationId string) error
+	ArchiveConversation(ctx context.Context, conversationId string) error
 }
 
 type ConversationService struct {
@@ -234,7 +234,7 @@ func (c *ConversationService) GetSingleConv(ctx context.Context, req *core_api.G
 	}, nil
 }
 
-func (c *ConversationService) FinishConversation(ctx context.Context, conversationId string) error {
+func (c *ConversationService) ArchiveConversation(ctx context.Context, conversationId string) error {
 	userMeta, err := c.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return err
