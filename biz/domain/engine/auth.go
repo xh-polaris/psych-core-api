@@ -35,7 +35,7 @@ func (e *Engine) auth(auth *core.Auth) (bool, error) {
 	}
 
 	// 记录初始消息总数，用于后续对比是否有新消息产生
-	if msgs, err := his.Mgr.GetUserDailyMessages(e.ctx, e.uSession, -1); err == nil {
+	if msgs, err := his.Mgr.GetConversationMessages(e.ctx, e.uSession, -1); err == nil {
 		e.initialCount = len(msgs)
 	}
 

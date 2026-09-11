@@ -35,7 +35,6 @@ type IMongoMapper interface {
 	FindWritableByUserDateAndCharacter(ctx context.Context, userId bson.ObjectID, chatDate string, characterID bson.ObjectID) (*Conversation, error)
 	FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error)
 	FindByUserIdAndTimeRange(ctx context.Context, userId bson.ObjectID, start, end time.Time) ([]*Conversation, error)
-	FindDistinctDatesByUserId(ctx context.Context, userId bson.ObjectID, start, end time.Time) ([]string, error)
 	FindManyByUnitId(ctx context.Context, unitId *bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
 	// 修改
 	SetActive(ctx context.Context, conversationId bson.ObjectID) error
@@ -1455,10 +1454,9 @@ func (m *mongoMapper) ConvDurationByGradeByClassList(ctx context.Context, grades
 // getUserIdsByGradesClasses 根据年级和班级获取用户 ID 列表（内部复用方法）
 func (m *mongoMapper) FindByUserIdAndTimeRange(ctx context.Context, userId bson.ObjectID, start, end time.Time) ([]*Conversation, error) {
 	filter := bson.M{
-		cst.UserID:      userId,
-		cst.Status:      enum.ConversationStatusActive,
-		cst.ChatDate:    bson.M{"$type": "string"},
-		cst.CharacterID: bson.M{"$type": "objectId"},
+		cst.UserID:   userId,
+		cst.Status:   enum.ConversationStatusActive,
+		cst.ChatDate: bson.M{"$type": "string"},
 	}
 	if !start.IsZero() || !end.IsZero() {
 		ct := bson.M{}
@@ -1472,57 +1470,8 @@ func (m *mongoMapper) FindByUserIdAndTimeRange(ctx context.Context, userId bson.
 			filter[cst.CreateTime] = ct
 		}
 	}
-	opts := options.Find().SetSort(bson.M{cst.CreateTime: 1})
+	opts := options.Find().SetSort(bson.M{cst.UpdateTime: -1})
 	return m.FindManyWithOption(ctx, filter, opts)
-}
-
-func (m *mongoMapper) FindDistinctDatesByUserId(ctx context.Context, userId bson.ObjectID, start, end time.Time) ([]string, error) {
-	matchStage := bson.M{
-		cst.UserID:      userId,
-		cst.Status:      enum.ConversationStatusActive,
-		cst.ChatDate:    bson.M{"$type": "string"},
-		cst.CharacterID: bson.M{"$type": "objectId"},
-	}
-	if !start.IsZero() || !end.IsZero() {
-		ct := bson.M{}
-		if !start.IsZero() {
-			ct[cst.GTE] = start
-		}
-		if !end.IsZero() {
-			ct[cst.LT] = end
-		}
-		if len(ct) > 0 {
-			matchStage[cst.CreateTime] = ct
-		}
-	}
-
-	pipeline := []bson.M{
-		{"$match": matchStage},
-		{"$addFields": bson.M{
-			"localDate": bson.M{
-				"$dateToString": bson.M{
-					"format": "%Y-%m-%d",
-					"date":   bson.M{"$add": bson.A{"$" + cst.CreateTime, 8 * 60 * 60 * 1000}},
-				},
-			},
-		}},
-		{"$group": bson.M{cst.ID: "$localDate"}},
-		{"$sort": bson.M{cst.ID: -1}},
-	}
-
-	var results []struct {
-		Date string `bson:"_id"`
-	}
-	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
-		logs.Errorf("[conversation mapper] find distinct dates err: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-
-	dates := make([]string, len(results))
-	for i, r := range results {
-		dates[i] = r.Date
-	}
-	return dates, nil
 }
 
 func (m *mongoMapper) getUserIdsByGradesClasses(ctx context.Context, grades, classes []int32) ([]bson.ObjectID, error) {
