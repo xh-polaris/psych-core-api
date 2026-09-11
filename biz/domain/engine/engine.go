@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/application/service"
-	"github.com/xh-polaris/psych-core-api/biz/domain/his"
-	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/hertz-contrib/websocket"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
@@ -26,6 +24,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/pkg/wsx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // 目前当websocket层出现问题, engine会直接结束, 并未处理可恢复错误而是强制由客户端尝试重连
@@ -59,15 +58,12 @@ type Engine struct {
 	heartbeatTicker *time.Ticker    // heartbeatTicker 是心跳计时器
 
 	// 记录
-	start        time.Time      // 开始时间
-	count        int            // 对话轮数 (当前会话新产生的)
-	initialCount int            // 初始消息总数
-	info         map[string]any // 基本信息
-	isAuth       bool           // 是否认证
-	uSession     string         // uSession 对话ID
-	usage        *core.Usage    // 用量
-	conf         *core.Config
-	Character    *core.CharacterInfo // 心理老师形象, 由前端指定或取config默认
+	info      map[string]any // 基本信息
+	isAuth    bool           // 是否认证
+	uSession  string         // uSession 对话ID
+	usage     *core.Usage    // 用量
+	conf      *core.Config
+	Character *core.CharacterInfo // 心理老师形象, 由前端指定或取config默认
 
 	usrSvc     *service.UserService
 	cfgSvc     *service.ConfigService
@@ -79,7 +75,7 @@ func NewEngine(ctx context.Context, conn *websocket.Conn, usrSvc *service.UserSe
 	ctx, cancel := context.WithCancel(ctx)
 	e := &Engine{
 		ctx: ctx, cancel: cancel, wsx: wsx.NewHZWSClient(conn), usage: &core.Usage{}, heartbeatTicker: time.NewTicker(heartbeatTimeout),
-		start: time.Now(), meta: meta, info: make(map[string]any), errs: make(chan error, 3),
+		meta: meta, info: make(map[string]any), errs: make(chan error, 3),
 		usrSvc: usrSvc, cfgSvc: cfgSvc, convMapper: convMapper,
 	}
 	//e.wsx.SetCloseHandler(func(code int, text string) (err error) { // 处理close消息
@@ -218,6 +214,58 @@ func (e *Engine) Unlock() error {
 	return nil
 }
 
+// triggerReportSegment 连接结束时触发一个报告段
+func (e *Engine) triggerReportSegment() {
+	if !conf.GetConfig().PostProcessEnabled() || !e.isAuth {
+		return
+	}
+	convID, err := bson.ObjectIDFromHex(e.uSession)
+	if err != nil {
+		return
+	}
+	// 连接的 ctx 此时已被取消，使用独立的带超时 context 执行查询与投递
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	conv, err := e.convMapper.FindOneById(ctx, convID)
+	if err != nil {
+		logs.Errorf("[engine] [report] load conversation err: %s", errorx.ErrorWithoutStack(err))
+		return
+	}
+	if conv.LastMessageAt.IsZero() {
+		return
+	}
+	// 首段起点沿用当天 00:00：早于当天首条消息，下游左开区间 (start, end] 不会漏首条
+	// 后续段起点 = last_report_at（上一段末条消息时间），相邻段不重不漏
+	start := conv.LastReportAt
+	if start.IsZero() {
+		if start, _, err = util.DayToUTCRange(conv.ChatDate); err != nil {
+			logs.Errorf("[engine] [report] parse chat date err: %s", errorx.ErrorWithoutStack(err))
+			return
+		}
+	}
+	end := conv.LastMessageAt
+	if !end.After(start) {
+		return
+	}
+
+	notify := &core.PostNotify{
+		Session: conv.ID.Hex(),
+		Usage:   &core.Usage{},
+		Info: map[string]any{
+			cst.JsonUserID: e.getID(e.info, cst.JsonUserID),
+			cst.JsonUnitID: e.getID(e.info, cst.JsonUnitID),
+			cst.JsonCode:   e.getID(e.info, cst.JsonCode),
+		},
+		Start: start.Unix(),
+		End:   end.Unix() + 1,
+		Date:  conv.ChatDate,
+	}
+	if err = mq.GetPostProducer().Produce(ctx, notify); err != nil {
+		logs.Errorf("[engine] [report] produce post notify err: %s", errorx.ErrorWithoutStack(err))
+	}
+}
+
 // Close 释放engine的资源
 func (e *Engine) Close() (err error) {
 	logs.Infof("[engine] %s closed by %s", e.uSession, util.CallerInfo(2))
@@ -234,74 +282,11 @@ func (e *Engine) Close() (err error) {
 		// 关闭主线程的ws连接
 		_ = e.wsx.Close()
 
-		// 只有认证过的连接才进行后处理
-		if !e.isAuth {
-			return
-		}
+		// 连接结束即本次对话结束触发一个报告段
+		e.triggerReportSegment()
 
-		// 使用背景上下文进行最后的操作, 避免受到e.ctx被cancel的影响
-		pCtx, pCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer pCancel()
-
-		// 检查数据库中会话是否依然有效
-		if oid, err := bson.ObjectIDFromHex(e.uSession); err == nil {
-			active, _ := e.convMapper.IsActive(pCtx, oid)
-			if !active {
-				logs.Infof("[engine] %s is not active in DB, skip post process", e.uSession)
-				return
-			}
-
-			// 再次查询最新的消息总数以确定是否有变化
-			userId := e.info[cst.JsonUserID].(string)
-			todayDate := util.FormatDateUTC8(time.Now())
-			latestMsgs, _ := his.Mgr.GetUserDailyMessages(pCtx, userId, todayDate)
-			currentTotal := len(latestMsgs)
-
-			// 只有消息数增加了，才执行更新和 MQ
-			if currentTotal <= e.initialCount && e.count == 0 {
-				logs.Infof("[engine] %s message count no change (%d -> %d), skip post process", e.uSession, e.initialCount, currentTotal)
-				return
-			}
-
-			// 更新会话信息 (时间、消息数、角色)
-			update := bson.M{
-				cst.StartTime:    e.start,
-				cst.EndTime:      time.Now(),
-				cst.MessageCount: currentTotal,
-			}
-			if e.Character != nil && e.Character.Id != "" {
-				if charOID, err := bson.ObjectIDFromHex(e.Character.Id); err == nil {
-					update[cst.CharacterID] = charOID
-				}
-			}
-			if err = e.convMapper.UpdateFields(pCtx, oid, update); err != nil {
-				logs.Error("[engine] update conversation time err: %v", err)
-			}
-		}
-
-		// 发布 MQ 通知
-		if err = mq.GetPostProducer().Produce(pCtx, e.buildPostNotify(time.Now())); err != nil {
-			// 发送失败需要详细记录日志, 以进行后续托底
-			logs.Error("[engine] produce notify error: %s with such state: session:%s start: %d end:%d info:%+v config:%+v", err, e.uSession, e.start, time.Now(), e.info, e.conf)
-			return
-		}
 	})
 	return nil
-}
-
-// buildPostNotify 构造后处理消息体
-func (e *Engine) buildPostNotify(end time.Time) *core.PostNotify {
-	return &core.PostNotify{
-		Session: e.uSession,
-		// 根层级的 UserId 和 UnitId 留空，因为它们已经存在于 Info 字典中了
-		Usage:     e.usage,
-		Info:      e.info,
-		Start:     e.start.Unix(),
-		End:       end.Unix(),
-		Config:    e.conf,
-		Date:      util.FormatDateUTC8(end),
-		Character: e.Character,
-	}
 }
 
 // getID 强效提取 ID 逻辑 (兼容 string 和 ObjectID)

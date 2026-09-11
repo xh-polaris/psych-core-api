@@ -89,6 +89,8 @@ func NewProvider() (*Provider, error) {
 		AuthDomain:         authDomain,
 		MessageMapper:      messageIMongoMapper,
 		ConversationMapper: conversationIMongoMapper,
+		UserMapper:         iMongoMapper,
+		Config:             confConfig,
 	}
 	storageProvider := storage.NewCOS(confConfig)
 	fileService := service.FileService{

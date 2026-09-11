@@ -32,13 +32,14 @@ type IMongoMapper interface {
 	CountByUserIds(ctx context.Context, userIds []bson.ObjectID) (int32, error)
 	FindManyByUserId(ctx context.Context, userId bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
 	FindManyByUserIds(ctx context.Context, userIds []bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
-	FindWritableByUserAndDate(ctx context.Context, userId bson.ObjectID, chatDate string) (*Conversation, error)
+	FindWritableByUserDateAndCharacter(ctx context.Context, userId bson.ObjectID, chatDate string, characterID bson.ObjectID) (*Conversation, error)
 	FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error)
 	FindByUserIdAndTimeRange(ctx context.Context, userId bson.ObjectID, start, end time.Time) ([]*Conversation, error)
 	FindDistinctDatesByUserId(ctx context.Context, userId bson.ObjectID, start, end time.Time) ([]string, error)
 	FindManyByUnitId(ctx context.Context, unitId *bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
 	// 修改
 	ActivatePending(ctx context.Context, conversationId bson.ObjectID) error
+	RecordMessage(ctx context.Context, conversationId bson.ObjectID, at time.Time) error
 	// 聚合统计
 	CountUnitConvByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 	CountUserDailyConv(ctx context.Context, userId bson.ObjectID) (map[int32]int32, error)
@@ -101,12 +102,14 @@ func (m *mongoMapper) Exists(ctx context.Context, conversationId bson.ObjectID) 
 	return count > 0, nil
 }
 
-// FindWritableByUserAndDate 查询用户当天可继续写入的会话。当天只允许一条 Pending 或 Active 会话。
-func (m *mongoMapper) FindWritableByUserAndDate(ctx context.Context, userId bson.ObjectID, chatDate string) (*Conversation, error) {
+// FindWritableByUserDateAndCharacter 查询用户某天、某位老师可继续写入的会话。
+// 唯一维度为 (user_id, chat_date, character_id)，当天同一老师只允许一条 Pending 或 Active 会话。
+func (m *mongoMapper) FindWritableByUserDateAndCharacter(ctx context.Context, userId bson.ObjectID, chatDate string, characterID bson.ObjectID) (*Conversation, error) {
 	conv := &Conversation{}
 	filter := bson.M{
-		cst.UserID:   userId,
-		cst.ChatDate: chatDate,
+		cst.UserID:      userId,
+		cst.ChatDate:    chatDate,
+		cst.CharacterID: characterID,
 		cst.Status: bson.M{cst.In: []int{
 			enum.ConversationStatusPending,
 			enum.ConversationStatusActive,
@@ -116,6 +119,15 @@ func (m *mongoMapper) FindWritableByUserAndDate(ctx context.Context, userId bson
 		return nil, err
 	}
 	return conv, nil
+}
+
+func (m *mongoMapper) RecordMessage(ctx context.Context, conversationId bson.ObjectID, at time.Time) error {
+	_, err := m.conn.UpdateOneNoCache(ctx, bson.M{cst.ID: conversationId}, bson.M{
+		"$min": bson.M{cst.StartTime: at},
+		"$max": bson.M{cst.EndTime: at, cst.LastMessageAt: at},
+		"$set": bson.M{cst.UpdateTime: at},
+	})
+	return err
 }
 
 // CountByUnit 统计对话数量，unitId 为空表示全平台
@@ -1442,8 +1454,10 @@ func (m *mongoMapper) ConvDurationByGradeByClassList(ctx context.Context, grades
 // getUserIdsByGradesClasses 根据年级和班级获取用户 ID 列表（内部复用方法）
 func (m *mongoMapper) FindByUserIdAndTimeRange(ctx context.Context, userId bson.ObjectID, start, end time.Time) ([]*Conversation, error) {
 	filter := bson.M{
-		cst.UserID: userId,
-		cst.Status: enum.ConversationStatusActive,
+		cst.UserID:      userId,
+		cst.Status:      enum.ConversationStatusActive,
+		cst.ChatDate:    bson.M{"$type": "string"},
+		cst.CharacterID: bson.M{"$type": "objectId"},
 	}
 	if !start.IsZero() || !end.IsZero() {
 		ct := bson.M{}
@@ -1463,8 +1477,10 @@ func (m *mongoMapper) FindByUserIdAndTimeRange(ctx context.Context, userId bson.
 
 func (m *mongoMapper) FindDistinctDatesByUserId(ctx context.Context, userId bson.ObjectID, start, end time.Time) ([]string, error) {
 	matchStage := bson.M{
-		cst.UserID: userId,
-		cst.Status: enum.ConversationStatusActive,
+		cst.UserID:      userId,
+		cst.Status:      enum.ConversationStatusActive,
+		cst.ChatDate:    bson.M{"$type": "string"},
+		cst.CharacterID: bson.M{"$type": "objectId"},
 	}
 	if !start.IsZero() || !end.IsZero() {
 		ct := bson.M{}

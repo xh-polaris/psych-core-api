@@ -90,7 +90,7 @@ func (e *Engine) pickCharacter(characters []*core_api.Character) *core.Character
 	if len(characters) == 0 {
 		return nil
 	}
-	characterId, _ := e.info["characterId"].(string)
+	characterId, _ := e.info[cst.JsonCharacterID].(string)
 	for _, ch := range characters {
 		if int(ch.Status) != enum.ConfigStatusActive {
 			continue

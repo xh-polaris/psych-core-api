@@ -1,11 +1,8 @@
 package engine
 
 import (
-	"time"
-
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
-	"github.com/xh-polaris/psych-core-api/biz/domain/his"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/core"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
@@ -36,14 +33,7 @@ func (e *Engine) auth(auth *core.Auth) (bool, error) {
 		e.uSession = bson.NewObjectID().Hex()
 	}
 
-	// 记录初始消息总数，用于后续对比是否有新消息产生
-	userId := e.info[cst.JsonUserID].(string)
-	todayDate := util.FormatDateUTC8(time.Now())
-	if msgs, err := his.Mgr.GetUserDailyMessages(e.ctx, userId, todayDate); err == nil {
-		e.initialCount = len(msgs)
-	}
-
-	logs.Infof("[engine] [auth] info: %+v, merr: %+v, uSession: %s, initialCount: %d", alreadyAuth, merr, e.uSession, e.initialCount)
+	logs.Infof("[engine] [auth] info: %+v, merr: %+v, uSession: %s", alreadyAuth, merr, e.uSession)
 	return true, e.MWrite(core.MAuth, alreadyAuth) // 前端收到Auth响应后, 需要显示配置中
 }
 
