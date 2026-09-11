@@ -148,10 +148,6 @@ func (h *HistoryManager) AddMessage(ctx context.Context, msg *message.Message) e
 		logs.Errorf("[his] add message err: %s", err)
 		return err
 	}
-	if err := h.convMapper.RecordMessage(ctx, msg.ConversationId, msg.CreateTime); err != nil {
-		logs.Errorf("[his] record conversation message err: %s", err)
-		return err
-	}
 
 	convIdHex := msg.ConversationId.Hex()
 

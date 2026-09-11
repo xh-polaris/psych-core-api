@@ -44,8 +44,6 @@ const (
 	RiskLevel      = "risk_level"
 	Remark         = "remark"
 	URI            = "uri"
-	LastMessageAt  = "last_message_at"
-	LastReportAt   = "last_report_at"
 	CharacterID    = "character_id"
 	VoiceType      = "voice_type"
 

@@ -50,6 +50,8 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	}
 	logs.Infof("[engine] [dialogue] GetUserDailyMessages in %dms, msgs=%d", time.Since(hisStart).Milliseconds(), len(mMsgs))
 
+	e.count++
+
 	oids, err := util.ObjectIDsFromHex(e.uSession, userId)
 	if err != nil {
 		return errorx.WrapByCode(err, errno.RetrieveHisErr)

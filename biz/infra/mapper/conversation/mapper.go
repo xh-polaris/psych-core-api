@@ -39,7 +39,6 @@ type IMongoMapper interface {
 	FindManyByUnitId(ctx context.Context, unitId *bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
 	// 修改
 	ActivatePending(ctx context.Context, conversationId bson.ObjectID) error
-	RecordMessage(ctx context.Context, conversationId bson.ObjectID, at time.Time) error
 	// 聚合统计
 	CountUnitConvByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 	CountUserDailyConv(ctx context.Context, userId bson.ObjectID) (map[int32]int32, error)
@@ -119,15 +118,6 @@ func (m *mongoMapper) FindWritableByUserDateAndCharacter(ctx context.Context, us
 		return nil, err
 	}
 	return conv, nil
-}
-
-func (m *mongoMapper) RecordMessage(ctx context.Context, conversationId bson.ObjectID, at time.Time) error {
-	_, err := m.conn.UpdateOneNoCache(ctx, bson.M{cst.ID: conversationId}, bson.M{
-		"$min": bson.M{cst.StartTime: at},
-		"$max": bson.M{cst.EndTime: at, cst.LastMessageAt: at},
-		"$set": bson.M{cst.UpdateTime: at},
-	})
-	return err
 }
 
 // CountByUnit 统计对话数量，unitId 为空表示全平台
