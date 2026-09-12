@@ -27,6 +27,9 @@ type IMongoMapper interface {
 	mapper.IMongoMapper[Conversation]
 	IsActive(ctx context.Context, conversationId bson.ObjectID) (bool, error)
 	Exists(ctx context.Context, conversationId bson.ObjectID) (bool, error)
+	// IsOwnedBy 校验会话是否归属于指定用户（按 _id + user_id 过滤，非删除状态），
+	// 用于 WS 连接时防止前端传入他人会话 ID 造成越权访问。
+	IsOwnedBy(ctx context.Context, conversationId, userId bson.ObjectID) (bool, error)
 	CountByUnit(ctx context.Context, unitId *bson.ObjectID) (int32, error)
 	CountByUser(ctx context.Context, userId bson.ObjectID) (int32, error)
 	CountByUserIds(ctx context.Context, userIds []bson.ObjectID) (int32, error)
@@ -38,7 +41,6 @@ type IMongoMapper interface {
 	FindManyByUnitId(ctx context.Context, unitId *bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
 	// 修改
 	SetActive(ctx context.Context, conversationId bson.ObjectID) error
-	SetCharacter(ctx context.Context, conversationId, characterId bson.ObjectID) error
 	// 聚合统计
 	CountUnitConvByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 	CountUserDailyConv(ctx context.Context, userId bson.ObjectID) (map[int32]int32, error)
@@ -96,6 +98,19 @@ func (m *mongoMapper) Exists(ctx context.Context, conversationId bson.ObjectID) 
 	count, err := m.conn.CountDocuments(ctx, bson.M{cst.ID: conversationId, cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}})
 	if err != nil {
 		logs.Errorf("[conversation mapper] exists err: %s", errorx.ErrorWithoutStack(err))
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (m *mongoMapper) IsOwnedBy(ctx context.Context, conversationId, userId bson.ObjectID) (bool, error) {
+	count, err := m.conn.CountDocuments(ctx, bson.M{
+		cst.ID:     conversationId,
+		cst.UserID: userId,
+		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+	})
+	if err != nil {
+		logs.Errorf("[conversation mapper] isOwnedBy err: %s", errorx.ErrorWithoutStack(err))
 		return false, err
 	}
 	return count > 0, nil
@@ -782,10 +797,6 @@ func (m *mongoMapper) SetActive(ctx context.Context, cid bson.ObjectID) error {
 		}},
 	)
 	return err
-}
-
-func (m *mongoMapper) SetCharacter(ctx context.Context, cid, characterId bson.ObjectID) error {
-	return m.UpdateFields(ctx, cid, bson.M{cst.CharacterID: characterId})
 }
 
 // CountConversationsByClassList 按班级列表统计对话数量
