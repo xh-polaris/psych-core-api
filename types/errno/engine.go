@@ -21,6 +21,7 @@ const (
 	ConfigErr = 999_004_000
 
 	ExistConn    = 999_005_000
+	ConvNotOwned  = 999_005_001
 	AlertSms     = 999_006_001
 	AlertSmsSend = 999_006_002
 	AlertResolve = 999_006_003
@@ -92,6 +93,11 @@ func init() {
 		ExistConn,
 		"用户连接数已满, 请先关闭先前的连接",
 		code.WithAffectStability(true))
+	code.Register(
+		ConvNotOwned,
+		"会话不属于当前用户",
+		code.WithAffectStability(true),
+	)
 	code.Register(
 		AlertSms,
 		"SMS告警发送已达每日上限",

@@ -285,15 +285,10 @@ func (e *Engine) Close() (err error) {
 				endTime = latestMsgs[0].CreateTime
 			}
 
-			// 更新会话信息 (时间、角色)
+			// 更新会话信息 (时间) character_id 仅在创建会话时确定
 			update := bson.M{
 				cst.StartTime: e.start,
 				cst.EndTime:   endTime,
-			}
-			if e.Character != nil && e.Character.Id != "" {
-				if charOID, err := bson.ObjectIDFromHex(e.Character.Id); err == nil {
-					update[cst.CharacterID] = charOID
-				}
 			}
 			if err = e.convMapper.UpdateFields(pCtx, oid, update); err != nil {
 				logs.Error("[engine] update conversation time err: %v", err)
