@@ -32,8 +32,9 @@ type IMongoMapper interface {
 	RetrieveByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time, opt *options.FindOptionsBuilder) ([]*Alarm, error)
 	CountByTime(ctx context.Context, unitID bson.ObjectID, start, end time.Time) (int32, error)
 	ExistsById(ctx context.Context, id bson.ObjectID) (bool, error)
-	AggregateStats(ctx context.Context, unitID bson.ObjectID, curStart, curEnd, prevStart, prevEnd time.Time) (*OverviewStats, error)
-	AggregateStatsByClassList(ctx context.Context, unitID bson.ObjectID, grades, classes []int32, curStart, curEnd, prevStart, prevEnd time.Time) (*OverviewStats, error)
+	// 快照口径：统计 create_time <= 截点 的预警存量（按 status 分组），cur 与 prev 为两个对比截点
+	AggregateStats(ctx context.Context, unitID bson.ObjectID, cur, prev time.Time) (*OverviewStats, error)
+	AggregateStatsByClassList(ctx context.Context, unitID bson.ObjectID, grades, classes []int32, cur, prev time.Time) (*OverviewStats, error)
 	BatchExistsByConvId(ctx context.Context, convId []bson.ObjectID) (map[bson.ObjectID]bool, error)
 	// 批量取每个用户最新的一条 alarm 记录（按 create_time 倒序），无记录的用户不出现在结果中
 	BatchFindLatestByUserIds(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*Alarm, error)
@@ -316,15 +317,15 @@ type weekData []struct {
 	Count int32 `bson:"count"`
 }
 
-// AggregateStats 计算预警统计信息：当前周期和对比上一周期变化。零值时间回退到 now / now-7d。
-func (m *mongoMapper) AggregateStats(ctx context.Context, unitID bson.ObjectID, curStart, curEnd, prevStart, prevEnd time.Time) (*OverviewStats, error) {
+// AggregateStats 快照口径统计预警存量：create_time <= 截点 的记录按 status 分组。
+// cur/prev 为两个对比截点（零值回退 now / now-7d）。processed/pending 以当前 status 近似历史时点。
+func (m *mongoMapper) AggregateStats(ctx context.Context, unitID bson.ObjectID, cur, prev time.Time) (*OverviewStats, error) {
 	now := time.Now()
-	if curEnd.IsZero() {
-		curEnd = now
+	if cur.IsZero() {
+		cur = now
 	}
-	lastweek := now.AddDate(0, 0, -7)
-	if prevEnd.IsZero() {
-		prevEnd = lastweek
+	if prev.IsZero() {
+		prev = now.AddDate(0, 0, -7)
 	}
 
 	pipeline := mongo.Pipeline{
@@ -332,18 +333,18 @@ func (m *mongoMapper) AggregateStats(ctx context.Context, unitID bson.ObjectID, 
 			cst.UnitID: unitID,
 		}}},
 		{{Key: "$facet", Value: bson.M{
-			"currentWeek": []bson.M{
+			"current": []bson.M{
 				{"$match": bson.M{
-					cst.CreateTime: bson.M{cst.GTE: curStart, cst.LTE: curEnd},
+					cst.CreateTime: bson.M{cst.LTE: cur},
 				}},
 				{"$group": bson.M{
 					"_id":   "$" + cst.Status,
 					"count": bson.M{"$sum": 1},
 				}},
 			},
-			"lastWeek": []bson.M{
+			"previous": []bson.M{
 				{"$match": bson.M{
-					cst.CreateTime: bson.M{cst.GTE: prevStart, cst.LTE: prevEnd},
+					cst.CreateTime: bson.M{cst.LTE: prev},
 				}},
 				{"$group": bson.M{
 					"_id":   "$" + cst.Status,
@@ -354,8 +355,8 @@ func (m *mongoMapper) AggregateStats(ctx context.Context, unitID bson.ObjectID, 
 	}
 	// 聚合结果
 	var results []struct {
-		CurrentWeek weekData `bson:"currentWeek"`
-		LastWeek    weekData `bson:"lastWeek"`
+		Current  weekData `bson:"current"`
+		Previous weekData `bson:"previous"`
 	}
 	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
 		return nil, err
@@ -367,16 +368,16 @@ func (m *mongoMapper) AggregateStats(ctx context.Context, unitID bson.ObjectID, 
 	// 构建返回结果
 	stats := OverviewStats{}
 
-	// 解析当前周数据
-	cu, cuTotal := parseWeekData(results[0].CurrentWeek)
+	// 解析当前截点数据
+	cu, cuTotal := parseWeekData(results[0].Current)
 
 	stats.Processed = cu[1] // 已处理
 	stats.Pending = cu[2]   // 待处理
 	stats.Total = cuTotal   // 总数
 	stats.Track = cuTotal   // Track 暂定为总数（已处理+待处理）
 
-	// 解析上周数据
-	lw, lwTotal := parseWeekData(results[0].LastWeek)
+	// 解析对比截点数据
+	lw, lwTotal := parseWeekData(results[0].Previous)
 
 	lwProcessed := lw[1]
 	lwPending := lw[2]
@@ -472,8 +473,8 @@ func (m *mongoMapper) BatchFindLatestByUserIds(ctx context.Context, userIds []bs
 	return result, nil
 }
 
-// AggregateStatsByClassList 按班级列表统计预警数据
-func (m *mongoMapper) AggregateStatsByClassList(ctx context.Context, unitID bson.ObjectID, grades, classes []int32, curStart, curEnd, prevStart, prevEnd time.Time) (*OverviewStats, error) {
+// AggregateStatsByClassList 按班级列表快照口径统计预警存量（同 AggregateStats，班主任按所带班级筛选）
+func (m *mongoMapper) AggregateStatsByClassList(ctx context.Context, unitID bson.ObjectID, grades, classes []int32, cur, prev time.Time) (*OverviewStats, error) {
 	if len(grades) == 0 && len(classes) == 0 {
 		return &OverviewStats{}, nil
 	}
@@ -519,12 +520,11 @@ func (m *mongoMapper) AggregateStatsByClassList(ctx context.Context, unitID bson
 	}
 
 	now := time.Now()
-	if curEnd.IsZero() {
-		curEnd = now
+	if cur.IsZero() {
+		cur = now
 	}
-	lastweek := now.AddDate(0, 0, -7)
-	if prevEnd.IsZero() {
-		prevEnd = lastweek
+	if prev.IsZero() {
+		prev = now.AddDate(0, 0, -7)
 	}
 
 	aggPipeline := mongo.Pipeline{
@@ -532,18 +532,18 @@ func (m *mongoMapper) AggregateStatsByClassList(ctx context.Context, unitID bson
 			cst.UserID: bson.M{cst.In: userIds},
 		}}},
 		{{Key: "$facet", Value: bson.M{
-			"currentWeek": []bson.M{
+			"current": []bson.M{
 				{"$match": bson.M{
-					cst.CreateTime: bson.M{cst.GTE: curStart, cst.LTE: curEnd},
+					cst.CreateTime: bson.M{cst.LTE: cur},
 				}},
 				{"$group": bson.M{
 					"_id":   "$" + cst.Status,
 					"count": bson.M{"$sum": 1},
 				}},
 			},
-			"lastWeek": []bson.M{
+			"previous": []bson.M{
 				{"$match": bson.M{
-					cst.CreateTime: bson.M{cst.GTE: prevStart, cst.LTE: prevEnd},
+					cst.CreateTime: bson.M{cst.LTE: prev},
 				}},
 				{"$group": bson.M{
 					"_id":   "$" + cst.Status,
@@ -554,8 +554,8 @@ func (m *mongoMapper) AggregateStatsByClassList(ctx context.Context, unitID bson
 	}
 
 	var results []struct {
-		CurrentWeek weekData `bson:"currentWeek"`
-		LastWeek    weekData `bson:"lastWeek"`
+		Current  weekData `bson:"current"`
+		Previous weekData `bson:"previous"`
 	}
 	if err := m.conn.Aggregate(ctx, &results, aggPipeline); err != nil {
 		return nil, err
@@ -566,13 +566,13 @@ func (m *mongoMapper) AggregateStatsByClassList(ctx context.Context, unitID bson
 
 	// 构建返回结果
 	stats := OverviewStats{}
-	cu, cuTotal := parseWeekData(results[0].CurrentWeek)
+	cu, cuTotal := parseWeekData(results[0].Current)
 	stats.Processed = cu[1]
 	stats.Pending = cu[2]
 	stats.Total = cuTotal
 	stats.Track = cuTotal
 
-	lw, lwTotal := parseWeekData(results[0].LastWeek)
+	lw, lwTotal := parseWeekData(results[0].Previous)
 	lwProcessed := lw[1]
 	lwPending := lw[2]
 
