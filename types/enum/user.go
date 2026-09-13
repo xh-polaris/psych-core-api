@@ -33,13 +33,30 @@ var UserRoleI2S = map[int32]string{
 	UserRoleSuperAdmin:   "SuperAdmin",
 }
 
-// UserRiskLevel
+// UserRiskLevel（与新报表 simple_report.riskLevel 数值对齐）
 const (
-	UserRiskLevelHigh   = 1
-	UserRiskLevelMedium = 2
-	UserRiskLevelLow    = 3
-	UserRiskLevelNormal = 4
+	UserRiskLevelUnknown = 0 // 未明确提及
+	UserRiskLevelHigh    = 1 // 高风险
+	UserRiskLevelMedium  = 2 // 中高风险
+	UserRiskLevelLow     = 3 // 中低风险
+	UserRiskLevelNormal  = 4 // 低风险
 )
+
+// RiskLevelLabel 将数值风险等级映射为中文标签
+func RiskLevelLabel(level int32) string {
+	switch level {
+	case UserRiskLevelHigh:
+		return "高风险"
+	case UserRiskLevelMedium:
+		return "中高风险"
+	case UserRiskLevelLow:
+		return "中低风险"
+	case UserRiskLevelNormal:
+		return "低风险"
+	default:
+		return "未明确提及"
+	}
+}
 
 // RiskLevelToInt 将报表的字符串风险等级映射为 1-4: High | Medium | Low | Normal
 func RiskLevelToInt(level string) int {

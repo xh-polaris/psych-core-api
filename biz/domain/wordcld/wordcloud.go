@@ -1,3 +1,5 @@
+// Deprecated: 词云域已弃用。v2 报表的关键词由 LLM 直接产出（simple_report.keywords），
+// dashboard 等消费方已改为读报表字段，本包仅保留代码备查，禁止新增调用。
 package wordcld
 
 import (

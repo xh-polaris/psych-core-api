@@ -7,7 +7,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper"
-	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/types/enum"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -30,25 +29,23 @@ type IMongoMapper interface {
 	FindUserLatest(ctx context.Context, userId bson.ObjectID) (*Report, error)
 	FindAllByUser(ctx context.Context, userId bson.ObjectID) ([]*Report, error)
 	BatchFindUserLatest(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*Report, error)
-	BatchGetUserKeyWords(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID][]string, error)
 	FindByConversation(ctx context.Context, sessionId bson.ObjectID) (*Report, error)
 	FindByConversationPreferSuccess(ctx context.Context, sessionId bson.ObjectID) (*Report, error)
 	BatchFindBySession(ctx context.Context, sessionIds []bson.ObjectID) (map[bson.ObjectID]*Report, error)
 	// 词云相关接口
+	// 关键词词云（v2 报表 simple_report.keywords 聚合）
 	GetAllUnitsKW(ctx context.Context, start, end time.Time) (map[string]int32, error)
 	GetUnitKW(ctx context.Context, unitId bson.ObjectID, start, end time.Time) (map[string]int32, error)
 	GetUnitKWByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32, start, end time.Time) (map[string]int32, error)
 	// 心理趋势：取时间段内每个用户最后一份报表的情绪/风险等级/性别
 	GetUserPsychStats(ctx context.Context, unitOID *bson.ObjectID, start, end time.Time, grades, classes []int32) ([]*UserPsychStat, error)
-	// 批量取用户最新报表的风险等级字符串
-	BatchGetUserRiskLevel(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]string, error)
 }
 
 // UserPsychStat 用户心理状态（来自该用户时间段内最后一份报表）
 type UserPsychStat struct {
 	UserID    bson.ObjectID `bson:"_id"`
-	Emotion   string        `bson:"emotion"`   // SimpleReport.Emotion.Type
-	RiskLevel string        `bson:"riskLevel"` // SimpleReport.Summary.RiskLevel
+	Emotion   string        `bson:"emotion"`   // SimpleReport.Emotion 首项
+	RiskLevel int32         `bson:"riskLevel"` // SimpleReport.RiskLevel（0未明确 1高 2中高 3中低 4低）
 	Gender    int32         `bson:"gender"`    // user.gender
 }
 
@@ -122,179 +119,18 @@ func (m *mongoMapper) BatchFindUserLatest(ctx context.Context, userIds []bson.Ob
 	return result, nil
 }
 
-// BatchGetUserKeyWords 获取某单位一批用户的近期关键词，注意关键词可能为空/不存在
-func (m *mongoMapper) BatchGetUserKeyWords(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID][]string, error) {
-	reports, err := m.BatchFindUserLatest(ctx, userIds)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make(map[bson.ObjectID][]string, len(reports))
-	for _, userId := range userIds {
-		report := reports[userId]
-		// 没有报表或报表结果为 nil，关键词为空切片
-		if report == nil || report.Keywords == nil {
-			result[userId] = []string{}
-			continue
-		}
-		// 若存在report，则应存在关键词
-		result[userId] = util.KeywordsMap2Slice(report.Keywords)
-	}
-
-	return result, nil
-}
-
 func (m *mongoMapper) FindAllByUser(ctx context.Context, userId bson.ObjectID) ([]*Report, error) {
 	return m.FindAllByFields(ctx, bson.M{cst.UserID: userId})
 }
 
-// GetAllUnitsKW 统计所有unit的报表的关键词以及它们的个数，优先考虑性能
+// GetAllUnitsKW 统计所有报表 simple_report.keywords 的词频
 func (m *mongoMapper) GetAllUnitsKW(ctx context.Context, start, end time.Time) (map[string]int32, error) {
-	matchFilter := bson.M{
-		cst.Keywords: bson.M{
-			"$exists": true,
-			"$ne":     nil,
-		},
-	}
-	if !start.IsZero() || !end.IsZero() {
-		tf := bson.M{}
-		if !start.IsZero() {
-			tf["$gte"] = start
-		}
-		if !end.IsZero() {
-			tf["$lte"] = end
-		}
-		matchFilter[cst.CreateTime] = tf
-	}
-	pipeline := mongo.Pipeline{
-		{{
-			Key: "$match", Value: matchFilter,
-		}},
-		// 将关键词map转换为数组便于统计
-		{{
-			Key: "$project", Value: bson.M{
-				"keywords": bson.M{"$objectToArray": "$keywords"},
-			},
-		}},
-		// 展开关键词数组，每个关键词成为一个文档
-		{{
-			Key: "$unwind", Value: "$keywords",
-		}},
-		// 按关键词分组并计数
-		{{
-			Key: "$group", Value: bson.M{
-				"_id":   "$keywords.k",
-				"count": bson.M{"$sum": 1},
-			},
-		}},
-		// 输出格式化
-		{{
-			Key: "$project", Value: bson.M{
-				"_id":     0,
-				"keyword": "$_id",
-				"count":   1,
-			},
-		}},
-		// 按计数倒序排列，便于查看高频词汇
-		{{
-			Key: "$sort", Value: bson.M{
-				"count": -1,
-			},
-		}},
-	}
-
-	var results []struct {
-		Keyword string `bson:"keyword"`
-		Count   int32  `bson:"count"`
-	}
-
-	err := m.conn.Aggregate(ctx, &results, pipeline)
-	if err != nil {
-		return nil, err
-	}
-
-	// 转换为map结构
-	wordCloud := make(map[string]int32, len(results))
-	for _, result := range results {
-		wordCloud[result.Keyword] = result.Count
-	}
-
-	return wordCloud, nil
+	return m.aggregateSimpleReportKW(ctx, bson.M{}, start, end)
 }
 
-// GetUnitKW 统计某个unit下报表的关键词及个数，优先考虑性能
+// GetUnitKW 统计某个unit下报表 simple_report.keywords 的词频
 func (m *mongoMapper) GetUnitKW(ctx context.Context, unitId bson.ObjectID, start, end time.Time) (map[string]int32, error) {
-	matchFilter := bson.M{
-		cst.UnitID: unitId,
-		cst.Keywords: bson.M{
-			"$exists": true,
-			"$ne":     nil,
-		},
-	}
-	if !start.IsZero() || !end.IsZero() {
-		tf := bson.M{}
-		if !start.IsZero() {
-			tf["$gte"] = start
-		}
-		if !end.IsZero() {
-			tf["$lte"] = end
-		}
-		matchFilter[cst.CreateTime] = tf
-	}
-	pipeline := mongo.Pipeline{
-		{{
-			Key: "$match", Value: matchFilter,
-		}},
-		// 将关键词map转换为数组便于统计
-		{{
-			Key: "$project", Value: bson.M{
-				"keywords": bson.M{"$objectToArray": "$keywords"},
-			},
-		}},
-		// 展开关键词数组，每个关键词成为一个文档
-		{{
-			Key: "$unwind", Value: "$keywords",
-		}},
-		// 按关键词分组并计数
-		{{
-			Key: "$group", Value: bson.M{
-				"_id":   "$keywords.k",
-				"count": bson.M{"$sum": 1},
-			},
-		}},
-		// 输出格式化
-		{{
-			Key: "$project", Value: bson.M{
-				"_id":     0,
-				"keyword": "$_id",
-				"count":   1,
-			},
-		}},
-		// 按计数倒序排列，便于查看高频词汇
-		{{
-			Key: "$sort", Value: bson.M{
-				"count": -1,
-			},
-		}},
-	}
-
-	var results []struct {
-		Keyword string `bson:"keyword"`
-		Count   int32  `bson:"count"`
-	}
-
-	err := m.conn.Aggregate(ctx, &results, pipeline)
-	if err != nil {
-		return nil, err
-	}
-
-	// 转换为map结构
-	wordCloud := make(map[string]int32, len(results))
-	for _, result := range results {
-		wordCloud[result.Keyword] = result.Count
-	}
-
-	return wordCloud, nil
+	return m.aggregateSimpleReportKW(ctx, bson.M{cst.UnitID: unitId}, start, end)
 }
 
 // FindByConversation 根据对话ID查找报表
@@ -316,33 +152,19 @@ func (m *mongoMapper) FindByConversationPreferSuccess(ctx context.Context, sessi
 	return report, nil
 }
 
-// GetUnitKWByClassList 按班级列表统计报表关键词
+// GetUnitKWByClassList 按班级列表统计报表 simple_report.keywords 的词频
 func (m *mongoMapper) GetUnitKWByClassList(ctx context.Context, unitId bson.ObjectID, grades, classes []int32, start, end time.Time) (map[string]int32, error) {
 	if len(grades) == 0 && len(classes) == 0 {
 		return m.GetUnitKW(ctx, unitId, start, end)
 	}
 
-	matchFilter := bson.M{
-		cst.UnitID: unitId,
-		cst.Status: bson.M{cst.NE: enum.ReportStatusDeleted},
-		cst.Keywords: bson.M{
-			"$exists": true,
-			"$ne":     nil,
-		},
-	}
-	if !start.IsZero() || !end.IsZero() {
-		tf := bson.M{}
-		if !start.IsZero() {
-			tf["$gte"] = start
-		}
-		if !end.IsZero() {
-			tf["$lte"] = end
-		}
-		matchFilter[cst.CreateTime] = tf
-	}
-
+	// 班级筛选需 join user 集合，以报表 create_time 限定窗口
 	pipeline := []bson.M{
-		{"$match": matchFilter},
+		{"$match": bson.M{
+			cst.UnitID:     unitId,
+			cst.Status:     bson.M{cst.NE: enum.ReportStatusDeleted},
+			"simple_report": bson.M{"$exists": true},
+		}},
 		{"$lookup": bson.M{
 			"from":         userCollection,
 			"localField":   cst.UserID,
@@ -364,13 +186,47 @@ func (m *mongoMapper) GetUnitKWByClassList(ctx context.Context, unitId bson.Obje
 	}
 
 	pipeline = append(pipeline,
-		bson.M{"$project": bson.M{"keywords": bson.M{"$objectToArray": "$keywords"}}},
-		bson.M{"$unwind": "$keywords"},
-		bson.M{"$group": bson.M{"_id": "$keywords.k", "count": bson.M{"$sum": 1}}},
+		bson.M{"$unwind": "$simple_report.keywords"},
+		bson.M{"$group": bson.M{"_id": "$simple_report.keywords", "count": bson.M{"$sum": 1}}},
 		bson.M{"$project": bson.M{"_id": 0, "keyword": "$_id", "count": 1}},
 		bson.M{"$sort": bson.M{"count": -1}},
 	)
 
+	return m.aggregateKWResult(ctx, pipeline)
+}
+
+// aggregateSimpleReportKW 按过滤条件聚合 simple_report.keywords 词频（baseMatch 为 unit 等基础过滤）
+func (m *mongoMapper) aggregateSimpleReportKW(ctx context.Context, baseMatch bson.M, start, end time.Time) (map[string]int32, error) {
+	match := bson.M{
+		cst.Status:      bson.M{cst.NE: enum.ReportStatusDeleted},
+		"simple_report": bson.M{"$exists": true},
+	}
+	for k, v := range baseMatch {
+		match[k] = v
+	}
+	if !start.IsZero() || !end.IsZero() {
+		tf := bson.M{}
+		if !start.IsZero() {
+			tf["$gte"] = start
+		}
+		if !end.IsZero() {
+			tf["$lte"] = end
+		}
+		match[cst.CreateTime] = tf
+	}
+
+	pipeline := []bson.M{
+		{"$match": match},
+		{"$unwind": "$simple_report.keywords"},
+		{"$group": bson.M{"_id": "$simple_report.keywords", "count": bson.M{"$sum": 1}}},
+		{"$project": bson.M{"_id": 0, "keyword": "$_id", "count": 1}},
+		{"$sort": bson.M{"count": -1}},
+	}
+	return m.aggregateKWResult(ctx, pipeline)
+}
+
+// aggregateKWResult 执行词频聚合管道并转为 map
+func (m *mongoMapper) aggregateKWResult(ctx context.Context, pipeline []bson.M) (map[string]int32, error) {
 	var results []struct {
 		Keyword string `bson:"keyword"`
 		Count   int32  `bson:"count"`
@@ -378,7 +234,6 @@ func (m *mongoMapper) GetUnitKWByClassList(ctx context.Context, unitId bson.Obje
 	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
 		return nil, err
 	}
-
 	wordCloud := make(map[string]int32, len(results))
 	for _, result := range results {
 		wordCloud[result.Keyword] = result.Count
@@ -412,8 +267,17 @@ func (m *mongoMapper) GetUserPsychStats(ctx context.Context, unitOID *bson.Objec
 		{"$sort": bson.M{cst.CreateTime: -1}},
 		{"$group": bson.M{
 			"_id":       "$" + cst.UserID,
-			"emotion":   bson.M{"$first": "$simple_report.emotion.type"},
-			"riskLevel": bson.M{"$first": "$simple_report.summary.riskLevel"},
+			"emotion":   bson.M{"$first": "$simple_report.emotion"},
+			"riskLevel": bson.M{"$first": "$simple_report.riskLevel"},
+		}},
+		// emotion 为字符串数组（1-3 项），取首项（主导情绪）；空数组兜底"未明确提及"
+		{"$addFields": bson.M{
+			"emotion": bson.M{
+				"$ifNull": bson.A{
+					bson.M{"$arrayElemAt": bson.A{"$emotion", 0}},
+					"未明确提及",
+				},
+			},
 		}},
 		{"$lookup": bson.M{
 			"from":         userCollection,
@@ -449,39 +313,6 @@ func (m *mongoMapper) GetUserPsychStats(ctx context.Context, unitOID *bson.Objec
 		return nil, err
 	}
 	return results, nil
-}
-
-// BatchGetUserRiskLevel 批量取每个用户最新报表的 riskLevel（字符串）
-func (m *mongoMapper) BatchGetUserRiskLevel(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]string, error) {
-	if len(userIds) == 0 {
-		return make(map[bson.ObjectID]string), nil
-	}
-
-	pipeline := []bson.M{
-		{"$match": bson.M{
-			cst.UserID: bson.M{cst.In: userIds},
-			cst.Status: bson.M{cst.NE: enum.ReportStatusDeleted},
-		}},
-		{"$sort": bson.M{cst.CreateTime: -1}},
-		{"$group": bson.M{
-			"_id":       "$" + cst.UserID,
-			"riskLevel": bson.M{"$first": "$simple_report.summary.riskLevel"},
-		}},
-	}
-
-	var results []struct {
-		UserID    bson.ObjectID `bson:"_id"`
-		RiskLevel string        `bson:"riskLevel"`
-	}
-	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
-		return nil, err
-	}
-
-	out := make(map[bson.ObjectID]string, len(results))
-	for _, r := range results {
-		out[r.UserID] = r.RiskLevel
-	}
-	return out, nil
 }
 
 // BatchFindBySession 批量根据会话ID查找报表
