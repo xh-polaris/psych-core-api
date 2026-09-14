@@ -49,6 +49,8 @@ func start() bool {
 	// 连接WebSocket服务器
 	if conn, meta, err = connectWebSocket(); err != nil {
 		log.Println("连接失败:", err)
+		cancel()
+		return false
 	}
 	defer func() { _ = conn.WriteControl(websocket.CloseMessage, []byte{}, time.Now().Add(time.Second)) }()
 	// 启动心跳协程
@@ -89,6 +91,10 @@ func handleUserInput(cancel context.CancelFunc, conn *websocket.Conn, meta *core
 			SendAuthMessage(conn, meta, reader)
 		case "cmd":
 			SendCommandMessage(conn, meta, reader)
+		case "archive":
+			if err := ArchiveSession(); err != nil {
+				log.Println("手动结束会话失败:", err)
+			}
 		case "exit":
 			cancel()
 			return false
@@ -106,7 +112,8 @@ func printMenu() {
 	fmt.Println("\n请选择操作:")
 	fmt.Println("auth. 发送认证消息")
 	fmt.Println("cmd. 发送命令消息")
-	fmt.Println("restart. 重启程序")
+	fmt.Println("archive. 手动结束当前会话（调用 /conversation/archive）")
+	fmt.Println("restart. 重启程序（重新登录并创建新会话）")
 	fmt.Println("exit. 退出程序")
 	fmt.Print("请输入选项: ")
 }

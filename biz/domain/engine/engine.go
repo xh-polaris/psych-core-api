@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/application/service"
@@ -69,6 +70,12 @@ type Engine struct {
 	conf         *core.Config
 	Character    *core.CharacterInfo // 心理老师形象, 由前端指定或取config默认
 
+	// 空闲自动截断与当日上下文
+	lastActive  atomic.Int64 // 最近一次对话活动时间 (UnixNano)，用户命令/模型流式输出/TTS 均会刷新
+	idleOnce    sync.Once    // 保证空闲看门狗只启动一次
+	characterID string       // 当前会话绑定的角色 ID（当日上下文聚合用）
+	chatDate    string       // 当前会话所属日期 UTC+8（当日上下文聚合用）
+
 	usrSvc     *service.UserService
 	cfgSvc     *service.ConfigService
 	convMapper conversation.IMongoMapper
@@ -82,6 +89,7 @@ func NewEngine(ctx context.Context, conn *websocket.Conn, usrSvc *service.UserSe
 		start: time.Now(), meta: meta, info: make(map[string]any), errs: make(chan error, 3),
 		usrSvc: usrSvc, cfgSvc: cfgSvc, convMapper: convMapper,
 	}
+	e.lastActive.Store(time.Now().UnixNano())
 	//e.wsx.SetCloseHandler(func(code int, text string) (err error) { // 处理close消息
 	//	if err = e.wsx.ControlClose(websocket.FormatCloseMessage(code, text)); err != nil { // 给客户端写回一个close消息
 	//		logs.Error("[engine] [close] err: %s", err)

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/bytedance/sonic"
+	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/cache"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
@@ -16,6 +17,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 var Mgr *HistoryManager
@@ -84,6 +86,45 @@ func (h *HistoryManager) RetrieveMessage(ctx context.Context, convId string, siz
 		return nil, err
 	}
 	return h.msgMapper.RetrieveMessage(ctx, convId, size)
+}
+
+// GetDailyMessages 聚合某用户某天、某位老师名下全部会话的消息。
+// singleConv 下当天同一老师可能有多条会话，这里合并后按 create_time 升序返回，
+// 并在内存中把 Index 重新编号为 0..N-1，仅用于读取/展示/LLM 上下文，不回写数据库，
+// 因此不会影响每个会话内部持久化的 Index（存储口径仍按本会话新增计数）。
+func (h *HistoryManager) GetDailyMessages(ctx context.Context, userId, date, characterId string) ([]*message.Message, error) {
+	userOID, err := bson.ObjectIDFromHex(userId)
+	if err != nil {
+		return nil, err
+	}
+	charOID, err := bson.ObjectIDFromHex(characterId)
+	if err != nil {
+		return nil, err
+	}
+
+	convs, err := h.convMapper.FindManyByUserDateAndCharacter(ctx, userOID, date, charOID)
+	if err != nil {
+		return nil, err
+	}
+	if len(convs) == 0 {
+		return []*message.Message{}, nil
+	}
+
+	convIDs := make([]bson.ObjectID, 0, len(convs))
+	for _, conv := range convs {
+		convIDs = append(convIDs, conv.ID)
+	}
+
+	msgs, err := h.msgMapper.FindByConversationIds(ctx, convIDs, options.Find().SetSort(bson.M{cst.CreateTime: 1}))
+	if err != nil {
+		return nil, err
+	}
+	sort.SliceStable(msgs, func(i, j int) bool { return msgs[i].CreateTime.Before(msgs[j].CreateTime) })
+	// 跨会话重新编号，保证整日消息 index 连续
+	for i, msg := range msgs {
+		msg.Index = i
+	}
+	return msgs, nil
 }
 
 // RetrieveMessageFromCache 从 Redis 缓存中获取消息

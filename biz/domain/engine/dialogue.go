@@ -43,12 +43,16 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	execStart := time.Now()
 	userId := e.info[cst.JsonUserID].(string)
 
+	// 当前会话已持久化消息：仅用于本会话内的 index 递增（存储口径只算本 conv 新增）
 	hisStart := time.Now()
-	mMsgs, err := his.Mgr.GetConversationMessages(ctx, e.uSession, -1)
+	convMsgs, err := his.Mgr.GetConversationMessages(ctx, e.uSession, -1)
 	if err != nil {
 		return errorx.WrapByCode(err, errno.RetrieveHisErr)
 	}
-	logs.Infof("[engine] [dialogue] GetConversationMessages in %dms, msgs=%d", time.Since(hisStart).Milliseconds(), len(mMsgs))
+	logs.Infof("[engine] [dialogue] GetConversationMessages in %dms, msgs=%d", time.Since(hisStart).Milliseconds(), len(convMsgs))
+
+	// 当日同角色上下文（升序、跨会话已重编号），不含本次尚未写入的用户消息
+	dayMsgs := e.loadDayMsgs(ctx, userId)
 
 	e.count++
 
@@ -57,8 +61,8 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 		return errorx.WrapByCode(err, errno.RetrieveHisErr)
 	}
 	var index int
-	if len(mMsgs) > 0 {
-		index = int(mMsgs[0].Index) + 1
+	if len(convMsgs) > 0 {
+		index = int(convMsgs[0].Index) + 1
 	}
 	usrMsg := convert.UserMMsg(oids[0], oids[1], cmd.Content.(string), index)
 	hisStart = time.Now()
@@ -67,12 +71,11 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 		return errorx.WrapByCode(err, errno.AddUserMsgErr)
 	}
 	logs.Infof("[engine] [dialogue] AddMessage in %dms", time.Since(hisStart).Milliseconds())
-	mMsgs = append([]*message.Message{usrMsg}, mMsgs...)
 	// 创建模型消息
 	astMsg := convert.AssistantMMsg(oids[0], oids[1], "", index+1)
 
-	// 存储域消息转模型域 (最新在前)
-	eMsgs := convert.MMsgToEMsgList(mMsgs)
+	// 存储域消息转模型域 (最新在前)，上下文为整日对话
+	eMsgs := convert.MMsgToEMsgList(e.buildContextMsgs(dayMsgs, usrMsg))
 
 	// 意图识别阶段: 策略 agent 生成策略 JSON + 加载微技能 (失败自动降级为空)
 	out, skillsText := e.execIntention(ctx, eMsgs)
@@ -88,7 +91,7 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	eMsgs = e.buildDialogueMsgs(ctx, eMsgs, strategyJSON, skillsText)
 	// 建立流前的总耗时 (历史加载 + 意图识别 + system 拼接)
 	logs.Infof("[engine] [dialogue] stream setup in %dms, hist_msgs=%d",
-		time.Since(execStart).Milliseconds(), len(mMsgs))
+		time.Since(execStart).Milliseconds(), len(eMsgs))
 
 	var subctx context.Context
 	subctx, e.llmCancel = context.WithCancel(ctx)
@@ -107,6 +110,44 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	go e.execTTS(subctx, cmd.ID, tts)
 	e.llmWg.Add(3) // 模型, tts发送, tts响应三个子线程
 	return err
+}
+
+// loadDayMsgs 返回当天同角色全部会话的消息（按 create_time 升序、Index 已重编号），
+// 不含本次尚未写入的用户消息。角色信息缺失时退化为当前会话消息。
+func (e *Engine) loadDayMsgs(ctx context.Context, userId string) []*message.Message {
+	if e.characterID != "" && e.chatDate != "" {
+		msgs, err := his.Mgr.GetDailyMessages(ctx, userId, e.chatDate, e.characterID)
+		if err == nil {
+			return msgs
+		}
+		logs.Errorf("[engine] [dialogue] GetDailyMessages err: %v, fallback to current conversation", err)
+	}
+	// 退化为当前会话消息，并转为升序
+	convMsgs, err := his.Mgr.GetConversationMessages(ctx, e.uSession, -1)
+	if err != nil {
+		return nil
+	}
+	asc := make([]*message.Message, len(convMsgs))
+	for i, msg := range convMsgs {
+		asc[len(convMsgs)-1-i] = msg
+	}
+	return asc
+}
+
+// buildContextMsgs 以整日对话构造模型上下文（最新在前），并跨会话重新编号 Index，
+// 避免不同会话各自从 0 开始的 Index 在上下文中冲突。
+func (e *Engine) buildContextMsgs(dayAsc []*message.Message, usrMsg *message.Message) []*message.Message {
+	out := make([]*message.Message, 0, len(dayAsc)+1)
+	// 本次用户消息位于整日序列末尾，Index 重编号为 N
+	usrCopy := *usrMsg
+	usrCopy.Index = len(dayAsc)
+	out = append(out, &usrCopy)
+	for i := len(dayAsc) - 1; i >= 0; i-- {
+		msgCopy := *dayAsc[i]
+		msgCopy.Index = i
+		out = append(out, &msgCopy)
+	}
+	return out
 }
 
 // buildDialogueMsgs 拼装对话 agent 的消息列表:
@@ -156,6 +197,8 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 		if err := his.Mgr.AddMessage(context.Background(), astMsg); err != nil {
 			e.unexpected(err, "llm response save err")
 		}
+		// 模型回复结束同样视为一次活动，避免长回复期间被空闲看门狗误截断
+		e.touchActive()
 	}(&collect, astMsg)
 
 	var finish string
@@ -183,6 +226,8 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 				e.llmUsage(msg.ResponseMeta) // 记录用量
 			}
 			logs.Infof("llm msg:%v", msg.Content)
+			// 流式输出期间持续刷新活动时间，避免长回复被空闲看门狗误截断
+			e.touchActive()
 			if first && msg.Content != "" {
 				first = false
 				// 首 token 耗时: 相对 execLLM 入口 (用户可感知) 与流建立 (网络+prefill) 两个口径

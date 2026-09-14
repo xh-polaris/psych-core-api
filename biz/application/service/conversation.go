@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/google/wire"
@@ -17,7 +16,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/types/enum"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type IConversationService interface {
@@ -39,8 +37,9 @@ var ConversationServiceSet = wire.NewSet(
 	wire.Bind(new(IConversationService), new(*ConversationService)),
 )
 
-// CreateConversation 获取或创建「当天 + 指定老师」的会话
-// 会话唯一维度为 (user_id, chat_date, character_id)，同一学生同一天与不同老师各自拥有独立会话
+// CreateConversation 新建一次独立会话（singleConv）。
+// 每次调用都创建一条新的 Pending 会话，不再按天复用；
+// 同一学生同一天多次连接会产生多条会话，dashboard 的时长/报表均按单次会话统计。
 func (c *ConversationService) CreateConversation(ctx context.Context, req *core_api.CreateConversationReq) (resp *core_api.CreateConversationResp, err error) {
 	userMeta, err := c.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
@@ -61,37 +60,16 @@ func (c *ConversationService) CreateConversation(ctx context.Context, req *core_
 	}
 
 	now := time.Now()
-	chatDate := util.FormatDateUTC8(now)
-	if existing, findErr := c.ConversationMapper.FindWritableByUserDateAndCharacter(ctx, userOID, chatDate, charOID); findErr == nil {
-		return &core_api.CreateConversationResp{
-			ConversationId: existing.ID.Hex(),
-			Code:           0,
-			Msg:            "success",
-		}, nil
-	} else if !errors.Is(findErr, mongo.ErrNoDocuments) {
-		return nil, errorx.New(errno.ErrCreateConversation)
-	}
 	created := &conversation.Conversation{
 		ID:          bson.NewObjectID(),
 		UserID:      userOID,
-		ChatDate:    chatDate,
+		ChatDate:    util.FormatDateUTC8(now),
 		CharacterID: charOID,
 		Status:      enum.ConversationStatusPending,
 		CreateTime:  now,
 		UpdateTime:  now,
 	}
 	if err := c.ConversationMapper.Insert(ctx, created); err != nil {
-		// 唯一索引决定唯一会话后，返回已创建的会话
-		if mongo.IsDuplicateKeyError(err) {
-			existing, findErr := c.ConversationMapper.FindWritableByUserDateAndCharacter(ctx, userOID, chatDate, charOID)
-			if findErr == nil {
-				return &core_api.CreateConversationResp{
-					ConversationId: existing.ID.Hex(),
-					Code:           0,
-					Msg:            "success",
-				}, nil
-			}
-		}
 		return nil, errorx.New(errno.ErrCreateConversation)
 	}
 
@@ -211,9 +189,14 @@ func (c *ConversationService) GetConvByDate(ctx context.Context, req *core_api.G
 		req.Date = util.FormatDateUTC8(time.Now())
 	}
 
-	// 定位该老师当天的会话；该老师当天尚无会话时返回空列表
-	conv, err := c.ConversationMapper.FindWritableByUserDateAndCharacter(ctx, userOID, req.Date, charOID)
-	if errors.Is(err, mongo.ErrNoDocuments) {
+	// 聚合该老师当天的全部会话消息（singleConv 下当天可能有多条会话）
+	msgs, err := his.Mgr.GetDailyMessages(ctx, userOID.Hex(), req.Date, charOID.Hex())
+	if err != nil {
+		return nil, errorx.New(errno.ErrFetchMessages)
+	}
+
+	total := int32(len(msgs))
+	if total == 0 {
 		return &core_api.GetConvByDateResp{
 			Pagination:  util.PaginationRes(0, req.PaginationOptions),
 			MessageList: []*core_api.ConvByDateMessage{},
@@ -221,27 +204,21 @@ func (c *ConversationService) GetConvByDate(ctx context.Context, req *core_api.G
 			Msg:         "success",
 		}, nil
 	}
-	if err != nil {
-		return nil, errorx.New(errno.ErrGetConversation)
-	}
 
-	// 按 conversation_id 读取该会话的消息
-	msgs, err := his.Mgr.RetrieveMessage(ctx, conv.ID.Hex(), -1)
-	if err != nil {
-		return nil, errorx.New(errno.ErrFetchMessages)
+	// msgs 升序（Index 0..N-1），构造最新在前的视图以保持原有分页语义
+	desc := make([]*message.Message, 0, total)
+	for i := len(msgs) - 1; i >= 0; i-- {
+		desc = append(desc, msgs[i])
 	}
-
-	// 分页并重新排序
-	total := int32(len(msgs))
 	startIdx, endIdx := util.PagedIndex(total, req.PaginationOptions)
 
 	result := make([]*core_api.ConvByDateMessage, 0, endIdx-startIdx)
-	for i, msg := range msgs[startIdx:endIdx] {
+	for _, msg := range desc[startIdx:endIdx] {
 		result = append(result, &core_api.ConvByDateMessage{
 			ConversationId: msg.ConversationId.Hex(),
 			Content:        msg.Content,
 			Role:           int32(msg.Role),
-			Index:          int32(total) - 1 - int32(startIdx+i),
+			Index:          int32(msg.Index),
 			CreateTime:     msg.CreateTime.Unix(),
 		})
 	}
@@ -339,9 +316,20 @@ func (c *ConversationService) ArchiveConversation(ctx context.Context, conversat
 		}
 	}
 	now := time.Now()
+	// start_time 未被引擎写入（如异常退出/提前归档）时，用最早一条消息兜底；
+	// end_time 取最后一条消息时间，避免用归档时刻造成虚高时长。
+	startTime := conv.StartTime
+	if startTime.IsZero() {
+		startTime = messages[len(messages)-1].CreateTime // messages 倒序，末位最早
+	}
+	endTime := messages[0].CreateTime // messages 倒序，首位最新
+	if endTime.Before(startTime) {
+		endTime = startTime
+	}
 	update := bson.M{
 		cst.Status:       enum.ConversationStatusActive,
-		cst.EndTime:      now,
+		cst.StartTime:    startTime,
+		cst.EndTime:      endTime,
 		cst.UpdateTime:   now,
 		cst.MessageCount: len(messages),
 	}

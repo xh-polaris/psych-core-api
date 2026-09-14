@@ -1,9 +1,12 @@
 package engine
 
 import (
+	"time"
+
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
+	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/app"
 	_ "github.com/xh-polaris/psych-core-api/pkg/app/volc/asr"
 	_ "github.com/xh-polaris/psych-core-api/pkg/app/volc/tts"
@@ -35,6 +38,7 @@ func (e *Engine) config() error {
 	}
 	// character_id 仅在会话创建时确定（CreateConversation）
 	// e.Character 以「会话已绑定 character」为准，前端本次携带的 characterId 仅在新建会话时生效
+	e.loadConvMeta()
 	e.Character = e.resolveCharacter(vo.Characters)
 	logs.Infof("[engine] [config] chat=%s/%s tts=%s/%s asr=%s type=%d",
 		wfc.ChatConfig.Provider, wfc.ChatConfig.BotId,
@@ -89,22 +93,30 @@ func (e *Engine) buildConfig(vo *core_api.ConfigVO) (c *core.Config, wfc *core.W
 	return
 }
 
-// resolveCharacter 确定本次会话绑定的老师形象。
-// conversationId 在 auth() 中已强制要求必填，因此这里以会话 DB 中已绑定的 character_id 为准，
-// 忽略前端本次携带的 characterId，避免归档/报告链路的 Character 与创建时绑定不一致；
-// 仅在 DB 中 character_id 缺失（零值，正常不应发生）时，回退用前端 characterId 兜底。
-func (e *Engine) resolveCharacter(characters []*core_api.Character) *core.CharacterInfo {
-	// 回查 DB 已绑定的 character_id
+// loadConvMeta 回查当前会话绑定的 character_id 与 chat_date，
+// 供当日同角色上下文聚合（GetDailyMessages）使用。
+func (e *Engine) loadConvMeta() {
 	if convOID, err := bson.ObjectIDFromHex(e.uSession); err == nil {
 		if conv, err := e.convMapper.FindOneById(e.ctx, convOID); err == nil && conv != nil {
 			if !conv.CharacterID.IsZero() {
-				return pickCharacterByID(characters, conv.CharacterID.Hex())
+				e.characterID = conv.CharacterID.Hex()
 			}
+			e.chatDate = conv.ChatDate
 		}
 	}
-	// 兜底：DB 缺失 character_id 时沿用前端 characterId
-	characterId, _ := e.info[cst.JsonCharacterID].(string)
-	return pickCharacterByID(characters, characterId)
+	if e.characterID == "" {
+		e.characterID, _ = e.info[cst.JsonCharacterID].(string)
+	}
+	if e.chatDate == "" {
+		e.chatDate = util.FormatDateUTC8(time.Now())
+	}
+}
+
+// resolveCharacter 确定本次会话绑定的老师形象。
+// conversationId 在 auth() 中已强制要求必填，character_id 由 loadConvMeta 从会话 DB 回查，
+// 前端本次携带的 characterId 仅在会话 character_id 缺失时兜底。
+func (e *Engine) resolveCharacter(characters []*core_api.Character) *core.CharacterInfo {
+	return pickCharacterByID(characters, e.characterID)
 }
 
 // pickCharacterByID 从角色列表中按指定 ID 匹配老师形象。
