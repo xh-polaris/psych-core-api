@@ -159,6 +159,17 @@ func (d *DeepSeekModel) Generate(ctx context.Context, in []*schema.Message, opts
 			TotalTokens:      chatResp.Usage.TotalTokens,
 		}
 	}
+	if msg.Content == "" {
+		fr, ct := "", 0
+		if msg.ResponseMeta != nil {
+			fr = msg.ResponseMeta.FinishReason
+			if msg.ResponseMeta.Usage != nil {
+				ct = msg.ResponseMeta.Usage.CompletionTokens
+			}
+		}
+		logs.Errorf("[deepseek] generate empty content: choices=%d finish_reason=%s completion_tokens=%d reasoning_len=%d",
+			len(chatResp.Choices), fr, ct, len(msg.ReasoningContent))
+	}
 	return msg, nil
 }
 

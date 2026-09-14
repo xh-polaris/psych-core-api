@@ -67,7 +67,7 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 
 	intentStart := time.Now()
 	defer func() {
-		logs.Infof("[engine] [strategy] intent phase done in %dms", time.Since(intentStart).Milliseconds())
+		logs.Infof("[engine] [strategy-statistic] intent phase done in %dms", time.Since(intentStart).Milliseconds())
 	}()
 
 	tplStart := time.Now()
@@ -80,7 +80,7 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 		logs.Errorf("[engine] [strategy] strategy template empty")
 		return nil, ""
 	}
-	logs.Infof("[engine] [strategy] get strategy template in %dms", time.Since(tplStart).Milliseconds())
+	logs.Infof("[engine] [strategy-statistic] get strategy template in %dms", time.Since(tplStart).Milliseconds())
 
 	var sb strings.Builder
 	sb.WriteString(tpl)
@@ -95,10 +95,24 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 	sctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	genStart := time.Now()
-	msg, err := e.strategy.app.Generate(sctx, msgs)
-	if err != nil {
-		logs.Errorf("[engine] [strategy] generate err: %v", err)
-		return nil, ""
+	var msg *schema.Message
+	var inTokens, outTokens int
+	for attempt := 1; ; attempt++ {
+		msg, err = e.strategy.app.Generate(sctx, msgs)
+		if err == nil && msg != nil && strings.TrimSpace(msg.Content) != "" {
+			break
+		}
+		// 失败轮次的 token 用量也记录 (上游可能已计费)
+		if err == nil && msg != nil && msg.ResponseMeta != nil && msg.ResponseMeta.Usage != nil {
+			e.llmUsage(msg.ResponseMeta)
+			logs.Infof("[engine] [strategy-statistic] failed attempt %d tokens: in=%d out=%d",
+				attempt, msg.ResponseMeta.Usage.PromptTokens, msg.ResponseMeta.Usage.CompletionTokens)
+		}
+		if attempt >= 2 {
+			logs.Errorf("[engine] [strategy] generate failed after retry, err: %v", err)
+			return nil, ""
+		}
+		logs.Errorf("[engine] [strategy] generate empty or err (attempt %d), retry: %v", attempt, err)
 	}
 	if msg == nil {
 		logs.Errorf("[engine] [strategy] nil response")
@@ -106,14 +120,12 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 	}
 	if msg.ResponseMeta != nil && msg.ResponseMeta.Usage != nil {
 		e.llmUsage(msg.ResponseMeta) // 策略调用 token 用量
-	}
-	plan := strings.TrimSpace(msg.Content)
-	outTokens := 0
-	if msg.ResponseMeta != nil && msg.ResponseMeta.Usage != nil {
+		inTokens = msg.ResponseMeta.Usage.PromptTokens
 		outTokens = msg.ResponseMeta.Usage.CompletionTokens
 	}
-	logs.Infof("[engine] [strategy] generate done in %dms, plan_chars=%d, out_tokens=%d",
-		time.Since(genStart).Milliseconds(), len(plan), outTokens)
+	plan := strings.TrimSpace(msg.Content)
+	logs.Infof("[engine] [strategy-statistic] generate done in %dms, plan_chars=%d, in_tokens=%d, out_tokens=%d",
+		time.Since(genStart).Milliseconds(), len(plan), inTokens, outTokens)
 	if plan == "" {
 		logs.Errorf("[engine] [strategy] empty plan")
 		return nil, ""
@@ -140,7 +152,7 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 		logs.Errorf("[engine] [strategy] get skills err: %v", err)
 		return &strategyOutput{Raw: plan, Bound: true}, ""
 	} else {
-		logs.Infof("[engine] [strategy] loaded skills in %dms: %v", time.Since(skillsStart).Milliseconds(), names)
+		logs.Infof("[engine] [strategy-statistic] loaded skills in %dms: %v", time.Since(skillsStart).Milliseconds(), names)
 	}
 	return &strategyOutput{Raw: plan, Bound: true}, e.joinSkills(names, skills)
 }

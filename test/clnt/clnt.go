@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -18,12 +19,16 @@ var baseURL = "ws://127.0.0.1:8080"
 
 //var baseURL = "wss://api.xhpolaris.com/psych"
 
+// 日志级别控制
+var verbose = flag.Bool("v", false, "打印详细日志 (每个文本帧/音频块)") // 默认静默逐帧/逐块日志, 仅打印完整回复与tts连接信息
+
 var authType2Int32 = map[string]int32{
 	"Already":             -1,
 	"AuthStudentIdAndPwd": 1,
 }
 
 func main() {
+	flag.Parse()
 	for start() {
 	}
 }
@@ -33,7 +38,14 @@ func start() bool {
 		ctx, cancel = context.WithCancel(context.Background())
 		meta        *core.Meta
 		conn        *websocket.Conn
+		reader      = bufio.NewReader(os.Stdin)
 	)
+	// 启动时自动登录并创建会话, 获取 conversationId
+	if err = prepareSession(reader); err != nil {
+		log.Println("初始化会话失败:", err)
+		cancel()
+		return false
+	}
 	// 连接WebSocket服务器
 	if conn, meta, err = connectWebSocket(); err != nil {
 		log.Println("连接失败:", err)
@@ -44,7 +56,7 @@ func start() bool {
 	// 启动消息接收协程
 	go receiveMessages(ctx, conn, meta)
 	// 主协程处理用户输入
-	return handleUserInput(cancel, conn, meta)
+	return handleUserInput(cancel, conn, meta, reader)
 }
 
 func connectWebSocket() (conn *websocket.Conn, meta *core.Meta, err error) {
@@ -66,8 +78,7 @@ func connectWebSocket() (conn *websocket.Conn, meta *core.Meta, err error) {
 }
 
 // 处理用户输入
-func handleUserInput(cancel context.CancelFunc, conn *websocket.Conn, meta *core.Meta) (restart bool) {
-	reader := bufio.NewReader(os.Stdin)
+func handleUserInput(cancel context.CancelFunc, conn *websocket.Conn, meta *core.Meta, reader *bufio.Reader) (restart bool) {
 	for {
 		printMenu()
 		input, _ := reader.ReadString('\n')
