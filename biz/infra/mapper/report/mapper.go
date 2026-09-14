@@ -21,6 +21,7 @@ const (
 	collection     = "report"
 	userCollection = "user"
 	cacheKeyPrefix = "cache:report:"
+	reportEndField = "end"
 )
 
 type IMongoMapper interface {
@@ -32,6 +33,8 @@ type IMongoMapper interface {
 	BatchFindUserLatest(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*Report, error)
 	FindByConversation(ctx context.Context, sessionId bson.ObjectID) (*Report, error)
 	FindByConversationPreferSuccess(ctx context.Context, sessionId bson.ObjectID) (*Report, error)
+	FindVisibleByID(ctx context.Context, reportID bson.ObjectID) (*Report, error)
+	FindVisibleByConversation(ctx context.Context, sessionID bson.ObjectID) ([]*Report, error)
 	BatchFindBySession(ctx context.Context, sessionIds []bson.ObjectID) (map[bson.ObjectID]*Report, error)
 	// 词云相关接口
 	// 关键词词云（v2 报表 simple_report.keywords 聚合）
@@ -154,11 +157,33 @@ func (m *mongoMapper) FindByConversationPreferSuccess(ctx context.Context, sessi
 		cst.ConversationID: sessionId,
 		cst.Status:         bson.M{cst.NE: enum.ReportStatusDeleted},
 	}
-	opt := options.FindOne().SetSort(bson.D{{cst.Status, -1}, {cst.EndTime, -1}})
+	opt := options.FindOne().SetSort(bson.D{{cst.Status, -1}, {reportEndField, -1}})
 	if err := m.conn.FindOneNoCache(ctx, report, filter, opt); err != nil {
 		return nil, err
 	}
 	return report, nil
+}
+
+// FindVisibleByID 查询一份未删除的报表
+func (m *mongoMapper) FindVisibleByID(ctx context.Context, reportID bson.ObjectID) (*Report, error) {
+	report := &Report{}
+	filter := bson.M{
+		cst.ID:     reportID,
+		cst.Status: bson.M{cst.NE: enum.ReportStatusDeleted},
+	}
+	if err := m.conn.FindOneNoCache(ctx, report, filter); err != nil {
+		return nil, err
+	}
+	return report, nil
+}
+
+// FindVisibleByConversation 查询会话下全部未删除报表，按结束时间倒序
+func (m *mongoMapper) FindVisibleByConversation(ctx context.Context, sessionID bson.ObjectID) ([]*Report, error) {
+	filter := bson.M{
+		cst.ConversationID: sessionID,
+		cst.Status:         bson.M{cst.NE: enum.ReportStatusDeleted},
+	}
+	return m.FindManyWithOption(ctx, filter, options.Find().SetSort(bson.D{{reportEndField, -1}}))
 }
 
 // GetUnitKWByClassList 按班级列表统计报表 simple_report.keywords 的词频

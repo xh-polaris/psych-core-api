@@ -9,6 +9,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/domain/dashboard"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
@@ -37,6 +38,7 @@ type IDashboardService interface {
 	DashboardUserConvRecords(ctx context.Context, req *core_api.DashboardUserConvRecordsReq) (*core_api.DashboardUserConvRecordsResp, error)
 	DashboardUnitConvRecords(ctx context.Context, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error)
 	DashboardGetConversationMessages(ctx context.Context, req *core_api.DashboardGetConversationMessagesReq) (*core_api.DashboardGetConversationMessagesResp, error)
+	DashboardGetConversationReports(ctx context.Context, req *core_api.DashboardGetConversationReportsReq) (*core_api.DashboardGetConversationReportsResp, error)
 	DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error)
 
 	// 预警
@@ -51,6 +53,7 @@ type DashboardService struct {
 	AuthDomain         auth.IAuthDomain
 	UserMapper         user.IMongoMapper
 	ConversationMapper conversation.IMongoMapper
+	ReportMapper       report.IMongoMapper
 	AlarmMapper        alarm.IMongoMapper
 	DashboardDomain    dashboard.IDashboardDomain
 }
@@ -204,9 +207,9 @@ func (s *DashboardService) DashboardUserConvRecords(ctx context.Context, req *co
 	return s.DashboardDomain.UserConvRecords(ctx, scope, userOID, targetUser, req)
 }
 
-// DashboardGetReport 查看报表详情
-func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error) {
-	convOID, err := bson.ObjectIDFromHex(req.ConversationId)
+// DashboardGetConversationReports 获取指定会话下的历史报表列表
+func (s *DashboardService) DashboardGetConversationReports(ctx context.Context, req *core_api.DashboardGetConversationReportsReq) (*core_api.DashboardGetConversationReportsResp, error) {
+	convOID, err := bson.ObjectIDFromHex(req.GetConversationId())
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "ConversationId"), errorx.KV("value", "对话ID"))
 	}
@@ -230,7 +233,40 @@ func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api
 	if err != nil {
 		return nil, err
 	}
-	return s.DashboardDomain.GetReport(ctx, scope, convOID, usr, req)
+	return s.DashboardDomain.GetConversationReports(ctx, scope, convOID, usr)
+}
+
+// DashboardGetReport 查看指定报表详情
+func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error) {
+	reportOID, err := bson.ObjectIDFromHex(req.GetReportId())
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "ReportId"), errorx.KV("value", "报表ID"))
+	}
+	rpt, err := s.ReportMapper.FindVisibleByID(ctx, reportOID)
+	if err != nil {
+		logs.Errorf("get report error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "报表"))
+	}
+	conv, err := s.ConversationMapper.FindOneById(ctx, rpt.ConversationID)
+	if err != nil {
+		logs.Errorf("get conversation error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "对话"))
+	}
+	usr, err := s.UserMapper.FindOneById(ctx, conv.UserID)
+	if err != nil {
+		logs.Errorf("get user error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "用户"))
+	}
+
+	meta, role, err := s.AuthDomain.IdentifyRole(ctx, usr.UnitID.Hex())
+	if err != nil {
+		return nil, err
+	}
+	scope, err := s.buildScope(usr.UnitID.Hex(), meta, role)
+	if err != nil {
+		return nil, err
+	}
+	return s.DashboardDomain.GetReport(ctx, scope, rpt, usr)
 }
 
 // DashboardGetConversationMessages 获取管理端报表关联的原始对话消息。

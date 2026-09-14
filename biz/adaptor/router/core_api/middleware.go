@@ -347,3 +347,8 @@ func _dashboardgetconversationmessagesMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _dashboardgetconversationreportsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
