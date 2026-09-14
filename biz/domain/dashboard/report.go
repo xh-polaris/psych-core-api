@@ -75,20 +75,22 @@ func (d *DashboardDomain) getReport(ctx context.Context, convOID bson.ObjectID, 
 	}
 
 	resp := &core_api.DashboardGetReportResp{
-		ReportId:       rpt.ID.Hex(),
-		Title:          rpt.Title,
-		Topics:         rpt.Topics,         // legacy: 仅 v0 报表有值
-		Digest:         DigestOf(rpt),      // v2 新报表不产出摘要
-		Emotion:        int32(rpt.Emotion), // legacy: 仅 v0 报表有值
-		Body:           BodyOf(rpt),        // v2 取 simple_report.content
-		Suggestions:    SuggestionsOf(rpt), // v2 取 simple_report.suggestions
-		NeedAlarm:      rpt.NeedAlarm,
-		KeywordPercent: rpt.Keywords, // legacy: 仅 v0 报表有值
-		ReportStatus:   int32(rpt.Status),
-		Analysis:       analysisToPB(rpt.Analysis),
-		SimpleReport:   simpleReportToPB(rpt.SimpleReport),
-		Code:           0,
-		Msg:            "success",
+		ReportId:             rpt.ID.Hex(),
+		Title:                rpt.Title,
+		Topics:               rpt.Topics,         // legacy: 仅 v0 报表有值
+		Digest:               DigestOf(rpt),      // v2 新报表不产出摘要
+		Emotion:              int32(rpt.Emotion), // legacy: 仅 v0 报表有值
+		Body:                 BodyOf(rpt),        // v2 取 simple_report.content
+		Suggestions:          SuggestionsOf(rpt), // v2 取 simple_report.suggestions
+		NeedAlarm:            rpt.NeedAlarm,
+		KeywordPercent:       rpt.Keywords, // legacy: 仅 v0 报表有值
+		ReportStatus:         int32(rpt.Status),
+		ConversationRounds:   int32(rpt.Round / 2),
+		LastConversationTime: rpt.End.Unix(),
+		Analysis:             analysisToPB(rpt.Analysis),
+		SimpleReport:         simpleReportToPB(rpt.SimpleReport),
+		Code:                 0,
+		Msg:                  "success",
 	}
 	if rpt.SimpleReport != nil && len(rpt.SimpleReport.Keywords) > 0 {
 		resp.KeywordPercent = rankedKeywords(rpt.SimpleReport.Keywords)
