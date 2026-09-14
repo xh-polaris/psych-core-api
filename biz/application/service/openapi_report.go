@@ -18,6 +18,7 @@ import (
 
 const (
 	defaultOpenAPIReportTimeout = 90 * time.Second
+	minOpenAPIReportTokens      = 4096
 	maxOpenAPIReportTokens      = 4096
 	maxOpenAPIProfileNameRunes  = 128
 )
@@ -78,8 +79,8 @@ func NewOpenAPIReportRequest(req *core_api.OpenApiGenerateReportReq) (openAPIRep
 	if req == nil {
 		return openAPIReportRequest{}, fmt.Errorf("request is required")
 	}
-	if req.MaxTokens != nil && (*req.MaxTokens < 1 || *req.MaxTokens > maxOpenAPIReportTokens) {
-		return openAPIReportRequest{}, fmt.Errorf("max_tokens must be between 1 and %d", maxOpenAPIReportTokens)
+	if req.MaxTokens != nil && (*req.MaxTokens < minOpenAPIReportTokens || *req.MaxTokens > maxOpenAPIReportTokens) {
+		return openAPIReportRequest{}, fmt.Errorf("max_tokens must be %d to generate a complete structured report", minOpenAPIReportTokens)
 	}
 	if profile := req.SubjectProfile; profile != nil {
 		if len([]rune(profile.Name)) > maxOpenAPIProfileNameRunes {
