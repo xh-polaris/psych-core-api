@@ -26,6 +26,7 @@ const (
 type IMongoMapper interface {
 	mapper.IMongoMapper[Report]
 	ExistByUser(ctx context.Context, userId bson.ObjectID) (bool, error)
+	CountCompletedByUser(ctx context.Context, userId bson.ObjectID) (int32, error)
 	FindUserLatest(ctx context.Context, userId bson.ObjectID) (*Report, error)
 	FindAllByUser(ctx context.Context, userId bson.ObjectID) ([]*Report, error)
 	BatchFindUserLatest(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*Report, error)
@@ -61,6 +62,14 @@ func NewReportMongoMapper(config *conf.Config) IMongoMapper {
 
 func (m *mongoMapper) ExistByUser(ctx context.Context, userId bson.ObjectID) (bool, error) {
 	return m.ExistsByFields(ctx, bson.M{cst.UserID: userId})
+}
+
+func (m *mongoMapper) CountCompletedByUser(ctx context.Context, userId bson.ObjectID) (int32, error) {
+	count, err := m.conn.CountDocuments(ctx, bson.M{
+		cst.UserID: userId,
+		cst.Status: enum.ReportStatusSuccess,
+	})
+	return int32(count), err
 }
 
 // FindUserLatest 查找某单位某用户的最新报表，注意报表可能不存在
