@@ -14,7 +14,7 @@ import (
 // analysisToPB converts report.Analysis to core_api.ReportAnalysis
 func analysisToPB(a *report.Analysis) *core_api.ReportAnalysis {
 	if a == nil {
-		return nil
+		a = &report.Analysis{}
 	}
 	r := &core_api.ReportAnalysis{
 		Cognition:   nonNilSlice(a.Cognition),

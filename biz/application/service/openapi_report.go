@@ -210,24 +210,24 @@ func reportResponseToDTO(result internalReportResponse, requestID string) *core_
 
 func reportAnalysisToDTO(a *report.Analysis) *core_api.ReportAnalysis {
 	if a == nil {
-		return nil
+		a = &report.Analysis{}
 	}
 	result := &core_api.ReportAnalysis{
-		Cognition:   a.Cognition,
-		Behavior:    a.Behavior,
+		Cognition:   nonNilSlice(a.Cognition),
+		Behavior:    nonNilSlice(a.Behavior),
 		Duration:    a.Duration,
-		Trigger:     a.Trigger,
-		Coping:      a.Coping,
+		Trigger:     nonNilSlice(a.Trigger),
+		Coping:      nonNilSlice(a.Coping),
 		HelpSeeking: a.HelpSeeking,
-		MissingInfo: a.MissingInfo,
-		Problem:     &core_api.AnalysisProblem{},
+		MissingInfo: nonNilSlice(a.MissingInfo),
+		Problem:     &core_api.AnalysisProblem{Primary: &core_api.ProblemItem{}, Secondary: make([]*core_api.ProblemItem, 0)},
 		Emotion:     emotionItemsToDTO(a.Emotion),
-		Support:     &core_api.AnalysisSupport{Family: a.Support.Family, Teacher: a.Support.Teacher, Friend: a.Support.Friend, Other: a.Support.Other, ProtectiveResources: a.Support.ProtectiveResources, Availability: a.Support.Availability},
+		Support:     &core_api.AnalysisSupport{Family: a.Support.Family, Teacher: a.Support.Teacher, Friend: a.Support.Friend, Other: nonNilSlice(a.Support.Other), ProtectiveResources: nonNilSlice(a.Support.ProtectiveResources), Availability: a.Support.Availability},
 		Function:    &core_api.AnalysisFunction{Learning: a.Function.Learning, Sleep: a.Function.Sleep, Diet: a.Function.Diet, Interpersonal: a.Function.Interpersonal, EmotionRegulation: a.Function.EmotionRegulation},
-		Distress:    &core_api.AnalysisDistress{Level: int32(a.Distress.Level), Reason: a.Distress.Reason},
+		Distress:    &core_api.AnalysisDistress{Level: int32(a.Distress.Level), Reason: nonNilSlice(a.Distress.Reason)},
 		Confidence:  &core_api.AnalysisConfidence{Overall: a.Confidence.Overall, Risk: a.Confidence.Risk, Reason: a.Confidence.Reason},
 		Risk: &core_api.AnalysisRisk{
-			Level: a.Risk.Level, Evidence: a.Risk.Evidence, Action: a.Risk.Action,
+			Level: a.Risk.Level, Evidence: nonNilSlice(a.Risk.Evidence), Action: a.Risk.Action,
 			Score:   &core_api.RiskScore{CurrentIdeation: int32(a.Risk.Score.CurrentIdeation), History: int32(a.Risk.Score.History), CurrentStress: int32(a.Risk.Score.CurrentStress), ProtectiveResources: int32(a.Risk.Score.ProtectiveResources), MentalHealthHistory: int32(a.Risk.Score.MentalHealthHistory), Total: int32(a.Risk.Score.Total)},
 			Profile: &core_api.RiskProfile{CurrentRisk: profileSectionToDTO(a.Risk.Profile.CurrentRisk), Stressors: profileSectionToDTO(a.Risk.Profile.Stressors), RiskFactors: profileSectionToDTO(a.Risk.Profile.RiskFactors), ProtectiveFactors: profileSectionToDTO(a.Risk.Profile.ProtectiveFactors), InformationGap: profileSectionToDTO(a.Risk.Profile.InformationGap), CurrentSafety: &core_api.RiskProfile_CurrentSafety{Summary: a.Risk.Profile.CurrentSafety.Summary, Status: a.Risk.Profile.CurrentSafety.Status}},
 		},
@@ -242,13 +242,20 @@ func reportAnalysisToDTO(a *report.Analysis) *core_api.ReportAnalysis {
 }
 
 func profileSectionToDTO(section report.ProfileSection) *core_api.ProfileSection {
-	return &core_api.ProfileSection{Summary: section.Summary, Items: section.Items}
+	return &core_api.ProfileSection{Summary: section.Summary, Items: nonNilSlice(section.Items)}
+}
+
+func nonNilSlice[T any](items []T) []T {
+	if items == nil {
+		return []T{}
+	}
+	return items
 }
 
 // emotionItemsToDTO converts report analysis emotion items to DTO
 func emotionItemsToDTO(items []report.AnalysisEmotion) []*core_api.AnalysisEmotion {
 	if len(items) == 0 {
-		return nil
+		return make([]*core_api.AnalysisEmotion, 0)
 	}
 	res := make([]*core_api.AnalysisEmotion, 0, len(items))
 	for _, e := range items {
@@ -262,12 +269,12 @@ func simpleReportToDTO(item *report.SimpleReport) *core_api.SimpleReportMsg {
 		return nil
 	}
 	return &core_api.SimpleReportMsg{
-		Keywords:      item.Keywords,
-		Emotion:       item.Emotion,
+		Keywords:      nonNilSlice(item.Keywords),
+		Emotion:       nonNilSlice(item.Emotion),
 		RiskLevel:     item.RiskLevel,
 		DistressLevel: item.DistressLevel,
 		Focus:         item.Focus,
-		Suggestions:   item.Suggestions,
+		Suggestions:   nonNilSlice(item.Suggestions),
 		Content:       item.Content,
 	}
 }
