@@ -1,21 +1,16 @@
 package report
 
-import "fmt"
+import (
+	"strings"
 
-// ScalarString normalizes report fields that can be emitted as either a JSON
-// string or number by different report schema versions.
-func ScalarString(value any) string {
-	if value == nil {
-		return ""
-	}
-	return fmt.Sprint(value)
-}
+	"go.mongodb.org/mongo-driver/v2/bson"
+)
 
 // ======== Analysis — 13 维度状态提取 ========
 
 type Analysis struct {
 	Problem     AnalysisProblem    `bson:"problem" json:"problem"`
-	Emotion     AnalysisEmotion    `bson:"emotion" json:"emotion"`
+	Emotion     []AnalysisEmotion  `bson:"emotion" json:"emotion"` // 情绪列表（1-3 项，按影响程度排序）
 	Cognition   []string           `bson:"cognition,omitempty" json:"cognition,omitempty"`
 	Behavior    []string           `bson:"behavior,omitempty" json:"behavior,omitempty"`
 	Duration    string             `bson:"duration" json:"duration"`
@@ -41,8 +36,8 @@ type AnalysisProblem struct {
 }
 
 type AnalysisEmotion struct {
-	Types     []string `bson:"type" json:"type"`
-	Intensity string   `bson:"intensity" json:"intensity"`
+	Type      string  `bson:"type" json:"type"`
+	Intensity float64 `bson:"intensity" json:"intensity"` // 0.5~2.0，中度基准 1.0
 }
 
 type AnalysisSupport struct {
@@ -51,7 +46,7 @@ type AnalysisSupport struct {
 	Friend              bool     `bson:"friend" json:"friend"`
 	Other               []string `bson:"other,omitempty" json:"other,omitempty"`
 	ProtectiveResources []string `bson:"protectiveResources,omitempty" json:"protectiveResources,omitempty"`
-	Availability        string   `bson:"availability,omitempty" json:"availability,omitempty"`
+	Availability        string   `bson:"availability,omitempty" json:"availability,omitempty"` // 充足 | 一般 | 不足 | 未明确提及
 }
 
 type AnalysisFunction struct {
@@ -59,16 +54,45 @@ type AnalysisFunction struct {
 	Sleep             string `bson:"sleep" json:"sleep"`
 	Diet              string `bson:"diet" json:"diet"`
 	Interpersonal     string `bson:"interpersonal" json:"interpersonal"`
-	DailyLife         string `bson:"dailyLife" json:"dailyLife"`
-	EmotionRegulation string `bson:"emotionRegulation,omitempty" json:"emotionRegulation,omitempty"`
+	EmotionRegulation string `bson:"emotionRegulation" json:"emotionRegulation"`
+}
+
+// DistressLevelNum 兼容新旧两版存储的困扰程度：
+// 新版为 0-4 数值；旧版为中文字符串（如"2级：中度困扰"），读取时自动归一化为数值。
+type DistressLevelNum int32
+
+func (l *DistressLevelNum) UnmarshalBSONValue(typ byte, data []byte) error {
+	rv := bson.RawValue{Type: bson.Type(typ), Value: data}
+	if rv.Type == bson.TypeString {
+		*l = DistressLevelNum(legacyDistressLevel(rv.StringValue()))
+		return nil
+	}
+	var n int32
+	if err := rv.Unmarshal(&n); err != nil {
+		return err
+	}
+	*l = DistressLevelNum(n)
+	return nil
+}
+
+func legacyDistressLevel(s string) int32 {
+	switch {
+	case strings.Contains(s, "高危"):
+		return 4
+	case strings.Contains(s, "重度"):
+		return 3
+	case strings.Contains(s, "中度"):
+		return 2
+	case strings.Contains(s, "轻度"):
+		return 1
+	default:
+		return 0
+	}
 }
 
 type AnalysisDistress struct {
-	// Level historically was a string. Report v2 sends a numeric severity level,
-	// so keep it polymorphic to remain able to decode both existing Mongo data
-	// and newly generated reports.
-	Level  any      `bson:"level" json:"level"`
-	Reason []string `bson:"reason,omitempty" json:"reason,omitempty"`
+	Level  DistressLevelNum `bson:"level" json:"level"` // 0正常波动 | 1轻度 | 2中度 | 3重度 | 4高危
+	Reason []string         `bson:"reason,omitempty" json:"reason,omitempty"`
 }
 
 type AnalysisRisk struct {
@@ -111,53 +135,15 @@ type AnalysisConfidence struct {
 	Reason  string `bson:"reason" json:"reason"`
 }
 
-// ======== SimpleReport — 16 板块简易报告 ========
+// ======== SimpleReport — 瘦身简易报告（v2 提示词产出） ========
+// 展示细节由 analysis 与 content 承担，此处仅保留统计与展示必需字段。
 
 type SimpleReport struct {
-	// Report v2 compact fields. The legacy fields below remain for reports that
-	// were generated before the compact report format was introduced.
-	Keywords           []string       `bson:"keywords,omitempty" json:"keywords,omitempty"`
-	RiskLevel          int            `bson:"riskLevel,omitempty" json:"riskLevel,omitempty"`
-	SeverityLevel      int            `bson:"severityLevel,omitempty" json:"severityLevel,omitempty"`
-	Focus              string         `bson:"focus,omitempty" json:"focus,omitempty"`
-	Content            string         `bson:"content,omitempty" json:"content,omitempty"`
-	MainProblem        string         `bson:"mainProblem" json:"mainProblem"`
-	Emotion            ReportEmotion  `bson:"emotion" json:"emotion"`
-	Thoughts           string         `bson:"thoughts" json:"thoughts"`
-	Behaviors          []string       `bson:"behaviors,omitempty" json:"behaviors,omitempty"`
-	Needs              []string       `bson:"needs,omitempty" json:"needs,omitempty"`
-	Duration           string         `bson:"duration" json:"duration"`
-	FunctionImpact     string         `bson:"functionImpact" json:"functionImpact"`
-	Triggers           string         `bson:"triggers" json:"triggers"`
-	Coping             string         `bson:"coping" json:"coping"`
-	Support            string         `bson:"support" json:"support"`
-	HelpSeeking        string         `bson:"helpSeeking" json:"helpSeeking"`
-	RiskObservation    ReportRiskObs  `bson:"riskObservation" json:"riskObservation"`
-	SeverityAssessment ReportSeverity `bson:"severityAssessment" json:"severityAssessment"`
-	Summary            ReportSummary  `bson:"summary" json:"summary"`
-	ProvidedSupport    string         `bson:"providedSupport" json:"providedSupport"`
-	Suggestions        []string       `bson:"suggestions" json:"suggestions"`
-}
-
-type ReportEmotion struct {
-	Type      string `bson:"type" json:"type"`
-	Intensity string `bson:"intensity" json:"intensity"`
-}
-
-type ReportRiskObs struct {
-	Level    string `bson:"level" json:"level"`
-	Evidence string `bson:"evidence,omitempty" json:"evidence,omitempty"`
-}
-
-type ReportSeverity struct {
-	Level string `bson:"level" json:"level"`
-	Basis string `bson:"basis" json:"basis"`
-}
-
-type ReportSummary struct {
-	MainProblem  string `bson:"mainProblem" json:"mainProblem"`
-	EmotionState string `bson:"emotionState" json:"emotionState"`
-	Severity     string `bson:"severity" json:"severity"`
-	RiskLevel    string `bson:"riskLevel" json:"riskLevel"`
-	Focus        string `bson:"focus" json:"focus"`
+	Keywords      []string `bson:"keywords,omitempty" json:"keywords,omitempty"` // 2-3 个，源自学生讲到的话题
+	Emotion       []string `bson:"emotion" json:"emotion"`                       // 情绪类型列表（1-3 项，与 analysis.emotion 顺序一致）
+	RiskLevel     int32    `bson:"riskLevel" json:"riskLevel"`                   // 0未明确 | 1高风险 | 2中高风险 | 3中低风险 | 4低风险
+	DistressLevel int32    `bson:"distressLevel" json:"distressLevel"`           // 0正常波动 | 1轻度 | 2中度 | 3重度 | 4高危
+	Focus         string   `bson:"focus" json:"focus"`                           // 需要重点关注的问题
+	Suggestions   []string `bson:"suggestions" json:"suggestions"`               // 面向老师的 3 条建议
+	Content       string   `bson:"content" json:"content"`                       // 报告正文（500-1500字，十六节固定格式）
 }

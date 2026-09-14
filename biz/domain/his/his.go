@@ -16,13 +16,13 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 var Mgr *HistoryManager
 
 const (
-	cachePrefix    = "psych:msg:"
+	msgCachePrefix = "psych:msg:conv:"
+	msgCacheTTL    = time.Hour * 6
 	convDatePrefix = "psych:conv:date:"
 )
 
@@ -40,90 +40,49 @@ func New(c cache.Cmdable, msgMapper message.IMongoMapper, convMapper conversatio
 	}
 }
 
-func dailyCacheKey(userId, date string) string {
-	return cachePrefix + userId + ":" + date
+// msgCacheKey 消息缓存 key：单会话维度（conversationId 唯一确定 用户+日期+老师角色）
+func msgCacheKey(convId string) string {
+	return msgCachePrefix + convId
 }
 
 func convDateCacheKey(convId string) string {
 	return convDatePrefix + convId
 }
 
-func hashField(convId string, index int) string {
-	return convId + ":" + strconv.Itoa(index)
+func hashField(index int) string {
+	return strconv.Itoa(index)
 }
 
-// GetUserDailyMessages 获取用户某天内所有消息 (带缓存)
-func (h *HistoryManager) GetUserDailyMessages(ctx context.Context, userId, date string) ([]*message.Message, error) {
-	key := dailyCacheKey(userId, date)
+// GetConversationMessages 获取单个会话的历史消息
+func (h *HistoryManager) GetConversationMessages(ctx context.Context, convId string, size int) ([]*message.Message, error) {
+	key := msgCacheKey(convId)
 	if msgs, err := h.RetrieveMessageFromCache(ctx, key); err == nil {
+		if size > 0 && len(msgs) > size {
+			return msgs[:size], nil
+		}
 		return msgs, nil
 	}
 
-	userOid, err := bson.ObjectIDFromHex(userId)
+	msgs, err := h.RetrieveMessage(ctx, convId, size)
 	if err != nil {
 		return nil, err
 	}
-
-	start, end, err := util.DayToUTCRange(date)
-	if err != nil {
-		return nil, err
+	if len(msgs) > 0 && size <= 0 {
+		if err = h.CacheMessages(ctx, convId, msgs); err != nil {
+			logs.Errorf("[his] backfill msg cache err: %s", err)
+			if derr := h.cache.Del(ctx, msgCacheKey(convId)).Err(); derr != nil {
+				logs.Errorf("[his] invalidate msg cache err: %s", derr)
+			}
+		}
 	}
-
-	convs, err := h.convMapper.FindByUserIdAndTimeRange(ctx, userOid, start, end)
-	if err != nil {
-		return nil, err
-	}
-	if len(convs) == 0 {
-		return []*message.Message{}, nil
-	}
-
-	convIds := make([]bson.ObjectID, len(convs))
-	for i, conv := range convs {
-		convIds[i] = conv.ID
-	}
-
-	msgs, err := h.msgMapper.FindByConversationIds(ctx, convIds, options.Find().SetSort(bson.M{"create_time": -1}))
-	if err != nil {
-		return nil, err
-	}
-
-	if len(msgs) > 0 {
-		_ = h.CacheDailyMessages(ctx, userId, date, msgs)
-	}
-	// 按时间倒序，越新的在前
-	sort.Slice(msgs, func(i, j int) bool { return msgs[i].CreateTime.After(msgs[j].CreateTime) })
 	return msgs, nil
 }
 
-// RetrieveMessage 获取某个 conversation 的历史消息 (向后兼容, 仅用于 GetConversation)
+// RetrieveMessage 获取某个 conversation 的历史消息, 按 create_time 倒序
 func (h *HistoryManager) RetrieveMessage(ctx context.Context, convId string, size int) ([]*message.Message, error) {
-	oid, err := bson.ObjectIDFromHex(convId)
-	if err != nil {
+	if _, err := bson.ObjectIDFromHex(convId); err != nil {
 		return nil, err
 	}
-
-	conv, err := h.convMapper.FindOneById(ctx, oid)
-	if err != nil || conv == nil {
-		return h.msgMapper.RetrieveMessage(ctx, convId, size)
-	}
-
-	date := util.FormatDateUTC8(conv.CreateTime)
-	userId := conv.UserID.Hex()
-
-	key := dailyCacheKey(userId, date)
-	if cached, cacheErr := h.RetrieveMessageFromCache(ctx, key); cacheErr == nil {
-		filtered := make([]*message.Message, 0)
-		for _, m := range cached {
-			if m.ConversationId.Hex() == convId {
-				filtered = append(filtered, m)
-			}
-		}
-		if size > 0 && len(filtered) > size {
-			return filtered[:size], nil
-		}
-		return filtered, nil
-	}
-
 	return h.msgMapper.RetrieveMessage(ctx, convId, size)
 }
 
@@ -146,26 +105,25 @@ func (h *HistoryManager) RetrieveMessageFromCache(ctx context.Context, key strin
 		}
 		msgs = append(msgs, &msg)
 	}
-	if len(msgs) > 0 {
-		sort.Slice(msgs, func(i, j int) bool { return msgs[i].CreateTime.After(msgs[j].CreateTime) })
-	}
+	// 显式排序：按时间倒序，越新的在前
+	sort.Slice(msgs, func(i, j int) bool { return msgs[i].CreateTime.After(msgs[j].CreateTime) })
 	return msgs, nil
 }
 
-// CacheDailyMessages 缓存一批消息到 Redis (按 userId:date 维度)
-func (h *HistoryManager) CacheDailyMessages(ctx context.Context, userId, date string, msgs []*message.Message) error {
-	key := dailyCacheKey(userId, date)
+// CacheMessages 缓存一批消息到 Redis（单会话维度）
+func (h *HistoryManager) CacheMessages(ctx context.Context, convId string, msgs []*message.Message) error {
+	key := msgCacheKey(convId)
 	fields := make(map[string]string, len(msgs))
 	for _, msg := range msgs {
 		data, err := sonic.Marshal(msg)
 		if err != nil {
 			return err
 		}
-		fields[hashField(msg.ConversationId.Hex(), int(msg.Index))] = string(data)
+		fields[hashField(int(msg.Index))] = string(data)
 	}
 	p := h.cache.Pipeline()
 	p.HSet(ctx, key, fields)
-	p.Expire(ctx, key, time.Hour*6)
+	p.Expire(ctx, key, msgCacheTTL)
 	_, err := p.Exec(ctx)
 	return err
 }
@@ -177,8 +135,16 @@ func (h *HistoryManager) CacheConvDate(ctx context.Context, convId, userId strin
 	return h.cache.Set(ctx, convDateCacheKey(convId), val, 7*24*time.Hour).Err()
 }
 
-// AddMessage 新增消息到存储并更新缓存 (userId:date 维度)
-func (h *HistoryManager) AddMessage(ctx context.Context, userId, date string, msg *message.Message) error {
+// AddMessage 新增消息到存储并维护会话消息统计与消息缓存
+func (h *HistoryManager) AddMessage(ctx context.Context, msg *message.Message) error {
+	writable, err := h.convMapper.Exists(ctx, msg.ConversationId)
+	if err != nil {
+		return err
+	}
+	if !writable {
+		return fmt.Errorf("conversation is deleted or does not exist: %s", msg.ConversationId.Hex())
+	}
+
 	if err := h.msgMapper.Insert(ctx, msg); err != nil {
 		logs.Errorf("[his] add message err: %s", err)
 		return err
@@ -186,14 +152,19 @@ func (h *HistoryManager) AddMessage(ctx context.Context, userId, date string, ms
 
 	convIdHex := msg.ConversationId.Hex()
 
-	// 消息序号按用户当日全量历史递增，不能用 Index==0 判断是否为新会话。
-	// 任一消息成功写入后都应确保会话可见，并缓存其日期归属。
-	_ = h.CacheConvDate(ctx, convIdHex, userId)
+	// 消息序号按会话内历史递增，不能用 Index==0 判断是否为新会话。
+	// 任一消息成功写入后，只允许将 Pending 会话变为 Active；Deleted 会话不会被恢复
+	_ = h.CacheConvDate(ctx, convIdHex, msg.UserId.Hex())
 	if err := h.convMapper.SetActive(ctx, msg.ConversationId); err != nil {
 		logs.Errorf("[his] activate conversation err: %s", err)
 	}
 
-	_ = h.CacheDailyMessages(ctx, userId, date, []*message.Message{msg})
+	if err := h.CacheMessages(ctx, convIdHex, []*message.Message{msg}); err != nil {
+		logs.Errorf("[his] cache message err: %s", err)
+		if derr := h.cache.Del(ctx, msgCacheKey(convIdHex)).Err(); derr != nil {
+			logs.Errorf("[his] invalidate msg cache err: %s", derr)
+		}
+	}
 
 	util.DPrint("[his] add message, conv=%s, index=%d\n", convIdHex, msg.Index)
 	return nil

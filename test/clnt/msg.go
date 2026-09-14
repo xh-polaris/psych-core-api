@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/gorilla/websocket"
+	"github.com/xh-polaris/psych-core-api/pkg/app"
 	"github.com/xh-polaris/psych-core-api/pkg/core"
 )
 
@@ -62,9 +64,35 @@ func processBinaryMessage(data []byte, meta *core.Meta) {
 	case core.MResp: // 响应消息
 		switch payload.(*core.Resp).Type {
 		case core.RModelAudio: // 模型音频
-			log.Printf("收到音频消息\n")
+			if !ttsConnected { // 仅打印一条连接成功
+				ttsConnected = true
+				log.Printf("[tts] 音频通道已连接, 开始接收语音")
+			}
+			if *verbose { // 详细模式才打印每条音频
+				log.Printf("收到音频消息, length=%d", len(payload.(*core.Resp).Content.(string)))
+			}
 			if payload.(*core.Resp) != nil && payload.(*core.Resp).Content != nil {
 				modelVideo = append(modelVideo, []byte(payload.(*core.Resp).Content.(string))...)
+			}
+		case core.RModelText: // 模型文本, 累积到完整回复
+			// Content 经 JSON 反序列化后为 map[string]any, 需重新序列化还原 ChatFrame
+			raw, err := json.Marshal(payload.(*core.Resp).Content)
+			if err != nil {
+				log.Println("模型文本帧序列化失败:", err)
+				break
+			}
+			var frame app.ChatFrame
+			if err = json.Unmarshal(raw, &frame); err != nil {
+				log.Println("模型文本帧解析失败:", err)
+				break
+			}
+			modelText.WriteString(frame.Content)
+			if *verbose { // 详细模式打印每帧
+				log.Printf("收到文本帧 id=%d: %s", frame.Id, frame.Content)
+			}
+			if frame.Finish == "stop" { // 完整回复结束
+				log.Printf("===== 模型完整回复 =====\n%s\n======================", modelText.String())
+				modelText.Reset()
 			}
 		default:
 			// 格式化输出
@@ -78,6 +106,9 @@ func processBinaryMessage(data []byte, meta *core.Meta) {
 	}
 
 }
+
+var ttsConnected bool
+var modelText strings.Builder // 累积模型文本回复
 
 // 发送消息
 func sendMessage(conn *websocket.Conn, meta *core.Meta, mType core.MType, payload any) error {

@@ -14,6 +14,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
+	"github.com/xh-polaris/psych-core-api/biz/domain/dashboard"
 	"github.com/xh-polaris/psych-core-api/biz/domain/his"
 	"github.com/xh-polaris/psych-core-api/biz/infra/cache"
 	"github.com/xh-polaris/psych-core-api/biz/infra/lock"
@@ -305,82 +306,31 @@ func formatReport(rpt *report.Report) string {
 	if rpt.Title != "" {
 		sb.WriteString(fmt.Sprintf("**报告标题**: %s\n\n", rpt.Title))
 	}
-	if rpt.Digest != "" {
-		sb.WriteString(fmt.Sprintf("**对话摘要**: %s\n\n", rpt.Digest))
+	if d := dashboard.DigestOf(rpt); d != "" {
+		sb.WriteString(fmt.Sprintf("**对话摘要**: %s\n\n", d))
 	}
 	if len(rpt.Topics) > 0 {
 		sb.WriteString(fmt.Sprintf("**主要话题**: %s\n\n", strings.Join(rpt.Topics, "、")))
 	}
-	if rpt.Body != "" {
-		sb.WriteString(fmt.Sprintf("**对话正文**: %s\n\n", rpt.Body))
+	if b := dashboard.BodyOf(rpt); b != "" {
+		sb.WriteString(fmt.Sprintf("**对话正文**: %s\n\n", b))
 	}
-	if len(rpt.Suggestions) > 0 {
-		sb.WriteString(fmt.Sprintf("**已有建议**: %s\n\n", strings.Join(rpt.Suggestions, "；")))
+	if s := dashboard.SuggestionsOf(rpt); len(s) > 0 {
+		sb.WriteString(fmt.Sprintf("**已有建议**: %s\n\n", strings.Join(s, "；")))
 	}
 
 	if sr := rpt.SimpleReport; sr != nil {
 		sb.WriteString("### 简易报告\n\n")
 		if len(sr.Keywords) > 0 {
-			sb.WriteString(fmt.Sprintf("- **关键词**: %s\n", strings.Join(sr.Keywords, "、")))
+			sb.WriteString(fmt.Sprintf("- **话题关键词**: %s\n", strings.Join(sr.Keywords, "、")))
 		}
-		if sr.RiskLevel > 0 || sr.SeverityLevel > 0 {
-			sb.WriteString(fmt.Sprintf("- **风险/严重程度**: 风险=%d，严重程度=%d\n", sr.RiskLevel, sr.SeverityLevel))
+		if len(sr.Emotion) > 0 {
+			sb.WriteString(fmt.Sprintf("- **情绪状态**: %s\n", strings.Join(sr.Emotion, "、")))
 		}
+		sb.WriteString(fmt.Sprintf("- **风险等级**: %s\n", enum.RiskLevelLabel(sr.RiskLevel)))
+		sb.WriteString(fmt.Sprintf("- **严重程度**: %s\n", enum.DistressLevelLabel(sr.DistressLevel)))
 		if sr.Focus != "" {
-			sb.WriteString(fmt.Sprintf("- **关注重点**: %s\n", sr.Focus))
-		}
-		if sr.Content != "" {
-			sb.WriteString(fmt.Sprintf("\n%s\n", sr.Content))
-		}
-		if sr.MainProblem != "" {
-			sb.WriteString(fmt.Sprintf("- **主要问题**: %s\n", sr.MainProblem))
-		}
-		if sr.Emotion.Type != "" || sr.Emotion.Intensity != "" {
-			sb.WriteString(fmt.Sprintf("- **情绪状态**: %s（%s）\n", sr.Emotion.Type, sr.Emotion.Intensity))
-		}
-		if sr.Thoughts != "" {
-			sb.WriteString(fmt.Sprintf("- **认知模式**: %s\n", sr.Thoughts))
-		}
-		if len(sr.Behaviors) > 0 {
-			sb.WriteString(fmt.Sprintf("- **行为表现**: %s\n", strings.Join(sr.Behaviors, "、")))
-		}
-		if len(sr.Needs) > 0 {
-			sb.WriteString(fmt.Sprintf("- **表达需求**: %s\n", strings.Join(sr.Needs, "、")))
-		}
-		if sr.Duration != "" {
-			sb.WriteString(fmt.Sprintf("- **问题持续时间**: %s\n", sr.Duration))
-		}
-		if sr.FunctionImpact != "" {
-			sb.WriteString(fmt.Sprintf("- **功能影响**: %s\n", sr.FunctionImpact))
-		}
-		if sr.Triggers != "" {
-			sb.WriteString(fmt.Sprintf("- **诱发因素**: %s\n", sr.Triggers))
-		}
-		if sr.Coping != "" {
-			sb.WriteString(fmt.Sprintf("- **应对方式**: %s\n", sr.Coping))
-		}
-		if sr.Support != "" {
-			sb.WriteString(fmt.Sprintf("- **支持系统**: %s\n", sr.Support))
-		}
-		if sr.HelpSeeking != "" {
-			sb.WriteString(fmt.Sprintf("- **求助意愿**: %s\n", sr.HelpSeeking))
-		}
-		if sr.RiskObservation.Level != "" {
-			sb.WriteString(fmt.Sprintf("- **风险观察**: 等级=%s", sr.RiskObservation.Level))
-			if sr.RiskObservation.Evidence != "" {
-				sb.WriteString(fmt.Sprintf("，证据=%s", sr.RiskObservation.Evidence))
-			}
-			sb.WriteString("\n")
-		}
-		if sr.SeverityAssessment.Level != "" {
-			sb.WriteString(fmt.Sprintf("- **严重程度**: %s（%s）\n", sr.SeverityAssessment.Level, sr.SeverityAssessment.Basis))
-		}
-		if sr.Summary.MainProblem != "" || sr.Summary.RiskLevel != "" {
-			sb.WriteString(fmt.Sprintf("- **总结**: 主要问题=%s，情绪=%s，严重程度=%s，风险=%s，关注点=%s\n",
-				sr.Summary.MainProblem, sr.Summary.EmotionState, sr.Summary.Severity, sr.Summary.RiskLevel, sr.Summary.Focus))
-		}
-		if sr.ProvidedSupport != "" {
-			sb.WriteString(fmt.Sprintf("- **已提供支持**: %s\n", sr.ProvidedSupport))
+			sb.WriteString(fmt.Sprintf("- **重点关注**: %s\n", sr.Focus))
 		}
 		if len(sr.Suggestions) > 0 {
 			sb.WriteString(fmt.Sprintf("- **给教师的建议**: %s\n", strings.Join(sr.Suggestions, "；")))
@@ -400,8 +350,12 @@ func formatReport(rpt *report.Report) string {
 			}
 			sb.WriteString(fmt.Sprintf("- **次要问题**: %s\n", strings.Join(secs, "、")))
 		}
-		if len(a.Emotion.Types) > 0 || a.Emotion.Intensity != "" {
-			sb.WriteString(fmt.Sprintf("- **情绪分析**: 类型=%s，强度=%s\n", strings.Join(a.Emotion.Types, "、"), a.Emotion.Intensity))
+		if len(a.Emotion) > 0 {
+			types := make([]string, 0, len(a.Emotion))
+			for _, e := range a.Emotion {
+				types = append(types, fmt.Sprintf("%s(%.1f)", e.Type, e.Intensity))
+			}
+			sb.WriteString(fmt.Sprintf("- **情绪分析**: %s\n", strings.Join(types, "、")))
 		}
 		if len(a.Cognition) > 0 {
 			sb.WriteString(fmt.Sprintf("- **认知模式**: %s\n", strings.Join(a.Cognition, "、")))
@@ -434,13 +388,11 @@ func formatReport(rpt *report.Report) string {
 		if a.HelpSeeking != "" {
 			sb.WriteString(fmt.Sprintf("- **求助意愿**: %s\n", a.HelpSeeking))
 		}
-		if a.Function.Learning != "" || a.Function.Sleep != "" || a.Function.Diet != "" || a.Function.Interpersonal != "" || a.Function.DailyLife != "" || a.Function.EmotionRegulation != "" {
-			sb.WriteString(fmt.Sprintf("- **功能影响**: 学习=%s，睡眠=%s，饮食=%s，人际=%s，日常生活=%s，情绪调节=%s\n",
-				a.Function.Learning, a.Function.Sleep, a.Function.Diet, a.Function.Interpersonal, a.Function.DailyLife, a.Function.EmotionRegulation))
+		if a.Function.Learning != "" || a.Function.Sleep != "" || a.Function.Diet != "" || a.Function.Interpersonal != "" || a.Function.EmotionRegulation != "" {
+			sb.WriteString(fmt.Sprintf("- **功能影响**: 学习=%s，睡眠=%s，饮食=%s，人际=%s，情绪调节=%s\n",
+				a.Function.Learning, a.Function.Sleep, a.Function.Diet, a.Function.Interpersonal, a.Function.EmotionRegulation))
 		}
-		if report.ScalarString(a.Distress.Level) != "" {
-			sb.WriteString(fmt.Sprintf("- **痛苦程度**: %s（%s）\n", a.Distress.Level, strings.Join(a.Distress.Reason, "、")))
-		}
+		sb.WriteString(fmt.Sprintf("- **痛苦程度**: %s（%s）\n", enum.DistressLevelLabel(int32(a.Distress.Level)), strings.Join(a.Distress.Reason, "、")))
 		if a.Risk.Level != "" {
 			sb.WriteString(fmt.Sprintf("- **风险评估**: 等级=%s，总分=%d\n", a.Risk.Level, a.Risk.Score.Total))
 			if len(a.Risk.Evidence) > 0 {

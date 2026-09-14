@@ -12,7 +12,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
-	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
@@ -22,12 +22,18 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-// GetAlarmOverview 预警概览
+// GetAlarmOverview 预警概览（快照口径）
+// 无时间参数：cur=now，prev=now-7d；有时间参数：cur=endTime，prev=startTime（对比开始时间的存量增幅）
 func (d *DashboardDomain) GetAlarmOverview(ctx context.Context, scope *Scope, req *core_api.DashboardGetAlarmOverviewReq) (*core_api.DashboardGetAlarmOverviewResp, error) {
 	endTime := util.ParseEndTime(req.GetEndTime())
-	startTime := util.ParseStartTime(req.GetStartTime(), endTime)
-	prevEndTime := startTime
-	prevStartTime := prevEndTime.AddDate(0, 0, -7)
+	var cur, prev time.Time
+	if req.GetStartTime() > 0 || req.GetEndTime() > 0 {
+		startTime := util.ParseStartTime(req.GetStartTime(), endTime)
+		cur, prev = endTime, startTime
+	} else {
+		cur = endTime
+		prev = cur.AddDate(0, 0, -7)
+	}
 
 	var unitOID bson.ObjectID
 	if scope.UnitID != nil {
@@ -46,7 +52,7 @@ func (d *DashboardDomain) GetAlarmOverview(ctx context.Context, scope *Scope, re
 				Code: 0, Msg: "success",
 			}, nil
 		}
-		st, err := d.AlarmMapper.AggregateStatsByClassList(ctx, unitOID, rs.grades, rs.classes, startTime, endTime, prevStartTime, prevEndTime)
+		st, err := d.AlarmMapper.AggregateStatsByClassList(ctx, unitOID, rs.grades, rs.classes, cur, prev)
 		if err != nil {
 			logs.Errorf("aggregate alarm by class list error: %s", errorx.ErrorWithoutStack(err))
 			return nil, errorx.New(errno.ErrDashboardAlarmUserStat)
@@ -54,7 +60,7 @@ func (d *DashboardDomain) GetAlarmOverview(ctx context.Context, scope *Scope, re
 		return buildAlarmOverview(st), nil
 	}
 
-	st, err := d.AlarmMapper.AggregateStats(ctx, unitOID, startTime, endTime, prevStartTime, prevEndTime)
+	st, err := d.AlarmMapper.AggregateStats(ctx, unitOID, cur, prev)
 	if err != nil {
 		logs.Errorf("aggregate alarm error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardAlarmUserStat)
@@ -208,7 +214,7 @@ func (d *DashboardDomain) completeAlarm(ctx context.Context, dbAlarms []*alarm.A
 	}
 
 	var userInfo map[bson.ObjectID]*user.User
-	var msgStats map[bson.ObjectID]*conversation.ConvStats
+	var msgStats map[bson.ObjectID]*message.MsgStats
 	var userErr, msgErr error
 
 	var wg sync.WaitGroup
@@ -222,7 +228,7 @@ func (d *DashboardDomain) completeAlarm(ctx context.Context, dbAlarms []*alarm.A
 	}()
 	go func() {
 		defer wg.Done()
-		msgStats, msgErr = d.ConversationMapper.BatchConvStats(ctx, userIds)
+		msgStats, msgErr = d.MessageMapper.BatchMessageStats(ctx, userIds)
 		if msgErr != nil {
 			logs.Errorf("查询对话统计失败: %v", errorx.ErrorWithoutStack(msgErr))
 		}

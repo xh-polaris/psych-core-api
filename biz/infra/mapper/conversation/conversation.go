@@ -8,17 +8,17 @@ import (
 
 // Conversation 对话记录，与 message.conversation_id 对应
 type Conversation struct {
-	ID           bson.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	UserID       bson.ObjectID `json:"userId,omitempty" bson:"user_id,omitempty"`
-	Title        string        `json:"title,omitempty" bson:"title,omitempty"`
-	StartTime    time.Time     `json:"startTime,omitempty" bson:"start_time,omitempty"`
-	EndTime      time.Time     `json:"endTime,omitempty" bson:"end_time,omitempty"`
-	CreateTime   time.Time     `json:"createTime,omitempty" bson:"create_time,omitempty"`
-	UpdateTime   time.Time     `json:"updateTime,omitempty" bson:"update_time,omitempty"`
-	Status       int           `json:"status,omitempty" bson:"status,omitempty"`            // 1-2: Active | Deleted
-	Type         int           `json:"type,omitempty" bson:"type,omitempty"`                // 1-2: Student | Teacher
-	MessageCount int           `json:"messageCount" bson:"message_count"`                   // 消息总数
-	CharacterID  bson.ObjectID `json:"characterId,omitempty" bson:"character_id,omitempty"` // 绑定对话角色
+	ID          bson.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	UserID      bson.ObjectID `json:"userId,omitempty" bson:"user_id,omitempty"`
+	ChatDate    string        `json:"chatDate,omitempty" bson:"chat_date,omitempty"` // 对话所属日期（UTC+8，YYYY-MM-DD）
+	Title       string        `json:"title,omitempty" bson:"title,omitempty"`
+	StartTime   time.Time     `json:"startTime,omitempty" bson:"start_time,omitempty"`
+	EndTime     time.Time     `json:"endTime,omitempty" bson:"end_time,omitempty"`
+	CreateTime  time.Time     `json:"createTime,omitempty" bson:"create_time,omitempty"`
+	UpdateTime  time.Time     `json:"updateTime,omitempty" bson:"update_time,omitempty"`
+	Status      int           `json:"status,omitempty" bson:"status,omitempty"`            // 1-3: Active | Deleted | Pending
+	Type        int           `json:"type,omitempty" bson:"type,omitempty"`                // 1-2: Student | Teacher
+	CharacterID bson.ObjectID `json:"characterId,omitempty" bson:"character_id,omitempty"` // 绑定对话角色
 }
 
 // DurationMinutes 返回对话时长（分钟）

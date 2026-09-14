@@ -36,7 +36,8 @@ type IDashboardService interface {
 	// 对话记录 / 报表
 	DashboardUserConvRecords(ctx context.Context, req *core_api.DashboardUserConvRecordsReq) (*core_api.DashboardUserConvRecordsResp, error)
 	DashboardUnitConvRecords(ctx context.Context, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error)
-	DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*dashboard.GetReportResponse, error)
+	DashboardGetConversationMessages(ctx context.Context, req *core_api.DashboardGetConversationMessagesReq) (*core_api.DashboardGetConversationMessagesResp, error)
+	DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error)
 
 	// 预警
 	DashboardGetAlarmOverview(ctx context.Context, req *core_api.DashboardGetAlarmOverviewReq) (*core_api.DashboardGetAlarmOverviewResp, error)
@@ -204,7 +205,7 @@ func (s *DashboardService) DashboardUserConvRecords(ctx context.Context, req *co
 }
 
 // DashboardGetReport 查看报表详情
-func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*dashboard.GetReportResponse, error) {
+func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error) {
 	convOID, err := bson.ObjectIDFromHex(req.ConversationId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "ConversationId"), errorx.KV("value", "对话ID"))
@@ -230,6 +231,33 @@ func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api
 		return nil, err
 	}
 	return s.DashboardDomain.GetReport(ctx, scope, convOID, usr, req)
+}
+
+// DashboardGetConversationMessages 获取管理端报表关联的原始对话消息。
+func (s *DashboardService) DashboardGetConversationMessages(ctx context.Context, req *core_api.DashboardGetConversationMessagesReq) (*core_api.DashboardGetConversationMessagesResp, error) {
+	convOID, err := bson.ObjectIDFromHex(req.ConversationId)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "ConversationId"), errorx.KV("value", "对话ID"))
+	}
+	conv, err := s.ConversationMapper.FindOneById(ctx, convOID)
+	if err != nil {
+		logs.Errorf("get conversation error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "对话"))
+	}
+	usr, err := s.UserMapper.FindOneById(ctx, conv.UserID)
+	if err != nil {
+		logs.Errorf("get user error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "用户"))
+	}
+	meta, role, err := s.AuthDomain.IdentifyRole(ctx, usr.UnitID.Hex())
+	if err != nil {
+		return nil, err
+	}
+	scope, err := s.buildScope(usr.UnitID.Hex(), meta, role)
+	if err != nil {
+		return nil, err
+	}
+	return s.DashboardDomain.GetConversationMessages(ctx, scope, convOID, usr, req)
 }
 
 // DashboardUnitConvRecords 单位/平台对话记录列表

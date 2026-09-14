@@ -10,8 +10,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
-	"github.com/xh-polaris/psych-core-api/biz/domain/his"
-	"github.com/xh-polaris/psych-core-api/biz/domain/wordcld"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
@@ -34,6 +32,35 @@ func (d *DashboardDomain) UserConvRecords(ctx context.Context, scope *Scope, use
 		}
 	}
 	return d.userConvRecords(ctx, userOID, targetUser, req)
+}
+
+// GetConversationMessages 返回已获授权的管理端原始对话消息
+func (d *DashboardDomain) GetConversationMessages(ctx context.Context, scope *Scope, convOID bson.ObjectID, targetUser *user.User, req *core_api.DashboardGetConversationMessagesReq) (*core_api.DashboardGetConversationMessagesResp, error) {
+	if scope.IsClassTeacher() {
+		rs, err := d.resolveScope(ctx, scope)
+		if err != nil {
+			return nil, err
+		}
+		if err := d.ensureStudentInScope(ctx, rs, targetUser); err != nil {
+			return nil, err
+		}
+	}
+	messages, err := d.MessageMapper.RetrieveMessage(ctx, convOID.Hex(), -1)
+	if err != nil {
+		return nil, errorx.New(errno.ErrFetchMessages)
+	}
+	total := int32(len(messages))
+	start, end := util.PagedIndex(total, req.PaginationOptions)
+	messageList := make([]*core_api.DashboardConversationMessage, 0, end-start)
+	for _, item := range messages[start:end] {
+		messageList = append(messageList, &core_api.DashboardConversationMessage{
+			Content: item.Content, Role: int32(item.Role), Index: int32(item.Index), CreateTime: item.CreateTime.Unix(),
+		})
+	}
+	return &core_api.DashboardGetConversationMessagesResp{
+		Pagination: util.PaginationRes(total, req.PaginationOptions), MessageList: messageList,
+		Code: 0, Msg: "success",
+	}, nil
 }
 
 // userConvRecords 用户对话记录（对话频率趋势 + 分页详情）
@@ -328,7 +355,7 @@ func (d *DashboardDomain) listUserConvDetails(ctx context.Context, userOID bson.
 			tm[c.ID] = c.StartTime.Unix()
 			tmMu.Unlock()
 
-			// 获取摘要
+			// 获取摘要与关键词（均取自报表；v2 新报表不产出摘要，关键词经兼容层取值）
 			rpt, err := d.ReportMapper.FindByConversationPreferSuccess(ctx, c.ID)
 			if err != nil {
 				// 报表不存在，可能还未完成创建
@@ -337,43 +364,23 @@ func (d *DashboardDomain) listUserConvDetails(ctx context.Context, userOID bson.
 					digests[c.ID] = "暂无摘要"
 					dgstMu.Unlock()
 				} else {
-					// 意外错误
-					// 这里不直接返回 继续尝试生成词云
 					logs.Errorf("get report error: %s", errorx.ErrorWithoutStack(err))
 				}
-			} else {
-				// 报表存在，正常填入摘要
-				dgstMu.Lock()
-				digests[c.ID] = rpt.Digest
-				dgstMu.Unlock()
-			}
-			// 获取所有对话历史消息
-			msgHis, err := his.Mgr.RetrieveMessage(ctx, c.ID.Hex(), -1)
-			if err != nil || len(msgHis) == 0 {
-				logs.Errorf("retrieve history messages error: %s", errorx.ErrorWithoutStack(err))
 				kwdsMu.Lock()
-				kwds[c.ID] = &core_api.Keywords{
-					KeywordMap: make(map[string]int32),
-					KeyTotal:   0,
-				}
+				kwds[c.ID] = &core_api.Keywords{KeywordMap: make(map[string]int32), KeyTotal: 0}
 				kwdsMu.Unlock()
 				return
 			}
-			// 生成词云
-			wc, err := wordcld.Extractor.FromHisMsg(msgHis)
-			if err != nil {
-				logs.Errorf("word cloud extractor error: %s", errorx.ErrorWithoutStack(err))
-				kwdsMu.Lock()
-				kwds[c.ID] = &core_api.Keywords{
-					KeywordMap: make(map[string]int32),
-					KeyTotal:   0,
-				}
-				kwdsMu.Unlock()
-				return
-			}
+			dgstMu.Lock()
+			digests[c.ID] = DigestOf(rpt)
+			dgstMu.Unlock()
 
+			kwMap := make(map[string]int32)
+			for _, kw := range KeywordsOf(rpt) {
+				kwMap[kw]++
+			}
 			kwdsMu.Lock()
-			kwds[c.ID] = wc
+			kwds[c.ID] = &core_api.Keywords{KeywordMap: kwMap, KeyTotal: int32(len(kwMap))}
 			kwdsMu.Unlock()
 		}(conv)
 	}

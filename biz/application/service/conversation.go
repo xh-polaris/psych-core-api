@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"sort"
+	"errors"
 	"time"
 
 	"github.com/google/wire"
@@ -17,13 +17,14 @@ import (
 	"github.com/xh-polaris/psych-core-api/types/enum"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type IConversationService interface {
 	CreateConversation(ctx context.Context, req *core_api.CreateConversationReq) (resp *core_api.CreateConversationResp, err error)
 	ListConversations(ctx context.Context, req *core_api.ListConversationsReq) (resp *core_api.ListConversationsResp, err error)
 	GetSingleConv(ctx context.Context, req *core_api.GetSingleConvReq) (resp *core_api.GetSingleConvResp, err error)
-	GetConvByDate(ctx context.Context, req *core_api.GetConvByDateReq, characterId string) (resp *core_api.GetConvByDateResp, err error)
+	GetConvByDate(ctx context.Context, req *core_api.GetConvByDateReq) (resp *core_api.GetConvByDateResp, err error)
 	ArchiveConversation(ctx context.Context, conversationId string) error
 }
 
@@ -38,6 +39,8 @@ var ConversationServiceSet = wire.NewSet(
 	wire.Bind(new(IConversationService), new(*ConversationService)),
 )
 
+// CreateConversation 获取或创建「当天 + 指定老师」的会话
+// 会话唯一维度为 (user_id, chat_date, character_id)，同一学生同一天与不同老师各自拥有独立会话
 func (c *ConversationService) CreateConversation(ctx context.Context, req *core_api.CreateConversationReq) (resp *core_api.CreateConversationResp, err error) {
 	userMeta, err := c.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
@@ -49,19 +52,51 @@ func (c *ConversationService) CreateConversation(ctx context.Context, req *core_
 		return nil, errorx.New(errno.ErrInvalidParams)
 	}
 
-	temp := bson.NewObjectID()
-	if err := c.ConversationMapper.Insert(ctx, &conversation.Conversation{
-		ID:         temp,
-		UserID:     userOID,
-		Status:     enum.ConversationStatusDeleted,
-		CreateTime: time.Now(),
-		UpdateTime: time.Now(),
-	}); err != nil {
+	if req.CharacterId == "" {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "characterId"))
+	}
+	charOID, err := bson.ObjectIDFromHex(req.CharacterId)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "characterId"))
+	}
+
+	now := time.Now()
+	chatDate := util.FormatDateUTC8(now)
+	if existing, findErr := c.ConversationMapper.FindWritableByUserDateAndCharacter(ctx, userOID, chatDate, charOID); findErr == nil {
+		return &core_api.CreateConversationResp{
+			ConversationId: existing.ID.Hex(),
+			Code:           0,
+			Msg:            "success",
+		}, nil
+	} else if !errors.Is(findErr, mongo.ErrNoDocuments) {
+		return nil, errorx.New(errno.ErrCreateConversation)
+	}
+	created := &conversation.Conversation{
+		ID:          bson.NewObjectID(),
+		UserID:      userOID,
+		ChatDate:    chatDate,
+		CharacterID: charOID,
+		Status:      enum.ConversationStatusPending,
+		CreateTime:  now,
+		UpdateTime:  now,
+	}
+	if err := c.ConversationMapper.Insert(ctx, created); err != nil {
+		// 唯一索引决定唯一会话后，返回已创建的会话
+		if mongo.IsDuplicateKeyError(err) {
+			existing, findErr := c.ConversationMapper.FindWritableByUserDateAndCharacter(ctx, userOID, chatDate, charOID)
+			if findErr == nil {
+				return &core_api.CreateConversationResp{
+					ConversationId: existing.ID.Hex(),
+					Code:           0,
+					Msg:            "success",
+				}, nil
+			}
+		}
 		return nil, errorx.New(errno.ErrCreateConversation)
 	}
 
 	return &core_api.CreateConversationResp{
-		ConversationId: temp.Hex(),
+		ConversationId: created.ID.Hex(),
 		Code:           0,
 		Msg:            "success",
 	}, nil
@@ -107,36 +142,9 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 		return nil, errorx.New(errno.ErrListConversation)
 	}
 
-	// 学生历史按「日期 + 对话角色」组织。同一天与同一老师的多场会话
-	// 在列表中只占一项，详情通过 get_by_date 合并展示。
-	type dailyConversation struct {
-		date        string
-		characterId string
-		first       *conversation.Conversation
-	}
-	dailyMap := make(map[string]*dailyConversation)
-	for _, conv := range convs {
-		date := util.FormatDateUTC8(conv.CreateTime)
-		characterId := conv.CharacterID.Hex()
-		key := date + ":" + characterId
-		group := dailyMap[key]
-		if group == nil {
-			dailyMap[key] = &dailyConversation{date: date, characterId: characterId, first: conv}
-			continue
-		}
-		if conv.UpdateTime.After(group.first.UpdateTime) {
-			group.first = conv
-		}
-	}
-	daily := make([]*dailyConversation, 0, len(dailyMap))
-	for _, group := range dailyMap {
-		daily = append(daily, group)
-	}
-	sort.Slice(daily, func(i, j int) bool {
-		return daily[i].first.UpdateTime.After(daily[j].first.UpdateTime)
-	})
-
-	total := int32(len(daily))
+	// 历史记录按会话分页。旧逻辑先按日期去重，会导致同一天的多次会话
+	// 只显示最后一条，看起来像记录没有生成。
+	total := int32(len(convs))
 	if total == 0 {
 		return &core_api.ListConversationsResp{
 			Pagination: util.PaginationRes(0, pg),
@@ -147,15 +155,15 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 
 	startIdx, endIdx := util.PagedIndex(total, pg)
 	result := make([]*core_api.ConversationVO, 0, endIdx-startIdx)
-	for _, group := range daily[startIdx:endIdx] {
-		conv := group.first
+	// 同一天下可能并存多位老师的会话，每个 (user+date+character) 独立，按 conv 直接分页即可
+	for _, conv := range convs[startIdx:endIdx] {
 		result = append(result, &core_api.ConversationVO{
 			ConversationId: conv.ID.Hex(),
-			Brief:          group.date,
+			Brief:          conv.Title,
 			CreateTime:     conv.CreateTime.Unix(),
 			UpdateTime:     conv.UpdateTime.Unix(),
-			Date:           group.date,
-			CharacterId:    group.characterId,
+			Date:           util.FormatDateUTC8(conv.CreateTime),
+			CharacterId:    conv.CharacterID.Hex(),
 		})
 	}
 
@@ -167,8 +175,8 @@ func (c *ConversationService) ListConversations(ctx context.Context, req *core_a
 	}, nil
 }
 
-// GetConvByDate 返回用户指定日期的对话消息
-func (c *ConversationService) GetConvByDate(ctx context.Context, req *core_api.GetConvByDateReq, characterId string) (resp *core_api.GetConvByDateResp, err error) {
+// GetConvByDate 返回用户指定日期和角色的对话消息
+func (c *ConversationService) GetConvByDate(ctx context.Context, req *core_api.GetConvByDateReq) (resp *core_api.GetConvByDateResp, err error) {
 	// 提取当前用户userId
 	userMeta, err := c.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
@@ -184,48 +192,43 @@ func (c *ConversationService) GetConvByDate(ctx context.Context, req *core_api.G
 		userId = req.UserId
 	}
 
+	userOID, err := bson.ObjectIDFromHex(userId)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams)
+	}
+
+	// 老师角色必填: 历史以「某位老师当天会话」为维度返回，不能跨老师混合
+	if req.CharacterId == "" {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "characterId"))
+	}
+	charOID, err := bson.ObjectIDFromHex(req.CharacterId)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "characterId"))
+	}
+
 	// 日期默认为当天
 	if req.Date == "" {
 		req.Date = util.FormatDateUTC8(time.Now())
 	}
 
-	// 获取当日消息
-	msgs, err := his.Mgr.GetUserDailyMessages(ctx, userId, req.Date)
+	// 定位该老师当天的会话；该老师当天尚无会话时返回空列表
+	conv, err := c.ConversationMapper.FindWritableByUserDateAndCharacter(ctx, userOID, req.Date, charOID)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return &core_api.GetConvByDateResp{
+			Pagination:  util.PaginationRes(0, req.PaginationOptions),
+			MessageList: []*core_api.ConvByDateMessage{},
+			Code:        0,
+			Msg:         "success",
+		}, nil
+	}
 	if err != nil {
-		return nil, errorx.New(errno.ErrFetchMessages)
+		return nil, errorx.New(errno.ErrGetConversation)
 	}
 
-	// 学生端按老师隔离每日记录，防止同一天切换老师后消息混在一起。
-	if characterId != "" {
-		characterOID, parseErr := bson.ObjectIDFromHex(characterId)
-		if parseErr != nil {
-			return nil, errorx.New(errno.ErrInvalidParams)
-		}
-		userOID, parseErr := bson.ObjectIDFromHex(userId)
-		if parseErr != nil {
-			return nil, errorx.New(errno.ErrInvalidParams)
-		}
-		start, end, rangeErr := util.DayToUTCRange(req.Date)
-		if rangeErr != nil {
-			return nil, errorx.New(errno.ErrInvalidParams)
-		}
-		convs, findErr := c.ConversationMapper.FindByUserIdAndTimeRange(ctx, userOID, start, end)
-		if findErr != nil {
-			return nil, errorx.New(errno.ErrFetchMessages)
-		}
-		allowed := make(map[bson.ObjectID]struct{})
-		for _, conv := range convs {
-			if conv.CharacterID == characterOID {
-				allowed[conv.ID] = struct{}{}
-			}
-		}
-		filtered := make([]*message.Message, 0, len(msgs))
-		for _, msg := range msgs {
-			if _, ok := allowed[msg.ConversationId]; ok {
-				filtered = append(filtered, msg)
-			}
-		}
-		msgs = filtered
+	// 按 conversation_id 读取该会话的消息
+	msgs, err := his.Mgr.RetrieveMessage(ctx, conv.ID.Hex(), -1)
+	if err != nil {
+		return nil, errorx.New(errno.ErrFetchMessages)
 	}
 
 	// 分页并重新排序

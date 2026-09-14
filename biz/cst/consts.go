@@ -9,6 +9,7 @@ const (
 	JsonUserID         = "userId"
 	JsonUnitID         = "unitId"
 	JsonConversationID = "conversationId"
+	JsonCharacterID    = "characterId"
 	JsonCode           = "code"
 	JsonRole           = "admin"
 )
@@ -17,6 +18,7 @@ const (
 const (
 	ID             = "_id"
 	ConversationID = "conversation_id"
+	ChatDate       = "chat_date"
 	MessageID      = "message_id"
 	UserID         = "user_id"
 	CreateTime     = "create_time"

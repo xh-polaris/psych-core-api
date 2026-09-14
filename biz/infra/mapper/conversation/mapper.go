@@ -27,18 +27,20 @@ type IMongoMapper interface {
 	mapper.IMongoMapper[Conversation]
 	IsActive(ctx context.Context, conversationId bson.ObjectID) (bool, error)
 	Exists(ctx context.Context, conversationId bson.ObjectID) (bool, error)
+	// IsOwnedBy 校验会话是否归属于指定用户（按 _id + user_id 过滤，非删除状态），
+	// 用于 WS 连接时防止前端传入他人会话 ID 造成越权访问。
+	IsOwnedBy(ctx context.Context, conversationId, userId bson.ObjectID) (bool, error)
 	CountByUnit(ctx context.Context, unitId *bson.ObjectID) (int32, error)
 	CountByUser(ctx context.Context, userId bson.ObjectID) (int32, error)
 	CountByUserIds(ctx context.Context, userIds []bson.ObjectID) (int32, error)
 	FindManyByUserId(ctx context.Context, userId bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
 	FindManyByUserIds(ctx context.Context, userIds []bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
+	FindWritableByUserDateAndCharacter(ctx context.Context, userId bson.ObjectID, chatDate string, characterID bson.ObjectID) (*Conversation, error)
 	FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error)
 	FindByUserIdAndTimeRange(ctx context.Context, userId bson.ObjectID, start, end time.Time) ([]*Conversation, error)
-	FindDistinctDatesByUserId(ctx context.Context, userId bson.ObjectID, start, end time.Time) ([]string, error)
 	FindManyByUnitId(ctx context.Context, unitId *bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
 	// 修改
 	SetActive(ctx context.Context, conversationId bson.ObjectID) error
-	SetCharacter(ctx context.Context, conversationId, characterId bson.ObjectID) error
 	// 聚合统计
 	CountUnitConvByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
 	CountUserDailyConv(ctx context.Context, userId bson.ObjectID) (map[int32]int32, error)
@@ -101,10 +103,42 @@ func (m *mongoMapper) Exists(ctx context.Context, conversationId bson.ObjectID) 
 	return count > 0, nil
 }
 
+func (m *mongoMapper) IsOwnedBy(ctx context.Context, conversationId, userId bson.ObjectID) (bool, error) {
+	count, err := m.conn.CountDocuments(ctx, bson.M{
+		cst.ID:     conversationId,
+		cst.UserID: userId,
+		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+	})
+	if err != nil {
+		logs.Errorf("[conversation mapper] isOwnedBy err: %s", errorx.ErrorWithoutStack(err))
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// FindWritableByUserDateAndCharacter 查询用户某天、某位老师可继续写入的会话。
+// 唯一维度为 (user_id, chat_date, character_id)，当天同一老师只允许一条 Pending 或 Active 会话。
+func (m *mongoMapper) FindWritableByUserDateAndCharacter(ctx context.Context, userId bson.ObjectID, chatDate string, characterID bson.ObjectID) (*Conversation, error) {
+	conv := &Conversation{}
+	filter := bson.M{
+		cst.UserID:      userId,
+		cst.ChatDate:    chatDate,
+		cst.CharacterID: characterID,
+		cst.Status: bson.M{cst.In: []int{
+			enum.ConversationStatusPending,
+			enum.ConversationStatusActive,
+		}},
+	}
+	if err := m.conn.FindOneNoCache(ctx, conv, filter, options.FindOne().SetSort(bson.M{cst.UpdateTime: -1})); err != nil {
+		return nil, err
+	}
+	return conv, nil
+}
+
 // CountByUnit 统计对话数量，unitId 为空表示全平台
 func (m *mongoMapper) CountByUnit(ctx context.Context, unitId *bson.ObjectID) (int32, error) {
 	if unitId == nil {
-		cnt, err := m.conn.CountDocuments(ctx, bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}})
+		cnt, err := m.conn.CountDocuments(ctx, bson.M{cst.Status: enum.ConversationStatusActive})
 		return int32(cnt), err
 	}
 	return m.countWithUnitFilter(ctx, unitId, nil, nil)
@@ -115,9 +149,6 @@ func (m *mongoMapper) CountByUser(ctx context.Context, userId bson.ObjectID) (in
 		cst.UserID: userId,
 		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
 	})
-	if err != nil {
-		return 0, err
-	}
 	return int32(cnt), err
 }
 
@@ -127,7 +158,7 @@ func (m *mongoMapper) CountUnitConvByPeriod(ctx context.Context, unitId *bson.Ob
 }
 
 func (m *mongoMapper) countWithUnitFilter(ctx context.Context, unitId *bson.ObjectID, start, end *time.Time) (int32, error) {
-	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
+	matchStage := bson.M{cst.Status: enum.ConversationStatusActive}
 	if (start != nil && !start.IsZero()) || (end != nil && !end.IsZero()) {
 		ct := bson.M{}
 		if start != nil && !start.IsZero() {
@@ -181,7 +212,7 @@ func (m *mongoMapper) AverageDurationByPeriod(ctx context.Context, unitId *bson.
 }
 
 func (m *mongoMapper) averageDurationWithFilter(ctx context.Context, unitId *bson.ObjectID, start, end *time.Time) (float64, error) {
-	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
+	matchStage := bson.M{cst.Status: enum.ConversationStatusActive}
 	if (start != nil && !start.IsZero()) || (end != nil && !end.IsZero()) {
 		ct := bson.M{}
 		if start != nil && !start.IsZero() {
@@ -242,7 +273,7 @@ func (m *mongoMapper) averageDurationWithFilter(ctx context.Context, unitId *bso
 
 // CountActiveUsers 统计活跃用户数：在给定时间段内（根据 endTime）有对话的去重用户数
 func (m *mongoMapper) CountActiveUsers(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error) {
-	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
+	matchStage := bson.M{cst.Status: enum.ConversationStatusActive}
 
 	timeFilter := bson.M{}
 	if !start.IsZero() {
@@ -297,7 +328,7 @@ func weekdayToCn(wd int32) int32 {
 
 // CountUnitConvByWeekday 按星期聚合对话数（create_time 口径，与 CountUnitConvByPeriod 一致）
 func (m *mongoMapper) CountUnitConvByWeekday(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (map[int32]int32, error) {
-	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
+	matchStage := bson.M{cst.Status: enum.ConversationStatusActive}
 	timeFilter := bson.M{}
 	if !start.IsZero() {
 		timeFilter[cst.GTE] = start
@@ -348,7 +379,7 @@ func (m *mongoMapper) CountUnitConvByWeekday(ctx context.Context, unitId *bson.O
 
 // CountActiveUsersByWeekday 按星期聚合活跃用户数（end_time 口径，与 CountActiveUsers 一致，先按 user+星期去重再计数）
 func (m *mongoMapper) CountActiveUsersByWeekday(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (map[int32]int32, error) {
-	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
+	matchStage := bson.M{cst.Status: enum.ConversationStatusActive}
 	timeFilter := bson.M{}
 	if !start.IsZero() {
 		timeFilter[cst.GTE] = start
@@ -417,7 +448,7 @@ func (m *mongoMapper) BatchConvStats(ctx context.Context, userIds []bson.ObjectI
 		{
 			"$match": bson.M{
 				cst.UserID: bson.M{cst.In: userIds},
-				cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}, // 非删除状态
+				cst.Status: enum.ConversationStatusActive,
 			},
 		},
 		{
@@ -466,7 +497,7 @@ func (m *mongoMapper) CountUserDailyConv(ctx context.Context, userId bson.Object
 		// 匹配特定用户和时间范围的对话记录
 		{"$match": bson.M{
 			cst.UserID: userId,
-			cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+			cst.Status: enum.ConversationStatusActive,
 			cst.CreateTime: bson.M{
 				"$gte": sevenDayStart,
 				"$lt":  sevenDayEnd,
@@ -514,7 +545,7 @@ func (m *mongoMapper) CountUserDailyConv(ctx context.Context, userId bson.Object
 
 func (m *mongoMapper) FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error) {
 	// 按时间顺序返回
-	c, err := m.FindManyWithOption(ctx, bson.M{cst.UserID: userId, cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}, options.Find().SetSort(bson.M{cst.UpdateTime: -1}))
+	c, err := m.FindManyWithOption(ctx, bson.M{cst.UserID: userId, cst.Status: enum.ConversationStatusActive}, options.Find().SetSort(bson.M{cst.UpdateTime: -1}))
 	if err != nil {
 		logs.Errorf("[conversation mapper] find all by user err: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
@@ -523,7 +554,7 @@ func (m *mongoMapper) FindAllByUserId(ctx context.Context, userId bson.ObjectID)
 }
 
 func (m *mongoMapper) FindManyByUserId(ctx context.Context, userId bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error) {
-	c, err := m.FindManyWithOption(ctx, bson.M{cst.UserID: userId, cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}, opt)
+	c, err := m.FindManyWithOption(ctx, bson.M{cst.UserID: userId, cst.Status: enum.ConversationStatusActive}, opt)
 	if err != nil {
 		logs.Errorf("[conversation mapper] paged find many by user err: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
@@ -535,7 +566,7 @@ func (m *mongoMapper) CountByUserIds(ctx context.Context, userIds []bson.ObjectI
 	if len(userIds) == 0 {
 		return 0, nil
 	}
-	count, err := m.conn.CountDocuments(ctx, bson.M{cst.UserID: bson.M{cst.In: userIds}, cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}})
+	count, err := m.conn.CountDocuments(ctx, bson.M{cst.UserID: bson.M{cst.In: userIds}, cst.Status: enum.ConversationStatusActive})
 	if err != nil {
 		logs.Errorf("[conversation mapper] count by user ids err: %s", errorx.ErrorWithoutStack(err))
 		return 0, err
@@ -547,7 +578,7 @@ func (m *mongoMapper) FindManyByUserIds(ctx context.Context, userIds []bson.Obje
 	if len(userIds) == 0 {
 		return []*Conversation{}, nil
 	}
-	c, err := m.FindManyWithOption(ctx, bson.M{cst.UserID: bson.M{cst.In: userIds}, cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}, opt)
+	c, err := m.FindManyWithOption(ctx, bson.M{cst.UserID: bson.M{cst.In: userIds}, cst.Status: enum.ConversationStatusActive}, opt)
 	if err != nil {
 		logs.Errorf("[conversation mapper] find many by user ids err: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
@@ -556,7 +587,7 @@ func (m *mongoMapper) FindManyByUserIds(ctx context.Context, userIds []bson.Obje
 }
 
 func (m *mongoMapper) FindManyByUnitId(ctx context.Context, unitId *bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error) {
-	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
+	matchStage := bson.M{cst.Status: enum.ConversationStatusActive}
 	pipeline := []bson.M{{"$match": matchStage}}
 
 	if unitId != nil {
@@ -621,7 +652,7 @@ func (m *mongoMapper) FindManyByUnitId(ctx context.Context, unitId *bson.ObjectI
 // CountByDurationBucket 按时长分桶统计对话数量（支持四舍五入到整数分钟）
 // minMinutes, maxMinutes: 时长范围（分钟），maxMinutes < 0 表示无上限
 func (m *mongoMapper) CountByDurationBucket(ctx context.Context, unitId *bson.ObjectID, minMinutes, maxMinutes float64, start, end time.Time) (int32, error) {
-	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
+	matchStage := bson.M{cst.Status: enum.ConversationStatusActive}
 	if !start.IsZero() || !end.IsZero() {
 		tf := bson.M{}
 		if !start.IsZero() {
@@ -695,7 +726,7 @@ func (m *mongoMapper) CountByDurationBucket(ctx context.Context, unitId *bson.Ob
 // ConvDurationByGrade 按年级统计对话时长分布（年级 1-12）
 // 返回 map[grade]durationSeconds 和总时长
 func (m *mongoMapper) ConvDurationByGrade(ctx context.Context, unitId *bson.ObjectID) (map[int32]int32, int32, error) {
-	matchStage := bson.M{cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted}}
+	matchStage := bson.M{cst.Status: enum.ConversationStatusActive}
 
 	pipeline := []bson.M{{"$match": matchStage}}
 
@@ -756,15 +787,16 @@ func (m *mongoMapper) ConvDurationByGrade(ctx context.Context, unitId *bson.Obje
 	return ratioMap, totalDuration, nil
 }
 
+// SetActive 仅允许待激活会话进入活跃状态，已删除会话不可被消息写入流程恢复。
 func (m *mongoMapper) SetActive(ctx context.Context, cid bson.ObjectID) error {
-	return m.UpdateFields(ctx, cid, bson.M{
-		cst.Status:     enum.ConversationStatusActive,
-		cst.UpdateTime: time.Now(),
-	})
-}
-
-func (m *mongoMapper) SetCharacter(ctx context.Context, cid, characterId bson.ObjectID) error {
-	return m.UpdateFields(ctx, cid, bson.M{cst.CharacterID: characterId})
+	_, err := m.conn.UpdateOneNoCache(ctx,
+		bson.M{cst.ID: cid, cst.Status: enum.ConversationStatusPending},
+		bson.M{"$set": bson.M{
+			cst.Status:     enum.ConversationStatusActive,
+			cst.UpdateTime: time.Now(),
+		}},
+	)
+	return err
 }
 
 // CountConversationsByClassList 按班级列表统计对话数量
@@ -807,7 +839,7 @@ func (m *mongoMapper) CountConversationsByClassList(ctx context.Context, grades,
 	// 查询这些用户的对话数量
 	convFilter := bson.M{
 		cst.UserID: bson.M{cst.In: userIds},
-		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+		cst.Status: enum.ConversationStatusActive,
 	}
 
 	if !start.IsZero() || !end.IsZero() {
@@ -879,7 +911,7 @@ func (m *mongoMapper) CountActiveUsersByClassList(ctx context.Context, grades, c
 	pipeline := []bson.M{
 		{"$match": bson.M{
 			cst.UserID:    bson.M{cst.In: userIds},
-			cst.Status:    bson.M{cst.NE: enum.ConversationStatusDeleted},
+			cst.Status:    enum.ConversationStatusActive,
 			cst.StartTime: timeFilter,
 		}},
 		{"$group": bson.M{"_id": "$" + cst.UserID}},
@@ -915,7 +947,7 @@ func (m *mongoMapper) CountConversationsByWeekdayByClassList(ctx context.Context
 
 	convFilter := bson.M{
 		cst.UserID: bson.M{cst.In: userIds},
-		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+		cst.Status: enum.ConversationStatusActive,
 	}
 	timeFilter := bson.M{}
 	if !start.IsZero() {
@@ -967,7 +999,7 @@ func (m *mongoMapper) CountActiveUsersByWeekdayByClassList(ctx context.Context, 
 
 	convFilter := bson.M{
 		cst.UserID: bson.M{cst.In: userIds},
-		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+		cst.Status: enum.ConversationStatusActive,
 	}
 	timeFilter := bson.M{}
 	if !start.IsZero() {
@@ -1048,7 +1080,7 @@ func (m *mongoMapper) AverageDurationByClassListAndPeriod(ctx context.Context, g
 	// 构建查询条件
 	matchStage := bson.M{
 		cst.UserID: bson.M{cst.In: userIds},
-		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+		cst.Status: enum.ConversationStatusActive,
 	}
 
 	if !start.IsZero() || !end.IsZero() {
@@ -1196,7 +1228,7 @@ func (m *mongoMapper) CountByClassList(ctx context.Context, grades, classes []in
 	// 查询这些用户的对话数量
 	convFilter := bson.M{
 		cst.UserID: bson.M{cst.In: userIds},
-		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+		cst.Status: enum.ConversationStatusActive,
 	}
 
 	count, err := m.conn.CountDocuments(ctx, convFilter)
@@ -1257,7 +1289,7 @@ func (m *mongoMapper) FindManyByClassList(ctx context.Context, grades, classes [
 	// 查询这些用户的对话
 	matchStage := bson.M{
 		cst.UserID: bson.M{cst.In: userIds},
-		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+		cst.Status: enum.ConversationStatusActive,
 	}
 
 	pipeline = []bson.M{{"$match": matchStage}}
@@ -1314,7 +1346,7 @@ func (m *mongoMapper) CountByDurationBucketByClassList(ctx context.Context, grad
 
 	matchStage := bson.M{
 		cst.UserID: bson.M{cst.In: userIds},
-		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+		cst.Status: enum.ConversationStatusActive,
 	}
 	if !start.IsZero() || !end.IsZero() {
 		tf := bson.M{}
@@ -1382,7 +1414,7 @@ func (m *mongoMapper) ConvDurationByGradeByClassList(ctx context.Context, grades
 
 	matchStage := bson.M{
 		cst.UserID: bson.M{cst.In: userIds},
-		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+		cst.Status: enum.ConversationStatusActive,
 	}
 
 	pipeline := []bson.M{{"$match": matchStage}}
@@ -1433,8 +1465,9 @@ func (m *mongoMapper) ConvDurationByGradeByClassList(ctx context.Context, grades
 // getUserIdsByGradesClasses 根据年级和班级获取用户 ID 列表（内部复用方法）
 func (m *mongoMapper) FindByUserIdAndTimeRange(ctx context.Context, userId bson.ObjectID, start, end time.Time) ([]*Conversation, error) {
 	filter := bson.M{
-		cst.UserID: userId,
-		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
+		cst.UserID:   userId,
+		cst.Status:   enum.ConversationStatusActive,
+		cst.ChatDate: bson.M{"$type": "string"},
 	}
 	if !start.IsZero() || !end.IsZero() {
 		ct := bson.M{}
@@ -1448,55 +1481,8 @@ func (m *mongoMapper) FindByUserIdAndTimeRange(ctx context.Context, userId bson.
 			filter[cst.CreateTime] = ct
 		}
 	}
-	opts := options.Find().SetSort(bson.M{cst.CreateTime: 1})
+	opts := options.Find().SetSort(bson.M{cst.UpdateTime: -1})
 	return m.FindManyWithOption(ctx, filter, opts)
-}
-
-func (m *mongoMapper) FindDistinctDatesByUserId(ctx context.Context, userId bson.ObjectID, start, end time.Time) ([]string, error) {
-	matchStage := bson.M{
-		cst.UserID: userId,
-		cst.Status: bson.M{cst.NE: enum.ConversationStatusDeleted},
-	}
-	if !start.IsZero() || !end.IsZero() {
-		ct := bson.M{}
-		if !start.IsZero() {
-			ct[cst.GTE] = start
-		}
-		if !end.IsZero() {
-			ct[cst.LT] = end
-		}
-		if len(ct) > 0 {
-			matchStage[cst.CreateTime] = ct
-		}
-	}
-
-	pipeline := []bson.M{
-		{"$match": matchStage},
-		{"$addFields": bson.M{
-			"localDate": bson.M{
-				"$dateToString": bson.M{
-					"format": "%Y-%m-%d",
-					"date":   bson.M{"$add": bson.A{"$" + cst.CreateTime, 8 * 60 * 60 * 1000}},
-				},
-			},
-		}},
-		{"$group": bson.M{cst.ID: "$localDate"}},
-		{"$sort": bson.M{cst.ID: -1}},
-	}
-
-	var results []struct {
-		Date string `bson:"_id"`
-	}
-	if err := m.conn.Aggregate(ctx, &results, pipeline); err != nil {
-		logs.Errorf("[conversation mapper] find distinct dates err: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-
-	dates := make([]string, len(results))
-	for i, r := range results {
-		dates[i] = r.Date
-	}
-	return dates, nil
 }
 
 func (m *mongoMapper) getUserIdsByGradesClasses(ctx context.Context, grades, classes []int32) ([]bson.ObjectID, error) {

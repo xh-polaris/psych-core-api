@@ -42,15 +42,13 @@ func (e *Engine) buildDialogueApp(cfg *app.ChatSetting) error {
 func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	execStart := time.Now()
 	userId := e.info[cst.JsonUserID].(string)
-	todayDate := util.FormatDateUTC8(time.Now())
 
 	hisStart := time.Now()
-	// 对话上下文严格限定在当前 conversation，避免切换老师时带入上一段会话。
-	mMsgs, err := his.Mgr.RetrieveMessage(ctx, e.uSession, -1)
+	mMsgs, err := his.Mgr.GetConversationMessages(ctx, e.uSession, -1)
 	if err != nil {
 		return errorx.WrapByCode(err, errno.RetrieveHisErr)
 	}
-	logs.Infof("[engine] [dialogue] RetrieveMessage in %dms, msgs=%d", time.Since(hisStart).Milliseconds(), len(mMsgs))
+	logs.Infof("[engine] [dialogue] GetConversationMessages in %dms, msgs=%d", time.Since(hisStart).Milliseconds(), len(mMsgs))
 
 	e.count++
 
@@ -64,7 +62,7 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	}
 	usrMsg := convert.UserMMsg(oids[0], oids[1], cmd.Content.(string), index)
 	hisStart = time.Now()
-	err = his.Mgr.AddMessage(ctx, userId, todayDate, usrMsg)
+	err = his.Mgr.AddMessage(ctx, usrMsg)
 	if err != nil {
 		return errorx.WrapByCode(err, errno.AddUserMsgErr)
 	}
@@ -155,9 +153,7 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 		astMsg.Usage = e.usage.LLMUsage
 		now := time.Now()
 		astMsg.CreateTime, astMsg.UpdateTime, astMsg.Content = now, now, collect.String()
-		userId := e.info[cst.JsonUserID].(string)
-		todayDate := util.FormatDateUTC8(now)
-		if err := his.Mgr.AddMessage(context.Background(), userId, todayDate, astMsg); err != nil {
+		if err := his.Mgr.AddMessage(context.Background(), astMsg); err != nil {
 			e.unexpected(err, "llm response save err")
 		}
 	}(&collect, astMsg)

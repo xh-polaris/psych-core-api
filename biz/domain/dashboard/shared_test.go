@@ -1,6 +1,8 @@
 package dashboard
 
 import (
+	"bytes"
+	"encoding/json"
 	"testing"
 	"time"
 )
@@ -23,5 +25,16 @@ func TestBuildRecentWeekTrendPointsEndsWithToday(t *testing.T) {
 	}
 	if points[0].Count != 22 || points[5].Count != 77 || points[6].Count != 11 {
 		t.Fatalf("counts were not kept with weekdays: %#v", points)
+	}
+}
+
+func TestAnalysisToPBEncodesAbsentListsAsEmptyArrays(t *testing.T) {
+	analysis := analysisToPB(nil)
+	body, err := json.Marshal(analysis)
+	if err != nil {
+		t.Fatalf("marshal analysis: %v", err)
+	}
+	if bytes.Contains(body, []byte(":null")) {
+		t.Fatalf("analysis contains null fields: %s", body)
 	}
 }

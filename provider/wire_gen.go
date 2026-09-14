@@ -41,12 +41,14 @@ func NewProvider() (*Provider, error) {
 		UnitMapper: unitIMongoMapper,
 	}
 	conversationIMongoMapper := conversation.NewConversationMongoMapper(confConfig)
+	messageIMongoMapper := message.NewMessageMongoMapper(confConfig)
 	alarmIMongoMapper := alarm.NewAlarmMongoMapper(confConfig)
 	reportIMongoMapper := report.NewReportMongoMapper(confConfig)
 	dashboardDomain := &dashboard.DashboardDomain{
 		UserMapper:         iMongoMapper,
 		UnitMapper:         unitIMongoMapper,
 		ConversationMapper: conversationIMongoMapper,
+		MessageMapper:      messageIMongoMapper,
 		ReportMapper:       reportIMongoMapper,
 		AlarmMapper:        alarmIMongoMapper,
 	}
@@ -83,7 +85,6 @@ func NewProvider() (*Provider, error) {
 		UserMapper:      iMongoMapper,
 		Synapse4bClient: client,
 	}
-	messageIMongoMapper := message.NewMessageMongoMapper(confConfig)
 	conversationService := service.ConversationService{
 		AuthDomain:         authDomain,
 		MessageMapper:      messageIMongoMapper,

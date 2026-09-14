@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
-	"github.com/xh-polaris/psych-core-api/biz/domain/wordcld"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
@@ -53,14 +52,20 @@ func (d *DashboardDomain) reportStats(ctx context.Context, rs *resolvedScope, st
 	return stats, nil
 }
 
-// getKeywords 关键词词云（来源报表）
+// getKeywords 关键词词云（v2 报表 simple_report.keywords 聚合；v0 报表不产出，不计入）
 func (d *DashboardDomain) getKeywords(ctx context.Context, rs *resolvedScope, start, end time.Time) (*core_api.Keywords, error) {
+	var kwMap map[string]int32
+	var err error
 	switch {
 	case rs.hasClass:
-		return wordcld.Extractor.FromUnitKWsByClassList(ctx, *rs.unitID, rs.grades, rs.classes, start, end)
+		kwMap, err = d.ReportMapper.GetUnitKWByClassList(ctx, *rs.unitID, rs.grades, rs.classes, start, end)
 	case rs.unitID != nil:
-		return wordcld.Extractor.FromUnitKWs(ctx, *rs.unitID, start, end)
+		kwMap, err = d.ReportMapper.GetUnitKW(ctx, *rs.unitID, start, end)
 	default:
-		return wordcld.Extractor.FromAllUnitsKWs(ctx, start, end)
+		kwMap, err = d.ReportMapper.GetAllUnitsKW(ctx, start, end)
 	}
+	if err != nil {
+		return nil, err
+	}
+	return &core_api.Keywords{KeywordMap: kwMap, KeyTotal: int32(len(kwMap))}, nil
 }

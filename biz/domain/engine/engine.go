@@ -11,7 +11,6 @@ import (
 
 	"github.com/xh-polaris/psych-core-api/biz/application/service"
 	"github.com/xh-polaris/psych-core-api/biz/domain/his"
-	"go.mongodb.org/mongo-driver/v2/bson"
 
 	"github.com/hertz-contrib/websocket"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
@@ -26,6 +25,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/pkg/wsx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // 目前当websocket层出现问题, engine会直接结束, 并未处理可恢复错误而是强制由客户端尝试重连
@@ -218,6 +218,21 @@ func (e *Engine) Unlock() error {
 	return nil
 }
 
+// buildPostNotify 构造后处理消息体
+func (e *Engine) buildPostNotify(end time.Time) *core.PostNotify {
+	return &core.PostNotify{
+		Session: e.uSession,
+		// 根层级的 UserId 和 UnitId 留空，因为它们已经存在于 Info 字典中了
+		Usage:     e.usage,
+		Info:      e.info,
+		Start:     e.start.Unix(),
+		End:       end.Unix() + 1, // +1 秒补偿：End 精确到最后一条消息，但 Unix() 丢毫秒，+1 保证不漏最后一条
+		Config:    e.conf,
+		Date:      util.FormatDateUTC8(end),
+		Character: e.Character,
+	}
+}
+
 // Close 释放engine的资源
 func (e *Engine) Close() (err error) {
 	logs.Infof("[engine] %s closed by %s", e.uSession, util.CallerInfo(2))
@@ -243,6 +258,10 @@ func (e *Engine) Close() (err error) {
 		pCtx, pCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer pCancel()
 
+		// 本次对话结束时间默认取断开时刻；有新消息时改为最后一条消息的精确时间
+		// 作为报告段的右边界，避免把断开后、下一次连接的消息误算进本段
+		endTime := time.Now()
+
 		// 检查数据库中会话是否依然有效
 		if oid, err := bson.ObjectIDFromHex(e.uSession); err == nil {
 			active, _ := e.convMapper.IsActive(pCtx, oid)
@@ -251,8 +270,8 @@ func (e *Engine) Close() (err error) {
 				return
 			}
 
-			// 只统计当前 conversation 的消息，避免把同一天其他老师的消息算进来。
-			latestMsgs, _ := his.Mgr.RetrieveMessage(pCtx, e.uSession, -1)
+			// 再次查询最新的消息总数以确定是否有变化
+			latestMsgs, _ := his.Mgr.GetConversationMessages(pCtx, e.uSession, -1)
 			currentTotal := len(latestMsgs)
 
 			// 只有消息数增加了，才执行更新和 MQ
@@ -261,16 +280,15 @@ func (e *Engine) Close() (err error) {
 				return
 			}
 
-			// 更新会话信息 (时间、消息数、角色)
-			update := bson.M{
-				cst.StartTime:    e.start,
-				cst.EndTime:      time.Now(),
-				cst.MessageCount: currentTotal,
+			// 报告段右边界 = 最后一条消息的精确创建时间（latestMsgs 按 create_time 倒序）
+			if currentTotal > 0 {
+				endTime = latestMsgs[0].CreateTime
 			}
-			if e.Character != nil && e.Character.Id != "" {
-				if charOID, err := bson.ObjectIDFromHex(e.Character.Id); err == nil {
-					update[cst.CharacterID] = charOID
-				}
+
+			// 更新会话信息 (时间) character_id 仅在创建会话时确定
+			update := bson.M{
+				cst.StartTime: e.start,
+				cst.EndTime:   endTime,
 			}
 			if err = e.convMapper.UpdateFields(pCtx, oid, update); err != nil {
 				logs.Error("[engine] update conversation time err: %v", err)
@@ -278,28 +296,13 @@ func (e *Engine) Close() (err error) {
 		}
 
 		// 发布 MQ 通知
-		if err = mq.GetPostProducer().Produce(pCtx, e.buildPostNotify(time.Now())); err != nil {
+		if err = mq.GetPostProducer().Produce(pCtx, e.buildPostNotify(endTime)); err != nil {
 			// 发送失败需要详细记录日志, 以进行后续托底
-			logs.Error("[engine] produce notify error: %s with such state: session:%s start: %d end:%d info:%+v config:%+v", err, e.uSession, e.start, time.Now(), e.info, e.conf)
+			logs.Error("[engine] produce notify error: %s with such state: session:%s start: %d end:%d info:%+v config:%+v", err, e.uSession, e.start, endTime, e.info, e.conf)
 			return
 		}
 	})
 	return nil
-}
-
-// buildPostNotify 构造后处理消息体
-func (e *Engine) buildPostNotify(end time.Time) *core.PostNotify {
-	return &core.PostNotify{
-		Session: e.uSession,
-		// 根层级的 UserId 和 UnitId 留空，因为它们已经存在于 Info 字典中了
-		Usage:     e.usage,
-		Info:      e.info,
-		Start:     e.start.Unix(),
-		End:       end.Unix(),
-		Config:    e.conf,
-		Date:      util.FormatDateUTC8(end),
-		Character: e.Character,
-	}
 }
 
 // getID 强效提取 ID 逻辑 (兼容 string 和 ObjectID)

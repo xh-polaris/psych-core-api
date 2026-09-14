@@ -111,6 +111,7 @@ func GetConvByDate(ctx context.Context, c *app.RequestContext) {
 		PaginationOptions: req.PaginationOptions,
 		Date:              req.Date,
 		UserId:            req.UserId,
-	}, req.CharacterId)
+		CharacterId:       req.CharacterId,
+	})
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
