@@ -35,7 +35,7 @@ type IMongoMapper interface {
 	CountByUserIds(ctx context.Context, userIds []bson.ObjectID) (int32, error)
 	FindManyByUserId(ctx context.Context, userId bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
 	FindManyByUserIds(ctx context.Context, userIds []bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
-	FindWritableByUserDateAndCharacter(ctx context.Context, userId bson.ObjectID, chatDate string, characterID bson.ObjectID) (*Conversation, error)
+	FindManyByUserDateAndCharacter(ctx context.Context, userId bson.ObjectID, chatDate string, characterID bson.ObjectID) ([]*Conversation, error)
 	FindAllByUserId(ctx context.Context, userId bson.ObjectID) ([]*Conversation, error)
 	FindByUserIdAndTimeRange(ctx context.Context, userId bson.ObjectID, start, end time.Time) ([]*Conversation, error)
 	FindManyByUnitId(ctx context.Context, unitId *bson.ObjectID, opt options.Lister[options.FindOptions]) ([]*Conversation, error)
@@ -116,23 +116,24 @@ func (m *mongoMapper) IsOwnedBy(ctx context.Context, conversationId, userId bson
 	return count > 0, nil
 }
 
-// FindWritableByUserDateAndCharacter 查询用户某天、某位老师可继续写入的会话。
-// 唯一维度为 (user_id, chat_date, character_id)，当天同一老师只允许一条 Pending 或 Active 会话。
-func (m *mongoMapper) FindWritableByUserDateAndCharacter(ctx context.Context, userId bson.ObjectID, chatDate string, characterID bson.ObjectID) (*Conversation, error) {
-	conv := &Conversation{}
+// FindManyByUserDateAndCharacter 查询用户某天、某位老师的全部有效会话。
+// singleConv 下每次连接都是一条独立会话，当天可能有多条，按创建时间升序返回，
+// 供「按天聚合消息」使用（GetDailyMessages / GetConvByDate）。
+// 这里放行 Pending 会话：会话由 AddMessage 之后才 SetActive，若激活写入失败，
+// 只按 Active 过滤会让已落库的消息在当日聚合中凭空消失。
+func (m *mongoMapper) FindManyByUserDateAndCharacter(ctx context.Context, userId bson.ObjectID, chatDate string, characterID bson.ObjectID) ([]*Conversation, error) {
 	filter := bson.M{
 		cst.UserID:      userId,
 		cst.ChatDate:    chatDate,
 		cst.CharacterID: characterID,
-		cst.Status: bson.M{cst.In: []int{
-			enum.ConversationStatusPending,
-			enum.ConversationStatusActive,
-		}},
+		cst.Status:      bson.M{cst.NE: enum.ConversationStatusDeleted},
 	}
-	if err := m.conn.FindOneNoCache(ctx, conv, filter, options.FindOne().SetSort(bson.M{cst.UpdateTime: -1})); err != nil {
+	convs, err := m.FindManyWithOption(ctx, filter, options.Find().SetSort(bson.M{cst.CreateTime: 1}))
+	if err != nil {
+		logs.Errorf("[conversation mapper] find many by user date character err: %s", errorx.ErrorWithoutStack(err))
 		return nil, err
 	}
-	return conv, nil
+	return convs, nil
 }
 
 // CountByUnit 统计对话数量，unitId 为空表示全平台
@@ -211,8 +212,21 @@ func (m *mongoMapper) AverageDurationByPeriod(ctx context.Context, unitId *bson.
 	return m.averageDurationWithFilter(ctx, unitId, &start, &end)
 }
 
+// minValidTime 时长统计的最小有效时间，用于排除 start_time 为零值或缺省的会话
+var minValidTime = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+
+// validDurationCondition 仅保留时长有效的会话：start_time/end_time 均为真实时间且 end_time > start_time。
+// 避免零值 start_time 或 end<start 造成天文/负时长污染平均值与分桶统计。
+func validDurationCondition() bson.M {
+	return bson.M{"$and": []interface{}{
+		bson.M{"$gt": []interface{}{"$" + cst.StartTime, minValidTime}},
+		bson.M{"$gt": []interface{}{"$" + cst.EndTime, "$" + cst.StartTime}},
+	}}
+}
+
 func (m *mongoMapper) averageDurationWithFilter(ctx context.Context, unitId *bson.ObjectID, start, end *time.Time) (float64, error) {
 	matchStage := bson.M{cst.Status: enum.ConversationStatusActive}
+	matchStage["$expr"] = validDurationCondition()
 	if (start != nil && !start.IsZero()) || (end != nil && !end.IsZero()) {
 		ct := bson.M{}
 		if start != nil && !start.IsZero() {
@@ -653,6 +667,7 @@ func (m *mongoMapper) FindManyByUnitId(ctx context.Context, unitId *bson.ObjectI
 // minMinutes, maxMinutes: 时长范围（分钟），maxMinutes < 0 表示无上限
 func (m *mongoMapper) CountByDurationBucket(ctx context.Context, unitId *bson.ObjectID, minMinutes, maxMinutes float64, start, end time.Time) (int32, error) {
 	matchStage := bson.M{cst.Status: enum.ConversationStatusActive}
+	matchStage["$expr"] = validDurationCondition()
 	if !start.IsZero() || !end.IsZero() {
 		tf := bson.M{}
 		if !start.IsZero() {
@@ -661,7 +676,7 @@ func (m *mongoMapper) CountByDurationBucket(ctx context.Context, unitId *bson.Ob
 		if !end.IsZero() {
 			tf["$lte"] = end
 		}
-		matchStage[cst.StartTime] = tf
+		matchStage[cst.CreateTime] = tf
 	}
 
 	// 构建时长过滤条件：durationMinutes = (end_time - start_time) / 60000
@@ -850,7 +865,7 @@ func (m *mongoMapper) CountConversationsByClassList(ctx context.Context, grades,
 		if !end.IsZero() {
 			timeFilter[cst.LTE] = end
 		}
-		convFilter[cst.StartTime] = timeFilter
+		convFilter[cst.CreateTime] = timeFilter
 	}
 
 	count, err := m.conn.CountDocuments(ctx, convFilter)
@@ -934,7 +949,7 @@ func (m *mongoMapper) CountActiveUsersByClassList(ctx context.Context, grades, c
 	return results[0].Count, nil
 }
 
-// CountConversationsByWeekdayByClassList 按星期聚合对话数（按班级列表，start_time 口径，与 CountConversationsByClassList 一致）
+// CountConversationsByWeekdayByClassList 按星期聚合对话数（按班级列表，create_time 口径，与 CountConversationsByClassList 一致）
 func (m *mongoMapper) CountConversationsByWeekdayByClassList(ctx context.Context, grades, classes []int32, start, end time.Time) (map[int32]int32, error) {
 	userIds, err := m.classListUserIds(ctx, grades, classes)
 	if err != nil {
@@ -957,13 +972,13 @@ func (m *mongoMapper) CountConversationsByWeekdayByClassList(ctx context.Context
 		timeFilter[cst.LTE] = end
 	}
 	if len(timeFilter) > 0 {
-		convFilter[cst.StartTime] = timeFilter
+		convFilter[cst.CreateTime] = timeFilter
 	}
 
 	pipeline := []bson.M{
 		{"$match": convFilter},
 		{"$group": bson.M{
-			cst.ID:  bson.M{"wd": bson.M{"$dayOfWeek": "$" + cst.StartTime}},
+			cst.ID:  bson.M{"wd": bson.M{"$dayOfWeek": "$" + cst.CreateTime}},
 			"count": bson.M{"$sum": 1},
 		}},
 	}
@@ -1082,6 +1097,7 @@ func (m *mongoMapper) AverageDurationByClassListAndPeriod(ctx context.Context, g
 		cst.UserID: bson.M{cst.In: userIds},
 		cst.Status: enum.ConversationStatusActive,
 	}
+	matchStage["$expr"] = validDurationCondition()
 
 	if !start.IsZero() || !end.IsZero() {
 		timeFilter := bson.M{}
@@ -1091,7 +1107,7 @@ func (m *mongoMapper) AverageDurationByClassListAndPeriod(ctx context.Context, g
 		if !end.IsZero() {
 			timeFilter[cst.LTE] = end
 		}
-		matchStage[cst.StartTime] = timeFilter
+		matchStage[cst.CreateTime] = timeFilter
 	}
 
 	// 聚合计算平均时长
@@ -1348,6 +1364,7 @@ func (m *mongoMapper) CountByDurationBucketByClassList(ctx context.Context, grad
 		cst.UserID: bson.M{cst.In: userIds},
 		cst.Status: enum.ConversationStatusActive,
 	}
+	matchStage["$expr"] = validDurationCondition()
 	if !start.IsZero() || !end.IsZero() {
 		tf := bson.M{}
 		if !start.IsZero() {
@@ -1356,7 +1373,7 @@ func (m *mongoMapper) CountByDurationBucketByClassList(ctx context.Context, grad
 		if !end.IsZero() {
 			tf["$lte"] = end
 		}
-		matchStage[cst.StartTime] = tf
+		matchStage[cst.CreateTime] = tf
 	}
 
 	durationExpr := bson.M{

@@ -45,6 +45,8 @@ func (e *Engine) handle(data []byte) (err error) {
 						return
 					}
 					e.isAuth = true
+					e.touchActive()
+					e.startIdleWatch()
 					return e.config() // 认证成功后配置
 				}
 			}
@@ -75,8 +77,10 @@ func (e *Engine) execCmd(ctx context.Context, cmd *core.Cmd) (err error) {
 
 	switch cmd.Command {
 	case core.CUserAudioASR: // 音频识别
+		e.touchActive()
 		return e.execASR(ctx, cmd)
 	case core.CUserText: // 常规文本
+		e.touchActive()
 		return e.execLLM(ctx, cmd)
 	case core.CUserAudio: // 暂不支持
 	case core.CInterrupt:

@@ -77,6 +77,8 @@ func (e *Engine) execTTSRecv(ctx context.Context, id uint) {
 				e.unexpected(err, "tts receive err")
 				return
 			}
+			// TTS 音频帧持续到达期间保持活动，避免语音播报被空闲看门狗截断
+			e.touchActive()
 			if err = e.MWrite(core.MResp, &core.Resp{ID: id, Type: core.RModelAudio, Content: audio}); err != nil {
 				e.unexpected(err, "tts resp err")
 				return

@@ -32,9 +32,14 @@ func receiveMessages(ctx context.Context, conn *websocket.Conn, meta *core.Meta)
 		default:
 			mt, data, err := conn.ReadMessage()
 			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
-					log.Println("连接异常关闭:", err)
+				select {
+				case <-ctx.Done(): // 主动退出/重启, 不再提示
+					return
+				default:
 				}
+				// 服务端在空闲(默认 10 分钟无对话活动)后会主动结束会话并关闭连接
+				log.Printf("连接已断开（服务端空闲后会自动结束会话）: %v", err)
+				log.Println("如需继续，请输入 restart 重新建立连接（会创建新的 conversationId）")
 				return
 			}
 			switch {

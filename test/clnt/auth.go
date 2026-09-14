@@ -116,6 +116,35 @@ func prepareSession(reader *bufio.Reader) error {
 	return nil
 }
 
+// ArchiveSession 手动结束当前会话: 调用 /conversation/archive, 写入标题与起止时间。
+// 注意该接口不会关闭 WebSocket, 也不会生成报表; 报表仍由服务端在会话结束(空闲/断开)时触发。
+func ArchiveSession() error {
+	if conversationId == "" {
+		return fmt.Errorf("当前无会话")
+	}
+	httpBase := strings.Replace(baseURL, "ws://", "http://", 1)
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	body, err := postJSON(client, httpBase+"/conversation/archive", map[string]string{
+		"conversationId": conversationId,
+	}, authToken)
+	if err != nil {
+		return fmt.Errorf("归档请求失败: %w", err)
+	}
+	var resp struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err = json.Unmarshal(body, &resp); err != nil {
+		return fmt.Errorf("解析归档响应失败: %w", err)
+	}
+	if resp.Code != 0 {
+		return fmt.Errorf("归档失败: code=%d msg=%s", resp.Code, resp.Msg)
+	}
+	log.Printf("会话已归档, conversationId: %s", conversationId)
+	return nil
+}
+
 func getJSON(client *http.Client, url string, token string) ([]byte, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
