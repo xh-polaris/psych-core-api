@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"testing"
 	"time"
-
-	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 )
 
 func TestBuildRecentWeekTrendPointsEndsWithToday(t *testing.T) {
@@ -31,12 +29,12 @@ func TestBuildRecentWeekTrendPointsEndsWithToday(t *testing.T) {
 }
 
 func TestAnalysisToPBEncodesAbsentListsAsEmptyArrays(t *testing.T) {
-	analysis := analysisToPB(&report.Analysis{})
+	analysis := analysisToPB(nil)
 	body, err := json.Marshal(analysis)
 	if err != nil {
 		t.Fatalf("marshal analysis: %v", err)
 	}
 	if bytes.Contains(body, []byte(":null")) {
-		t.Fatalf("analysis contains null list fields: %s", body)
+		t.Fatalf("analysis contains null fields: %s", body)
 	}
 }
