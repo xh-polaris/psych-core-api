@@ -176,14 +176,25 @@ func (wce *WordCloudExtractor) FromHisMsg(msgs []*message.Message) (*core_api.Ke
 		return &core_api.Keywords{KeywordMap: make(map[string]int32), KeyTotal: 0}, nil
 	}
 
-	// 使用 TF-IDF 提取关键词（top 50）
-	words := wce.jieba.Extract(text, 50)
+	// 使用 TF-IDF 提取关键词及其真实权重（top 50）。旧实现仅返回词语
+	// 并为每个词固定加 1，导致词云中所有词大小完全一致。
+	words := wce.jieba.ExtractWithWeight(text, 50)
 	wordCounts := make(map[string]int32)
+	var maxWeight float64
+	for _, item := range words {
+		if item.Weight > maxWeight {
+			maxWeight = item.Weight
+		}
+	}
 
-	for _, word := range words {
-		normalizedWord := normalizeWord(word)
+	for _, item := range words {
+		normalizedWord := normalizeWord(item.Word)
 		if isValidWord(normalizedWord) {
-			wordCounts[normalizedWord]++
+			weight := int32(1)
+			if maxWeight > 0 {
+				weight = int32(item.Weight/maxWeight*99) + 1
+			}
+			wordCounts[normalizedWord] = weight
 		}
 	}
 

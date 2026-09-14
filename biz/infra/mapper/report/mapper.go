@@ -161,8 +161,8 @@ func (m *mongoMapper) GetUnitKWByClassList(ctx context.Context, unitId bson.Obje
 	// 班级筛选需 join user 集合，以报表 create_time 限定窗口
 	pipeline := []bson.M{
 		{"$match": bson.M{
-			cst.UnitID:     unitId,
-			cst.Status:     bson.M{cst.NE: enum.ReportStatusDeleted},
+			cst.UnitID:      unitId,
+			cst.Status:      bson.M{cst.NE: enum.ReportStatusDeleted},
 			"simple_report": bson.M{"$exists": true},
 		}},
 		{"$lookup": bson.M{
