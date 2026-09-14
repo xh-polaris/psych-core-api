@@ -29,6 +29,7 @@ type IMongoMapper interface {
 	mapper.IMongoMapper[Message]
 	RetrieveMessage(ctx context.Context, conversation string, size int) ([]*Message, error)
 	FindByConversationIds(ctx context.Context, convIds []bson.ObjectID, opts options.Lister[options.FindOptions]) ([]*Message, error)
+	LatestMessageTimeByUser(ctx context.Context, userId bson.ObjectID) (int64, error)
 	BatchMessageStats(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*MsgStats, error)
 }
 
@@ -73,6 +74,23 @@ func (m *mongoMapper) FindByConversationIds(ctx context.Context, convIds []bson.
 		cst.ConversationID: bson.M{cst.In: convIds},
 		cst.Status:         bson.M{cst.NE: -1},
 	}, opts)
+}
+
+// LatestMessageTimeByUser 返回用户最后一条未删除消息的时间
+func (m *mongoMapper) LatestMessageTimeByUser(ctx context.Context, userId bson.ObjectID) (int64, error) {
+	msg := &Message{}
+	err := m.conn.FindOneNoCache(ctx, msg, bson.M{
+		cst.UserID: userId,
+		cst.Status: bson.M{cst.NE: -1},
+	}, options.FindOne().SetSort(bson.D{{Key: cst.CreateTime, Value: -1}}))
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return 0, nil
+	}
+	if err != nil {
+		logs.Errorf("[message mapper] find latest message err:%s", errorx.ErrorWithoutStack(err))
+		return 0, err
+	}
+	return msg.CreateTime.Unix(), nil
 }
 
 func (m *mongoMapper) BatchMessageStats(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*MsgStats, error) {

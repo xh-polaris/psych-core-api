@@ -69,6 +69,10 @@ func (d *DashboardDomain) userConvRecords(ctx context.Context, userOID bson.Obje
 	if err != nil {
 		return nil, errorx.New(errno.ErrDashboardGetConversations)
 	}
+	lastConversationTime, err := d.MessageMapper.LatestMessageTimeByUser(ctx, userOID)
+	if err != nil {
+		return nil, errorx.New(errno.ErrDashboardGetConversations)
+	}
 
 	// 获取用户对话频率趋势
 	userConvTrend, err := d.getUserConvTrend(ctx, userOID)
@@ -100,6 +104,7 @@ func (d *DashboardDomain) userConvRecords(ctx context.Context, userOID bson.Obje
 		ConvDetail:              convDetail,
 		Pagination:              pagination,
 		TotalConversationRounds: totalRounds,
+		LastConversationTime:    lastConversationTime,
 		Code:                    0,
 		Msg:                     "success",
 	}
