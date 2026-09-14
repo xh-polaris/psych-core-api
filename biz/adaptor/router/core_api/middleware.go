@@ -342,3 +342,8 @@ func _openapigeneratereportMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _dashboardgetconversationmessagesMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
