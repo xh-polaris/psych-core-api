@@ -36,6 +36,7 @@ type IDashboardDomain interface {
 	// 对话记录 / 报表
 	UserConvRecords(ctx context.Context, scope *Scope, userOID bson.ObjectID, targetUser *user.User, req *core_api.DashboardUserConvRecordsReq) (*core_api.DashboardUserConvRecordsResp, error)
 	UnitConvRecords(ctx context.Context, scope *Scope, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error)
+	GetConversationMessages(ctx context.Context, scope *Scope, convOID bson.ObjectID, targetUser *user.User, req *core_api.DashboardGetConversationMessagesReq) (*core_api.DashboardGetConversationMessagesResp, error)
 	GetReport(ctx context.Context, scope *Scope, convOID bson.ObjectID, targetUser *user.User, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error)
 
 	// 预警

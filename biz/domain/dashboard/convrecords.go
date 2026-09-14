@@ -34,6 +34,35 @@ func (d *DashboardDomain) UserConvRecords(ctx context.Context, scope *Scope, use
 	return d.userConvRecords(ctx, userOID, targetUser, req)
 }
 
+// GetConversationMessages 返回已获授权的管理端原始对话消息
+func (d *DashboardDomain) GetConversationMessages(ctx context.Context, scope *Scope, convOID bson.ObjectID, targetUser *user.User, req *core_api.DashboardGetConversationMessagesReq) (*core_api.DashboardGetConversationMessagesResp, error) {
+	if scope.IsClassTeacher() {
+		rs, err := d.resolveScope(ctx, scope)
+		if err != nil {
+			return nil, err
+		}
+		if err := d.ensureStudentInScope(ctx, rs, targetUser); err != nil {
+			return nil, err
+		}
+	}
+	messages, err := d.MessageMapper.RetrieveMessage(ctx, convOID.Hex(), -1)
+	if err != nil {
+		return nil, errorx.New(errno.ErrFetchMessages)
+	}
+	total := int32(len(messages))
+	start, end := util.PagedIndex(total, req.PaginationOptions)
+	messageList := make([]*core_api.DashboardConversationMessage, 0, end-start)
+	for _, item := range messages[start:end] {
+		messageList = append(messageList, &core_api.DashboardConversationMessage{
+			Content: item.Content, Role: int32(item.Role), Index: int32(item.Index), CreateTime: item.CreateTime.Unix(),
+		})
+	}
+	return &core_api.DashboardGetConversationMessagesResp{
+		Pagination: util.PaginationRes(total, req.PaginationOptions), MessageList: messageList,
+		Code: 0, Msg: "success",
+	}, nil
+}
+
 // userConvRecords 用户对话记录（对话频率趋势 + 分页详情）
 func (d *DashboardDomain) userConvRecords(ctx context.Context, userOID bson.ObjectID, targetUser *user.User, req *core_api.DashboardUserConvRecordsReq) (*core_api.DashboardUserConvRecordsResp, error) {
 	// 获取用户对话频率趋势
