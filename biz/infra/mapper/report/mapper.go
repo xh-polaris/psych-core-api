@@ -411,9 +411,12 @@ func (m *mongoMapper) GetUserPsychStats(ctx context.Context, unitOID *bson.Objec
 		{"$match": match},
 		{"$sort": bson.M{cst.CreateTime: -1}},
 		{"$group": bson.M{
-			"_id":       "$" + cst.UserID,
-			"emotion":   bson.M{"$first": "$simple_report.emotion.type"},
-			"riskLevel": bson.M{"$first": "$simple_report.summary.riskLevel"},
+			"_id":     "$" + cst.UserID,
+			"emotion": bson.M{"$first": "$simple_report.emotion.type"},
+			"riskLevel": bson.M{"$first": bson.M{"$convert": bson.M{
+				"input": bson.M{"$ifNull": bson.A{"$simple_report.riskLevel", "$simple_report.summary.riskLevel"}},
+				"to":    "string", "onError": "", "onNull": "",
+			}}},
 		}},
 		{"$lookup": bson.M{
 			"from":         userCollection,
@@ -464,8 +467,11 @@ func (m *mongoMapper) BatchGetUserRiskLevel(ctx context.Context, userIds []bson.
 		}},
 		{"$sort": bson.M{cst.CreateTime: -1}},
 		{"$group": bson.M{
-			"_id":       "$" + cst.UserID,
-			"riskLevel": bson.M{"$first": "$simple_report.summary.riskLevel"},
+			"_id": "$" + cst.UserID,
+			"riskLevel": bson.M{"$first": bson.M{"$convert": bson.M{
+				"input": bson.M{"$ifNull": bson.A{"$simple_report.riskLevel", "$simple_report.summary.riskLevel"}},
+				"to":    "string", "onError": "", "onNull": "",
+			}}},
 		}},
 	}
 

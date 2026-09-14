@@ -36,7 +36,7 @@ type IDashboardService interface {
 	// 对话记录 / 报表
 	DashboardUserConvRecords(ctx context.Context, req *core_api.DashboardUserConvRecordsReq) (*core_api.DashboardUserConvRecordsResp, error)
 	DashboardUnitConvRecords(ctx context.Context, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error)
-	DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error)
+	DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*dashboard.GetReportResponse, error)
 
 	// 预警
 	DashboardGetAlarmOverview(ctx context.Context, req *core_api.DashboardGetAlarmOverviewReq) (*core_api.DashboardGetAlarmOverviewResp, error)
@@ -204,7 +204,7 @@ func (s *DashboardService) DashboardUserConvRecords(ctx context.Context, req *co
 }
 
 // DashboardGetReport 查看报表详情
-func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error) {
+func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*dashboard.GetReportResponse, error) {
 	convOID, err := bson.ObjectIDFromHex(req.ConversationId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "ConversationId"), errorx.KV("value", "对话ID"))

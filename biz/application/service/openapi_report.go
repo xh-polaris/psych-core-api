@@ -224,7 +224,7 @@ func reportAnalysisToDTO(a *report.Analysis) *core_api.ReportAnalysis {
 		Emotion:     &core_api.AnalysisEmotion{Type: a.Emotion.Types, Intensity: a.Emotion.Intensity},
 		Support:     &core_api.AnalysisSupport{Family: a.Support.Family, Teacher: a.Support.Teacher, Friend: a.Support.Friend, Other: a.Support.Other, ProtectiveResources: a.Support.ProtectiveResources},
 		Function:    &core_api.AnalysisFunction{Learning: a.Function.Learning, Sleep: a.Function.Sleep, Diet: a.Function.Diet, Interpersonal: a.Function.Interpersonal, DailyLife: a.Function.DailyLife},
-		Distress:    &core_api.AnalysisDistress{Level: a.Distress.Level, Reason: a.Distress.Reason},
+		Distress:    &core_api.AnalysisDistress{Level: report.ScalarString(a.Distress.Level), Reason: a.Distress.Reason},
 		Confidence:  &core_api.AnalysisConfidence{Overall: a.Confidence.Overall, Risk: a.Confidence.Risk, Reason: a.Confidence.Reason},
 		Risk: &core_api.AnalysisRisk{
 			Level: a.Risk.Level, Evidence: a.Risk.Evidence, Action: a.Risk.Action,

@@ -45,6 +45,14 @@ const (
 func RiskLevelToInt(level string) int {
 	s := strings.TrimSpace(level)
 	switch {
+	case s == "1":
+		return UserRiskLevelHigh
+	case s == "2":
+		return UserRiskLevelMedium
+	case s == "3":
+		return UserRiskLevelLow
+	case s == "4":
+		return UserRiskLevelNormal
 	case strings.Contains(s, "高危") || strings.Contains(s, "严重") || strings.Contains(s, "紧急"):
 		return UserRiskLevelHigh
 	case strings.Contains(s, "较高") || strings.Contains(s, "中"):

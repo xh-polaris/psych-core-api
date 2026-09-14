@@ -34,7 +34,7 @@ func analysisToPB(a *report.Analysis) *core_api.ReportAnalysis {
 			Learning: a.Function.Learning, Sleep: a.Function.Sleep, Diet: a.Function.Diet,
 			Interpersonal: a.Function.Interpersonal, DailyLife: a.Function.DailyLife,
 		},
-		Distress:   &core_api.AnalysisDistress{Level: a.Distress.Level, Reason: a.Distress.Reason},
+		Distress:   &core_api.AnalysisDistress{Level: report.ScalarString(a.Distress.Level), Reason: a.Distress.Reason},
 		Confidence: &core_api.AnalysisConfidence{Overall: a.Confidence.Overall, Risk: a.Confidence.Risk, Reason: a.Confidence.Reason},
 	}
 	if a.Problem.Primary.Category != "" || a.Problem.Primary.Subcategory != "" {

@@ -1,5 +1,16 @@
 package report
 
+import "fmt"
+
+// ScalarString normalizes report fields that can be emitted as either a JSON
+// string or number by different report schema versions.
+func ScalarString(value any) string {
+	if value == nil {
+		return ""
+	}
+	return fmt.Sprint(value)
+}
+
 // ======== Analysis — 13 维度状态提取 ========
 
 type Analysis struct {
@@ -40,18 +51,23 @@ type AnalysisSupport struct {
 	Friend              bool     `bson:"friend" json:"friend"`
 	Other               []string `bson:"other,omitempty" json:"other,omitempty"`
 	ProtectiveResources []string `bson:"protectiveResources,omitempty" json:"protectiveResources,omitempty"`
+	Availability        string   `bson:"availability,omitempty" json:"availability,omitempty"`
 }
 
 type AnalysisFunction struct {
-	Learning      string `bson:"learning" json:"learning"`
-	Sleep         string `bson:"sleep" json:"sleep"`
-	Diet          string `bson:"diet" json:"diet"`
-	Interpersonal string `bson:"interpersonal" json:"interpersonal"`
-	DailyLife     string `bson:"dailyLife" json:"dailyLife"`
+	Learning          string `bson:"learning" json:"learning"`
+	Sleep             string `bson:"sleep" json:"sleep"`
+	Diet              string `bson:"diet" json:"diet"`
+	Interpersonal     string `bson:"interpersonal" json:"interpersonal"`
+	DailyLife         string `bson:"dailyLife" json:"dailyLife"`
+	EmotionRegulation string `bson:"emotionRegulation,omitempty" json:"emotionRegulation,omitempty"`
 }
 
 type AnalysisDistress struct {
-	Level  string   `bson:"level" json:"level"`
+	// Level historically was a string. Report v2 sends a numeric severity level,
+	// so keep it polymorphic to remain able to decode both existing Mongo data
+	// and newly generated reports.
+	Level  any      `bson:"level" json:"level"`
 	Reason []string `bson:"reason,omitempty" json:"reason,omitempty"`
 }
 
@@ -98,6 +114,13 @@ type AnalysisConfidence struct {
 // ======== SimpleReport — 16 板块简易报告 ========
 
 type SimpleReport struct {
+	// Report v2 compact fields. The legacy fields below remain for reports that
+	// were generated before the compact report format was introduced.
+	Keywords           []string       `bson:"keywords,omitempty" json:"keywords,omitempty"`
+	RiskLevel          int            `bson:"riskLevel,omitempty" json:"riskLevel,omitempty"`
+	SeverityLevel      int            `bson:"severityLevel,omitempty" json:"severityLevel,omitempty"`
+	Focus              string         `bson:"focus,omitempty" json:"focus,omitempty"`
+	Content            string         `bson:"content,omitempty" json:"content,omitempty"`
 	MainProblem        string         `bson:"mainProblem" json:"mainProblem"`
 	Emotion            ReportEmotion  `bson:"emotion" json:"emotion"`
 	Thoughts           string         `bson:"thoughts" json:"thoughts"`

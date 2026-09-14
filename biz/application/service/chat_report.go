@@ -320,6 +320,18 @@ func formatReport(rpt *report.Report) string {
 
 	if sr := rpt.SimpleReport; sr != nil {
 		sb.WriteString("### 简易报告\n\n")
+		if len(sr.Keywords) > 0 {
+			sb.WriteString(fmt.Sprintf("- **关键词**: %s\n", strings.Join(sr.Keywords, "、")))
+		}
+		if sr.RiskLevel > 0 || sr.SeverityLevel > 0 {
+			sb.WriteString(fmt.Sprintf("- **风险/严重程度**: 风险=%d，严重程度=%d\n", sr.RiskLevel, sr.SeverityLevel))
+		}
+		if sr.Focus != "" {
+			sb.WriteString(fmt.Sprintf("- **关注重点**: %s\n", sr.Focus))
+		}
+		if sr.Content != "" {
+			sb.WriteString(fmt.Sprintf("\n%s\n", sr.Content))
+		}
 		if sr.MainProblem != "" {
 			sb.WriteString(fmt.Sprintf("- **主要问题**: %s\n", sr.MainProblem))
 		}
@@ -422,11 +434,11 @@ func formatReport(rpt *report.Report) string {
 		if a.HelpSeeking != "" {
 			sb.WriteString(fmt.Sprintf("- **求助意愿**: %s\n", a.HelpSeeking))
 		}
-		if a.Function.Learning != "" || a.Function.Sleep != "" || a.Function.Diet != "" || a.Function.Interpersonal != "" || a.Function.DailyLife != "" {
-			sb.WriteString(fmt.Sprintf("- **功能影响**: 学习=%s，睡眠=%s，饮食=%s，人际=%s，日常生活=%s\n",
-				a.Function.Learning, a.Function.Sleep, a.Function.Diet, a.Function.Interpersonal, a.Function.DailyLife))
+		if a.Function.Learning != "" || a.Function.Sleep != "" || a.Function.Diet != "" || a.Function.Interpersonal != "" || a.Function.DailyLife != "" || a.Function.EmotionRegulation != "" {
+			sb.WriteString(fmt.Sprintf("- **功能影响**: 学习=%s，睡眠=%s，饮食=%s，人际=%s，日常生活=%s，情绪调节=%s\n",
+				a.Function.Learning, a.Function.Sleep, a.Function.Diet, a.Function.Interpersonal, a.Function.DailyLife, a.Function.EmotionRegulation))
 		}
-		if a.Distress.Level != "" {
+		if report.ScalarString(a.Distress.Level) != "" {
 			sb.WriteString(fmt.Sprintf("- **痛苦程度**: %s（%s）\n", a.Distress.Level, strings.Join(a.Distress.Reason, "、")))
 		}
 		if a.Risk.Level != "" {
