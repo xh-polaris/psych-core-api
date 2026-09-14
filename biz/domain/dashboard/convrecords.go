@@ -65,6 +65,11 @@ func (d *DashboardDomain) GetConversationMessages(ctx context.Context, scope *Sc
 
 // userConvRecords 用户对话记录（对话频率趋势 + 分页详情）
 func (d *DashboardDomain) userConvRecords(ctx context.Context, userOID bson.ObjectID, targetUser *user.User, req *core_api.DashboardUserConvRecordsReq) (*core_api.DashboardUserConvRecordsResp, error) {
+	totalRounds, err := d.ReportMapper.CountCompletedByUser(ctx, userOID)
+	if err != nil {
+		return nil, errorx.New(errno.ErrDashboardGetConversations)
+	}
+
 	// 获取用户对话频率趋势
 	userConvTrend, err := d.getUserConvTrend(ctx, userOID)
 	if err != nil {
@@ -91,11 +96,12 @@ func (d *DashboardDomain) userConvRecords(ctx context.Context, userOID bson.Obje
 			Grade:  int32(calculatedGrade),
 			Class:  int32(targetUser.Class),
 		},
-		UserConvTrend: userConvTrend,
-		ConvDetail:    convDetail,
-		Pagination:    pagination,
-		Code:          0,
-		Msg:           "success",
+		UserConvTrend:           userConvTrend,
+		ConvDetail:              convDetail,
+		Pagination:              pagination,
+		TotalConversationRounds: totalRounds,
+		Code:                    0,
+		Msg:                     "success",
 	}
 
 	return resp, nil
