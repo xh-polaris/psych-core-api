@@ -44,6 +44,8 @@ func NewProvider() (*Provider, error) {
 	alarmIMongoMapper := alarm.NewAlarmMongoMapper(confConfig)
 	messageIMongoMapper := message.NewMessageMongoMapper(confConfig)
 	reportIMongoMapper := report.NewReportMongoMapper(confConfig)
+	alarmIMongoMapper := alarm.NewAlarmMongoMapper(confConfig)
+	messageIMongoMapper := message.NewMessageMongoMapper(confConfig)
 	dashboardDomain := &dashboard.DashboardDomain{
 		UserMapper:         iMongoMapper,
 		UnitMapper:         unitIMongoMapper,
@@ -56,6 +58,7 @@ func NewProvider() (*Provider, error) {
 		AuthDomain:         authDomain,
 		UserMapper:         iMongoMapper,
 		ConversationMapper: conversationIMongoMapper,
+		ReportMapper:       reportIMongoMapper,
 		AlarmMapper:        alarmIMongoMapper,
 		DashboardDomain:    dashboardDomain,
 	}

@@ -250,3 +250,20 @@ func DashboardGetConversationMessages(ctx context.Context, c *app.RequestContext
 	resp, err := p.DashboardService.DashboardGetConversationMessages(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
+
+// DashboardGetConversationReports .
+// @router /dashboard/conversation_reports [POST]
+func DashboardGetConversationReports(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.DashboardGetConversationReportsReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	middleware.StoreToken(ctx, c, &req)
+	p := provider.Get()
+	resp, err := p.DashboardService.DashboardGetConversationReports(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}

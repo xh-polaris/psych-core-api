@@ -37,7 +37,8 @@ type IDashboardDomain interface {
 	UserConvRecords(ctx context.Context, scope *Scope, userOID bson.ObjectID, targetUser *user.User, req *core_api.DashboardUserConvRecordsReq) (*core_api.DashboardUserConvRecordsResp, error)
 	UnitConvRecords(ctx context.Context, scope *Scope, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error)
 	GetConversationMessages(ctx context.Context, scope *Scope, convOID bson.ObjectID, targetUser *user.User, req *core_api.DashboardGetConversationMessagesReq) (*core_api.DashboardGetConversationMessagesResp, error)
-	GetReport(ctx context.Context, scope *Scope, convOID bson.ObjectID, targetUser *user.User, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error)
+	GetConversationReports(ctx context.Context, scope *Scope, convOID bson.ObjectID, targetUser *user.User) (*core_api.DashboardGetConversationReportsResp, error)
+	GetReport(ctx context.Context, scope *Scope, rpt *report.Report, targetUser *user.User) (*core_api.DashboardGetReportResp, error)
 
 	// 预警
 	GetAlarmOverview(ctx context.Context, scope *Scope, req *core_api.DashboardGetAlarmOverviewReq) (*core_api.DashboardGetAlarmOverviewResp, error)

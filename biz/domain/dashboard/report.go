@@ -52,8 +52,8 @@ func DigestOf(rpt *report.Report) string {
 	return rpt.Digest
 }
 
-// GetReport 查看报表详情（班主任需目标学生在所带班级）
-func (d *DashboardDomain) GetReport(ctx context.Context, scope *Scope, convOID bson.ObjectID, targetUser *user.User, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error) {
+// GetConversationReports 获取指定会话下的历史报表列表（班主任需目标学生在所带班级）
+func (d *DashboardDomain) GetConversationReports(ctx context.Context, scope *Scope, convOID bson.ObjectID, targetUser *user.User) (*core_api.DashboardGetConversationReportsResp, error) {
 	if scope.IsClassTeacher() {
 		rs, err := d.resolveScope(ctx, scope)
 		if err != nil {
@@ -63,32 +63,51 @@ func (d *DashboardDomain) GetReport(ctx context.Context, scope *Scope, convOID b
 			return nil, err
 		}
 	}
-	return d.getReport(ctx, convOID, req)
+	reports, err := d.ReportMapper.FindVisibleByConversation(ctx, convOID)
+	if err != nil {
+		logs.Errorf("get conversation reports error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrDashboardGetReport)
+	}
+	reportList := make([]*core_api.DashboardConversationReport, 0, len(reports))
+	for _, rpt := range reports {
+		reportList = append(reportList, reportSummaryToPB(rpt))
+	}
+	return &core_api.DashboardGetConversationReportsResp{
+		ReportList: reportList,
+		Code:       0,
+		Msg:        "success",
+	}, nil
 }
 
-// getReport 报表详情
-func (d *DashboardDomain) getReport(ctx context.Context, convOID bson.ObjectID, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error) {
-	rpt, err := d.ReportMapper.FindByConversationPreferSuccess(ctx, convOID)
-	if err != nil {
-		logs.Errorf("get report error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrDashboardGetReport)
+// GetReport 查看指定报表详情（班主任需目标学生在所带班级）
+func (d *DashboardDomain) GetReport(ctx context.Context, scope *Scope, rpt *report.Report, targetUser *user.User) (*core_api.DashboardGetReportResp, error) {
+	if scope.IsClassTeacher() {
+		rs, err := d.resolveScope(ctx, scope)
+		if err != nil {
+			return nil, err
+		}
+		if err := d.ensureStudentInScope(ctx, rs, targetUser); err != nil {
+			return nil, err
+		}
 	}
 
 	resp := &core_api.DashboardGetReportResp{
-		ReportId:       rpt.ID.Hex(),
-		Title:          rpt.Title,
-		Topics:         rpt.Topics,         // legacy: 仅 v0 报表有值
-		Digest:         DigestOf(rpt),      // v2 新报表不产出摘要
-		Emotion:        int32(rpt.Emotion), // legacy: 仅 v0 报表有值
-		Body:           BodyOf(rpt),        // v2 取 simple_report.content
-		Suggestions:    SuggestionsOf(rpt), // v2 取 simple_report.suggestions
-		NeedAlarm:      rpt.NeedAlarm,
-		KeywordPercent: rpt.Keywords, // legacy: 仅 v0 报表有值
-		ReportStatus:   int32(rpt.Status),
-		Analysis:       analysisToPB(rpt.Analysis),
-		SimpleReport:   simpleReportToPB(rpt.SimpleReport),
-		Code:           0,
-		Msg:            "success",
+		ReportId:             rpt.ID.Hex(),
+		Title:                rpt.Title,
+		Topics:               rpt.Topics,         // legacy: 仅 v0 报表有值
+		Digest:               DigestOf(rpt),      // v2 新报表不产出摘要
+		Emotion:              int32(rpt.Emotion), // legacy: 仅 v0 报表有值
+		Body:                 BodyOf(rpt),        // v2 取 simple_report.content
+		Suggestions:          SuggestionsOf(rpt), // v2 取 simple_report.suggestions
+		NeedAlarm:            rpt.NeedAlarm,
+		KeywordPercent:       rpt.Keywords, // legacy: 仅 v0 报表有值
+		ReportStatus:         int32(rpt.Status),
+		ConversationRounds:   int32(rpt.Round / 2),
+		LastConversationTime: rpt.End.Unix(),
+		Analysis:             analysisToPB(rpt.Analysis),
+		SimpleReport:         simpleReportToPB(rpt.SimpleReport),
+		Code:                 0,
+		Msg:                  "success",
 	}
 	if rpt.SimpleReport != nil && len(rpt.SimpleReport.Keywords) > 0 {
 		resp.KeywordPercent = rankedKeywords(rpt.SimpleReport.Keywords)
@@ -106,6 +125,17 @@ func (d *DashboardDomain) getReport(ctx context.Context, convOID bson.ObjectID, 
 	}
 
 	return resp, nil
+}
+
+func reportSummaryToPB(rpt *report.Report) *core_api.DashboardConversationReport {
+	return &core_api.DashboardConversationReport{
+		ReportId:             rpt.ID.Hex(),
+		ReportStatus:         int32(rpt.Status),
+		Title:                rpt.Title,
+		ConversationRounds:   int32(rpt.Round / 2),
+		StartTime:            rpt.Start.Unix(),
+		LastConversationTime: rpt.End.Unix(),
+	}
 }
 
 func rankedKeywords(words []string) map[string]float64 {
