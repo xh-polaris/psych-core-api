@@ -9,10 +9,12 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	"github.com/xh-polaris/psych-core-api/biz/domain/his"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
+	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/enum"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -30,6 +32,7 @@ type ConversationService struct {
 	AuthDomain         auth.IAuthDomain
 	MessageMapper      message.IMongoMapper
 	ConversationMapper conversation.IMongoMapper
+	ConfigMapper       config.IMongoMapper
 }
 
 var ConversationServiceSet = wire.NewSet(
@@ -52,13 +55,43 @@ func (c *ConversationService) CreateConversation(ctx context.Context, req *core_
 	}
 
 	if req.CharacterId == "" {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "characterId"))
+		// 前端未指定角色时，回退到单位配置中的首个启用角色
+		logs.CtxWarnf(ctx, "[CreateConversation] characterId empty, fallback to unit default character, userId=%s unitId=%s", userMeta.UserId, userMeta.UnitId)
+		charOID, resolveErr := c.defaultCharacter(ctx, userMeta.UnitId)
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		return c.insertConversation(ctx, userOID, charOID)
 	}
 	charOID, err := bson.ObjectIDFromHex(req.CharacterId)
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "characterId"))
 	}
+	return c.insertConversation(ctx, userOID, charOID)
+}
 
+// defaultCharacter 取单位配置中首个启用角色，未配置有效角色时返回参数错误
+func (c *ConversationService) defaultCharacter(ctx context.Context, unitId string) (bson.ObjectID, error) {
+	if unitId == "" {
+		return bson.ObjectID{}, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "characterId"))
+	}
+	unitOID, err := bson.ObjectIDFromHex(unitId)
+	if err != nil {
+		return bson.ObjectID{}, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "unitId"))
+	}
+	cfg, err := c.ConfigMapper.FindOneByUnitID(ctx, unitOID)
+	if err != nil || cfg == nil {
+		return bson.ObjectID{}, errorx.New(errno.ErrConfigNotFound, errorx.KV("unitId", unitId))
+	}
+	for _, ch := range cfg.Characters {
+		if ch.Status == enum.ConfigStatusActive {
+			return ch.ID, nil
+		}
+	}
+	return bson.ObjectID{}, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "characterId"))
+}
+
+func (c *ConversationService) insertConversation(ctx context.Context, userOID, charOID bson.ObjectID) (*core_api.CreateConversationResp, error) {
 	now := time.Now()
 	created := &conversation.Conversation{
 		ID:          bson.NewObjectID(),
