@@ -41,8 +41,6 @@ func NewProvider() (*Provider, error) {
 		UnitMapper: unitIMongoMapper,
 	}
 	conversationIMongoMapper := conversation.NewConversationMongoMapper(confConfig)
-	alarmIMongoMapper := alarm.NewAlarmMongoMapper(confConfig)
-	messageIMongoMapper := message.NewMessageMongoMapper(confConfig)
 	reportIMongoMapper := report.NewReportMongoMapper(confConfig)
 	alarmIMongoMapper := alarm.NewAlarmMongoMapper(confConfig)
 	messageIMongoMapper := message.NewMessageMongoMapper(confConfig)
