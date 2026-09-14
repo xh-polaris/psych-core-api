@@ -221,10 +221,10 @@ func reportAnalysisToDTO(a *report.Analysis) *core_api.ReportAnalysis {
 		HelpSeeking: a.HelpSeeking,
 		MissingInfo: a.MissingInfo,
 		Problem:     &core_api.AnalysisProblem{},
-		Emotion:     &core_api.AnalysisEmotion{Type: a.Emotion.Types, Intensity: a.Emotion.Intensity},
-		Support:     &core_api.AnalysisSupport{Family: a.Support.Family, Teacher: a.Support.Teacher, Friend: a.Support.Friend, Other: a.Support.Other, ProtectiveResources: a.Support.ProtectiveResources},
-		Function:    &core_api.AnalysisFunction{Learning: a.Function.Learning, Sleep: a.Function.Sleep, Diet: a.Function.Diet, Interpersonal: a.Function.Interpersonal, DailyLife: a.Function.DailyLife},
-		Distress:    &core_api.AnalysisDistress{Level: a.Distress.Level, Reason: a.Distress.Reason},
+		Emotion:     emotionItemsToDTO(a.Emotion),
+		Support:     &core_api.AnalysisSupport{Family: a.Support.Family, Teacher: a.Support.Teacher, Friend: a.Support.Friend, Other: a.Support.Other, ProtectiveResources: a.Support.ProtectiveResources, Availability: a.Support.Availability},
+		Function:    &core_api.AnalysisFunction{Learning: a.Function.Learning, Sleep: a.Function.Sleep, Diet: a.Function.Diet, Interpersonal: a.Function.Interpersonal, EmotionRegulation: a.Function.EmotionRegulation},
+		Distress:    &core_api.AnalysisDistress{Level: int32(a.Distress.Level), Reason: a.Distress.Reason},
 		Confidence:  &core_api.AnalysisConfidence{Overall: a.Confidence.Overall, Risk: a.Confidence.Risk, Reason: a.Confidence.Reason},
 		Risk: &core_api.AnalysisRisk{
 			Level: a.Risk.Level, Evidence: a.Risk.Evidence, Action: a.Risk.Action,
@@ -245,16 +245,30 @@ func profileSectionToDTO(section report.ProfileSection) *core_api.ProfileSection
 	return &core_api.ProfileSection{Summary: section.Summary, Items: section.Items}
 }
 
+// emotionItemsToDTO converts report analysis emotion items to DTO
+func emotionItemsToDTO(items []report.AnalysisEmotion) []*core_api.AnalysisEmotion {
+	if len(items) == 0 {
+		return nil
+	}
+	res := make([]*core_api.AnalysisEmotion, 0, len(items))
+	for _, e := range items {
+		res = append(res, &core_api.AnalysisEmotion{Type: e.Type, Intensity: e.Intensity})
+	}
+	return res
+}
+
 func simpleReportToDTO(item *report.SimpleReport) *core_api.SimpleReportMsg {
 	if item == nil {
 		return nil
 	}
 	return &core_api.SimpleReportMsg{
-		MainProblem: item.MainProblem, Thoughts: item.Thoughts, Behaviors: item.Behaviors, Needs: item.Needs, Duration: item.Duration, FunctionImpact: item.FunctionImpact, Triggers: item.Triggers, Coping: item.Coping, Support: item.Support, HelpSeeking: item.HelpSeeking, ProvidedSupport: item.ProvidedSupport, Suggestions: item.Suggestions,
-		Emotion:            &core_api.ReportEmotion{Type: item.Emotion.Type, Intensity: item.Emotion.Intensity},
-		RiskObservation:    &core_api.ReportRiskObs{Level: item.RiskObservation.Level, Evidence: item.RiskObservation.Evidence},
-		SeverityAssessment: &core_api.ReportSeverity{Level: item.SeverityAssessment.Level, Basis: item.SeverityAssessment.Basis},
-		Summary:            &core_api.ReportSummary{MainProblem: item.Summary.MainProblem, EmotionState: item.Summary.EmotionState, Severity: item.Summary.Severity, RiskLevel: item.Summary.RiskLevel, Focus: item.Summary.Focus},
+		Keywords:      item.Keywords,
+		Emotion:       item.Emotion,
+		RiskLevel:     item.RiskLevel,
+		DistressLevel: item.DistressLevel,
+		Focus:         item.Focus,
+		Suggestions:   item.Suggestions,
+		Content:       item.Content,
 	}
 }
 

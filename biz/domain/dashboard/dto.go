@@ -17,24 +17,25 @@ func analysisToPB(a *report.Analysis) *core_api.ReportAnalysis {
 		return nil
 	}
 	r := &core_api.ReportAnalysis{
-		Cognition:   nonNilSlice(a.Cognition),
-		Behavior:    nonNilSlice(a.Behavior),
+		Cognition:   a.Cognition,
+		Behavior:    a.Behavior,
 		Duration:    a.Duration,
-		Trigger:     nonNilSlice(a.Trigger),
-		Coping:      nonNilSlice(a.Coping),
+		Trigger:     a.Trigger,
+		Coping:      a.Coping,
 		HelpSeeking: a.HelpSeeking,
-		MissingInfo: nonNilSlice(a.MissingInfo),
-		Problem:     &core_api.AnalysisProblem{Primary: &core_api.ProblemItem{}, Secondary: make([]*core_api.ProblemItem, 0)},
-		Emotion:     &core_api.AnalysisEmotion{Type: nonNilSlice(a.Emotion.Types), Intensity: a.Emotion.Intensity},
+		MissingInfo: a.MissingInfo,
+		Problem:     &core_api.AnalysisProblem{},
+		Emotion:     emotionItemsToPB(a.Emotion),
 		Support: &core_api.AnalysisSupport{
 			Family: a.Support.Family, Teacher: a.Support.Teacher, Friend: a.Support.Friend,
-			Other: nonNilSlice(a.Support.Other), ProtectiveResources: nonNilSlice(a.Support.ProtectiveResources),
+			Other: a.Support.Other, ProtectiveResources: a.Support.ProtectiveResources,
+			Availability: a.Support.Availability,
 		},
 		Function: &core_api.AnalysisFunction{
 			Learning: a.Function.Learning, Sleep: a.Function.Sleep, Diet: a.Function.Diet,
-			Interpersonal: a.Function.Interpersonal, DailyLife: a.Function.DailyLife,
+			Interpersonal: a.Function.Interpersonal, EmotionRegulation: a.Function.EmotionRegulation,
 		},
-		Distress:   &core_api.AnalysisDistress{Level: a.Distress.Level, Reason: nonNilSlice(a.Distress.Reason)},
+		Distress:   &core_api.AnalysisDistress{Level: int32(a.Distress.Level), Reason: a.Distress.Reason},
 		Confidence: &core_api.AnalysisConfidence{Overall: a.Confidence.Overall, Risk: a.Confidence.Risk, Reason: a.Confidence.Reason},
 	}
 	if a.Problem.Primary.Category != "" || a.Problem.Primary.Subcategory != "" {
@@ -47,7 +48,7 @@ func analysisToPB(a *report.Analysis) *core_api.ReportAnalysis {
 		}
 	}
 
-	risk := &core_api.AnalysisRisk{Level: a.Risk.Level, Evidence: nonNilSlice(a.Risk.Evidence), Action: a.Risk.Action}
+	risk := &core_api.AnalysisRisk{Level: a.Risk.Level, Evidence: a.Risk.Evidence, Action: a.Risk.Action}
 	risk.Score = &core_api.RiskScore{
 		CurrentIdeation: int32(a.Risk.Score.CurrentIdeation), History: int32(a.Risk.Score.History),
 		CurrentStress: int32(a.Risk.Score.CurrentStress), ProtectiveResources: int32(a.Risk.Score.ProtectiveResources),
@@ -66,45 +67,38 @@ func analysisToPB(a *report.Analysis) *core_api.ReportAnalysis {
 }
 
 func secToPB(s report.ProfileSection) *core_api.ProfileSection {
-	return &core_api.ProfileSection{Summary: s.Summary, Items: nonNilSlice(s.Items)}
+	return &core_api.ProfileSection{Summary: s.Summary, Items: s.Items}
 }
 
-func nonNilSlice[T any](items []T) []T {
-	if items == nil {
-		return []T{}
-	}
-	return items
-}
-
-// simpleReportToPB converts report.SimpleReport to core_api.SimpleReportMsg
+// simpleReportToPB converts report.SimpleReport to core_api.SimpleReportMsg（v2 瘦身结构直映射）
 func simpleReportToPB(sr *report.SimpleReport) *core_api.SimpleReportMsg {
 	if sr == nil {
 		return nil
 	}
 	return &core_api.SimpleReportMsg{
-		MainProblem:        sr.MainProblem,
-		Thoughts:           sr.Thoughts,
-		Behaviors:          sr.Behaviors,
-		Needs:              sr.Needs,
-		Duration:           sr.Duration,
-		FunctionImpact:     sr.FunctionImpact,
-		Triggers:           sr.Triggers,
-		Coping:             sr.Coping,
-		Support:            sr.Support,
-		HelpSeeking:        sr.HelpSeeking,
-		ProvidedSupport:    sr.ProvidedSupport,
-		Suggestions:        sr.Suggestions,
-		Emotion:            &core_api.ReportEmotion{Type: sr.Emotion.Type, Intensity: sr.Emotion.Intensity},
-		RiskObservation:    &core_api.ReportRiskObs{Level: sr.RiskObservation.Level, Evidence: sr.RiskObservation.Evidence},
-		SeverityAssessment: &core_api.ReportSeverity{Level: sr.SeverityAssessment.Level, Basis: sr.SeverityAssessment.Basis},
-		Summary: &core_api.ReportSummary{
-			MainProblem: sr.Summary.MainProblem, EmotionState: sr.Summary.EmotionState,
-			Severity: sr.Summary.Severity, RiskLevel: sr.Summary.RiskLevel, Focus: sr.Summary.Focus,
-		},
+		Keywords:      sr.Keywords,
+		Emotion:       sr.Emotion,
+		RiskLevel:     sr.RiskLevel,
+		DistressLevel: sr.DistressLevel,
+		Focus:         sr.Focus,
+		Suggestions:   sr.Suggestions,
+		Content:       sr.Content,
 	}
 }
 
-// buildEmotionRatio 按每用户最后一份报表的情绪类型统计分布（key 为 SimpleReport.Emotion.Type 字符串）
+// emotionItemsToPB converts report analysis emotion items to PB
+func emotionItemsToPB(items []report.AnalysisEmotion) []*core_api.AnalysisEmotion {
+	if len(items) == 0 {
+		return nil
+	}
+	res := make([]*core_api.AnalysisEmotion, 0, len(items))
+	for _, e := range items {
+		res = append(res, &core_api.AnalysisEmotion{Type: e.Type, Intensity: e.Intensity})
+	}
+	return res
+}
+
+// buildEmotionRatio 按每用户最后一份报表的情绪类型统计分布（key 为 SimpleReport.Emotion 字符串）
 func buildEmotionRatio(stats []*report.UserPsychStat) *core_api.EmotionRatio {
 	cnt := make(map[string]int32)
 	var total int32
@@ -134,7 +128,10 @@ func buildRiskDistribution(stats []*report.UserPsychStat) []*core_api.RiskDistri
 		if st.Gender < 1 || st.Gender > 2 {
 			continue
 		}
-		lvl := int32(enum.RiskLevelToInt(st.RiskLevel))
+		lvl := st.RiskLevel
+		if lvl < int32(enum.UserRiskLevelHigh) || lvl > int32(enum.UserRiskLevelNormal) {
+			continue // 0=未明确或旧数据，不计入分布
+		}
 		idx := (lvl-1)*2 + (st.Gender - 1)
 		res[idx].Count++
 	}
