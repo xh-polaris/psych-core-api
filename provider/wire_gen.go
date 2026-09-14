@@ -41,6 +41,8 @@ func NewProvider() (*Provider, error) {
 		UnitMapper: unitIMongoMapper,
 	}
 	conversationIMongoMapper := conversation.NewConversationMongoMapper(confConfig)
+	alarmIMongoMapper := alarm.NewAlarmMongoMapper(confConfig)
+	messageIMongoMapper := message.NewMessageMongoMapper(confConfig)
 	reportIMongoMapper := report.NewReportMongoMapper(confConfig)
 	alarmIMongoMapper := alarm.NewAlarmMongoMapper(confConfig)
 	messageIMongoMapper := message.NewMessageMongoMapper(confConfig)
@@ -90,6 +92,7 @@ func NewProvider() (*Provider, error) {
 		AuthDomain:         authDomain,
 		MessageMapper:      messageIMongoMapper,
 		ConversationMapper: conversationIMongoMapper,
+		ConfigMapper:       configIMongoMapper,
 	}
 	storageProvider := storage.NewCOS(confConfig)
 	fileService := service.FileService{
