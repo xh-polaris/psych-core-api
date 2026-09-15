@@ -60,6 +60,7 @@ type deepseekUsage struct {
 }
 
 type deepseekChatResp struct {
+	ID      string           `json:"id"`
 	Choices []deepseekChoice `json:"choices"`
 	Usage   *deepseekUsage   `json:"usage"`
 }
@@ -140,12 +141,11 @@ func (d *DeepSeekModel) Generate(ctx context.Context, in []*schema.Message, opts
 		return nil, err
 	}
 	defer resp.Body.Close()
-	// 记录上游请求标识，便于排查调用和计费问题
-	if rid := resp.Header.Get("X-Request-Id"); rid != "" {
-		logs.Infof("[deepseek] generate provider request_id: %s", rid)
-	}
+	rid := resp.Header.Get("X-Request-Id")
 	if resp.StatusCode != http.StatusOK {
 		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		logs.Errorf("[deepseek] generate status %d: model=%s request_id=%s body=%s",
+			resp.StatusCode, d.model, rid, string(data))
 		return nil, fmt.Errorf("deepseek generate status %d: %s", resp.StatusCode, string(data))
 	}
 
@@ -155,6 +155,8 @@ func (d *DeepSeekModel) Generate(ctx context.Context, in []*schema.Message, opts
 	}
 	var chatResp deepseekChatResp
 	if err = sonic.Unmarshal(data, &chatResp); err != nil {
+		logs.Errorf("[deepseek] generate unmarshal err: model=%s request_id=%s body_head=%q",
+			d.model, rid, previewOf(data, 200))
 		return nil, err
 	}
 
@@ -168,15 +170,29 @@ func (d *DeepSeekModel) Generate(ctx context.Context, in []*schema.Message, opts
 	}
 	msg.ResponseMeta = meta
 
-	if msg.Content == "" {
-		ct := 0
-		if meta.Usage != nil {
-			ct = meta.Usage.CompletionTokens
+	// 空内容诊断: 正常路径不打日志. json_object 模式下 DS 会退化为纯空白输出
+	// (finish_reason=stop, 无 reasoning), TrimSpace 判空而非 == "" 才能捕获该形态;
+	// content 用 %q 保证空白可见.
+	if strings.TrimSpace(msg.Content) == "" {
+		var in, cached, miss, out, total int
+		if u := chatResp.Usage; u != nil {
+			in, cached, miss, out, total =
+				u.PromptTokens, u.PromptCacheHitTokens, u.PromptCacheMissTokens, u.CompletionTokens, u.TotalTokens
 		}
-		logs.Errorf("[deepseek] generate empty content: choices=%d finish_reason=%s completion_tokens=%d reasoning_len=%d",
-			len(chatResp.Choices), meta.FinishReason, ct, len(msg.ReasoningContent))
+		logs.Errorf("[deepseek] generate empty content: model=%s finish_reason=%s choices=%d resp_id=%s request_id=%s "+
+			"content=%q reasoning_len=%d usage: prompt=%d cached=%d miss=%d completion=%d total=%d",
+			d.model, meta.FinishReason, len(chatResp.Choices), chatResp.ID, rid,
+			previewOf([]byte(msg.Content), 80), len(msg.ReasoningContent), in, cached, miss, out, total)
 	}
 	return msg, nil
+}
+
+// previewOf 截断字节串用于日志展示
+func previewOf(data []byte, n int) string {
+	if len(data) <= n {
+		return string(data)
+	}
+	return string(data[:n])
 }
 
 // Stream 流式调用: 成功响应交给后台 goroutine 按 SSE 解析
@@ -187,13 +203,13 @@ func (d *DeepSeekModel) Stream(ctx context.Context, in []*schema.Message, opts .
 	if err != nil {
 		return nil, err
 	}
-	if rid := resp.Header.Get("X-Request-Id"); rid != "" {
-		logs.Infof("[deepseek] stream provider request_id: %s", rid)
-	}
+	rid := resp.Header.Get("X-Request-Id")
 	// 非成功响应不是 SSE 数据，必须直接返回错误，不能交给流解析器静默处理。
 	if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
 		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		logs.Errorf("[deepseek] stream status %d: model=%s request_id=%s body=%s",
+			resp.StatusCode, d.model, rid, string(data))
 		return nil, fmt.Errorf("deepseek stream status %d: %s", resp.StatusCode, string(data))
 	}
 	sr, sw := schema.Pipe[*schema.Message](5)

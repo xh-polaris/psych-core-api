@@ -82,18 +82,10 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 	}
 	logs.Infof("[engine] [strategy-statistic] get strategy template in %dms", time.Since(tplStart).Milliseconds())
 
-	// system 只承载静态模板; 上一轮策略 (每轮变化) 独立成尾注消息, 位于历史之后、
-	// 最新用户消息之前, 保证 [system, 历史...] 前缀跨轮字节稳定, 命中 DeepSeek 前缀缓存.
-	// baseMsgs 最新在前 (首位为本次用户消息), ChatModel 内部 reverse 后上述顺序成立.
-	msgs := make([]*schema.Message, 0, len(baseMsgs)+2)
-	if len(baseMsgs) > 0 {
-		msgs = append(msgs, baseMsgs[0])
-	}
-	if e.strategy.lastPlan != "" {
-		msgs = append(msgs, &schema.Message{Role: schema.System, Content: "## 上一轮策略\n" + e.strategy.lastPlan})
-	}
-	msgs = append(msgs, baseMsgs[1:]...)
-	msgs = append(msgs, &schema.Message{Role: schema.System, Content: tpl})
+	// baseMsgs 最新在前 (首位为本次用户消息). buildStrategyMsgs 负责组装,
+	// ChatModel 内部 reverse 后顺序为 [策略模板, 历史asc, 尾注, 本次用户消息],
+	// 保证 [策略模板, 历史...] 前缀跨轮字节稳定, 命中 DeepSeek 前缀缓存.
+	msgs := buildStrategyMsgs(baseMsgs, e.strategy.lastPlan, tpl)
 
 	sctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -161,6 +153,25 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 		logs.Infof("[engine] [strategy-statistic] loaded skills in %dms: %v", time.Since(skillsStart).Milliseconds(), names)
 	}
 	return &strategyOutput{Raw: plan, Bound: true}, e.joinSkills(names, skills)
+}
+
+// buildStrategyMsgs 组装策略请求消息: system 只承载静态模板; 上一轮策略 (每轮变化)
+// 独立成尾注消息, 位于历史之后、最新用户消息之前. baseMsgs 最新在前 (首位为本次用户消息).
+// wire 终序 (ChatModel reverse 后): [策略模板 system, 历史asc..., 尾注 system, 本次用户消息].
+// 回归背景: 部署版曾将 lastPlan 融入策略模板 system, 在 response_format=json_object 下
+// DeepSeek 会以 ~13% 概率输出纯空格内容 (finish_reason=stop) 导致策略轮空, 见 strategy 重试与
+// deepseek.go 空内容诊断日志.
+func buildStrategyMsgs(baseMsgs []*schema.Message, lastPlan, tpl string) []*schema.Message {
+	msgs := make([]*schema.Message, 0, len(baseMsgs)+2)
+	if len(baseMsgs) > 0 {
+		msgs = append(msgs, baseMsgs[0])
+	}
+	if lastPlan != "" {
+		msgs = append(msgs, &schema.Message{Role: schema.System, Content: "## 上一轮策略\n" + lastPlan})
+	}
+	msgs = append(msgs, baseMsgs[1:]...)
+	msgs = append(msgs, &schema.Message{Role: schema.System, Content: tpl})
+	return msgs
 }
 
 // parseStrategyPlan 解析策略 JSON (容忍 markdown fence). ok=false 表示 JSON 解析失败.
