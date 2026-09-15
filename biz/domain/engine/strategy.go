@@ -82,21 +82,24 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 	}
 	logs.Infof("[engine] [strategy-statistic] get strategy template in %dms", time.Since(tplStart).Milliseconds())
 
-	var sb strings.Builder
-	sb.WriteString(tpl)
-	if e.strategy.lastPlan != "" { // 注入上一轮策略作为上下文
-		sb.WriteString("\n\n## 上一轮策略\n")
-		sb.WriteString(e.strategy.lastPlan)
+	// system 只承载静态模板; 上一轮策略 (每轮变化) 独立成尾注消息, 位于历史之后、
+	// 最新用户消息之前, 保证 [system, 历史...] 前缀跨轮字节稳定, 命中 DeepSeek 前缀缓存.
+	// baseMsgs 最新在前 (首位为本次用户消息), ChatModel 内部 reverse 后上述顺序成立.
+	msgs := make([]*schema.Message, 0, len(baseMsgs)+2)
+	if len(baseMsgs) > 0 {
+		msgs = append(msgs, baseMsgs[0])
 	}
-	msgs := make([]*schema.Message, 0, len(baseMsgs)+1)
-	msgs = append(msgs, baseMsgs...)
-	msgs = append(msgs, &schema.Message{Role: schema.System, Content: sb.String()})
+	if e.strategy.lastPlan != "" {
+		msgs = append(msgs, &schema.Message{Role: schema.System, Content: "## 上一轮策略\n" + e.strategy.lastPlan})
+	}
+	msgs = append(msgs, baseMsgs[1:]...)
+	msgs = append(msgs, &schema.Message{Role: schema.System, Content: tpl})
 
 	sctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	genStart := time.Now()
 	var msg *schema.Message
-	var inTokens, outTokens int
+	var inTokens, outTokens, cachedTokens int
 	for attempt := 1; ; attempt++ {
 		msg, err = e.strategy.app.Generate(sctx, msgs)
 		if err == nil && msg != nil && strings.TrimSpace(msg.Content) != "" {
@@ -105,8 +108,9 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 		// 失败轮次的 token 用量也记录 (上游可能已计费)
 		if err == nil && msg != nil && msg.ResponseMeta != nil && msg.ResponseMeta.Usage != nil {
 			e.llmUsage(msg.ResponseMeta)
-			logs.Infof("[engine] [strategy-statistic] failed attempt %d tokens: in=%d out=%d",
-				attempt, msg.ResponseMeta.Usage.PromptTokens, msg.ResponseMeta.Usage.CompletionTokens)
+			logs.Infof("[engine] [strategy-statistic] failed attempt %d tokens: in=%d cached=%d out=%d",
+				attempt, msg.ResponseMeta.Usage.PromptTokens,
+				msg.ResponseMeta.Usage.PromptTokenDetails.CachedTokens, msg.ResponseMeta.Usage.CompletionTokens)
 		}
 		if attempt >= 2 {
 			logs.Errorf("[engine] [strategy] generate failed after retry, err: %v", err)
@@ -122,10 +126,12 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 		e.llmUsage(msg.ResponseMeta) // 策略调用 token 用量
 		inTokens = msg.ResponseMeta.Usage.PromptTokens
 		outTokens = msg.ResponseMeta.Usage.CompletionTokens
+		cachedTokens = msg.ResponseMeta.Usage.PromptTokenDetails.CachedTokens
 	}
 	plan := strings.TrimSpace(msg.Content)
-	logs.Infof("[engine] [strategy-statistic] generate done in %dms, plan_chars=%d, in_tokens=%d, out_tokens=%d",
-		time.Since(genStart).Milliseconds(), len(plan), inTokens, outTokens)
+	// cached/in 反映前缀缓存命中率: 上一轮 in ≈ 本轮 cached 说明前缀稳定生效
+	logs.Infof("[engine] [strategy-statistic] generate done in %dms, plan_chars=%d, in_tokens=%d, cached_tokens=%d, out_tokens=%d",
+		time.Since(genStart).Milliseconds(), len(plan), inTokens, cachedTokens, outTokens)
 	if plan == "" {
 		logs.Errorf("[engine] [strategy] empty plan")
 		return nil, ""
