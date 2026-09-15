@@ -155,8 +155,12 @@ func (d *DeepSeekModel) Generate(ctx context.Context, in []*schema.Message, opts
 	}
 	var chatResp deepseekChatResp
 	if err = sonic.Unmarshal(data, &chatResp); err != nil {
+		head := data
+		if len(head) > 200 {
+			head = head[:200]
+		}
 		logs.Errorf("[deepseek] generate unmarshal err: model=%s request_id=%s body_head=%q",
-			d.model, rid, previewOf(data, 200))
+			d.model, rid, string(head))
 		return nil, err
 	}
 
@@ -179,20 +183,16 @@ func (d *DeepSeekModel) Generate(ctx context.Context, in []*schema.Message, opts
 			in, cached, miss, out, total =
 				u.PromptTokens, u.PromptCacheHitTokens, u.PromptCacheMissTokens, u.CompletionTokens, u.TotalTokens
 		}
+		content := msg.Content
+		if len(content) > 80 {
+			content = content[:80]
+		}
 		logs.Errorf("[deepseek] generate empty content: model=%s finish_reason=%s choices=%d resp_id=%s request_id=%s "+
 			"content=%q reasoning_len=%d usage: prompt=%d cached=%d miss=%d completion=%d total=%d",
 			d.model, meta.FinishReason, len(chatResp.Choices), chatResp.ID, rid,
-			previewOf([]byte(msg.Content), 80), len(msg.ReasoningContent), in, cached, miss, out, total)
+			content, len(msg.ReasoningContent), in, cached, miss, out, total)
 	}
 	return msg, nil
-}
-
-// previewOf 截断字节串用于日志展示
-func previewOf(data []byte, n int) string {
-	if len(data) <= n {
-		return string(data)
-	}
-	return string(data[:n])
 }
 
 // Stream 流式调用: 成功响应交给后台 goroutine 按 SSE 解析

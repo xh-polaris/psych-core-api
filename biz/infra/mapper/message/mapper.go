@@ -53,7 +53,7 @@ func (m *mongoMapper) RetrieveMessage(ctx context.Context, conversation string, 
 	if size > 0 {
 		opts.SetLimit(int64(size))
 	}
-	if err = m.conn.Find(ctx, &msgs, bson.M{cst.ConversationID: oid, cst.Status: bson.M{cst.NE: -1}},
+	if err = m.conn.Find(ctx, &msgs, bson.M{cst.ConversationID: oid, cst.Status: bson.M{cst.NE: cst.MsgDeleted}},
 		opts); err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
 		logs.Errorf("[message mapper] find err:%s", errorx.ErrorWithoutStack(err))
 		return nil, err
@@ -65,12 +65,12 @@ func (m *mongoMapper) RetrieveMessage(ctx context.Context, conversation string, 
 func (m *mongoMapper) FindByConversationAndTimeRange(ctx context.Context, conversationID bson.ObjectID, start, end time.Time) ([]*Message, error) {
 	return m.FindManyWithOption(ctx, bson.M{
 		cst.ConversationID: conversationID,
-		cst.Status:         bson.M{cst.NE: -1},
+		cst.Status:         bson.M{cst.NE: cst.MsgDeleted},
 		cst.CreateTime: bson.M{
 			cst.GTE: start,
 			cst.LTE: end,
 		},
-	}, options.Find().SetSort(bson.D{{cst.CreateTime, 1}}))
+	}, options.Find().SetSort(bson.D{{Key: cst.CreateTime, Value: 1}}))
 }
 
 type MsgStats struct {
@@ -84,7 +84,7 @@ func (m *mongoMapper) FindByConversationIds(ctx context.Context, convIds []bson.
 	}
 	return m.FindManyWithOption(ctx, bson.M{
 		cst.ConversationID: bson.M{cst.In: convIds},
-		cst.Status:         bson.M{cst.NE: -1},
+		cst.Status:         bson.M{cst.NE: cst.MsgDeleted},
 	}, opts)
 }
 
@@ -97,8 +97,8 @@ func (m *mongoMapper) BatchMessageStats(ctx context.Context, userIds []bson.Obje
 		{
 			"$match": bson.M{
 				cst.UserID: bson.M{cst.In: userIds},
-				cst.Role:   enum.MsgRoleUser,   // user角色
-				cst.Status: bson.M{cst.NE: -1}, // 非删除状态
+				cst.Role:   enum.MsgRoleUser,               // user角色
+				cst.Status: bson.M{cst.NE: cst.MsgDeleted}, // 非删除状态
 			},
 		},
 		{

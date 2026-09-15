@@ -8,7 +8,6 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/xh-polaris/psych-core-api/biz/adaptor/middleware"
-	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/pkg/httpx"
 	"github.com/xh-polaris/psych-core-api/provider"
@@ -21,13 +20,6 @@ type archiveConversationReq struct {
 type archiveConversationResp struct {
 	Code int32  `json:"code"`
 	Msg  string `json:"msg"`
-}
-
-type getConvByDateReq struct {
-	PaginationOptions *basic.PaginationOptions `json:"paginationOptions"`
-	Date              string                   `json:"date"`
-	UserId            string                   `json:"userId"`
-	CharacterId       string                   `json:"characterId"`
 }
 
 // CreateConversation .
@@ -98,7 +90,7 @@ func ArchiveConversation(ctx context.Context, c *app.RequestContext) {
 // @router /conversation/get_by_date [POST]
 func GetConvByDate(ctx context.Context, c *app.RequestContext) {
 	var err error
-	var req getConvByDateReq
+	var req core_api.GetConvByDateReq
 	err = c.BindAndValidate(&req)
 	if err != nil {
 		c.String(consts.StatusBadRequest, err.Error())
@@ -107,11 +99,6 @@ func GetConvByDate(ctx context.Context, c *app.RequestContext) {
 
 	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
-	resp, err := p.ConversationService.GetConvByDate(ctx, &core_api.GetConvByDateReq{
-		PaginationOptions: req.PaginationOptions,
-		Date:              req.Date,
-		UserId:            req.UserId,
-		CharacterId:       req.CharacterId,
-	})
+	resp, err := p.ConversationService.GetConvByDate(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }

@@ -39,3 +39,8 @@ type Report struct {
 	Analysis     *Analysis          `bson:"analysis,omitempty" json:"analysis,omitempty"`          // 评估分析（13维度）
 	SimpleReport *SimpleReport      `bson:"simple_report,omitempty" json:"simpleReport,omitempty"` // 简易报告（16板块）
 }
+
+// ConversationRounds 将 round 字段 (对话消息总数) 折算为对话轮数 (一轮 = 学生+AI 各一条)
+func (r *Report) ConversationRounds() int {
+	return r.Round / 2
+}

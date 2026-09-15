@@ -39,7 +39,7 @@ func (e *Engine) config() error {
 	// character_id 仅在会话创建时确定（CreateConversation）
 	// e.Character 以「会话已绑定 character」为准，前端本次携带的 characterId 仅在新建会话时生效
 	e.loadConvMeta()
-	e.Character = e.resolveCharacter(vo.Characters)
+	e.Character = pickCharacterByID(vo.Characters, e.characterID)
 	logs.Infof("[engine] [config] chat=%s/%s tts=%s/%s asr=%s type=%d",
 		wfc.ChatConfig.Provider, wfc.ChatConfig.BotId,
 		wfc.TTSConfig.Provider, wfc.TTSConfig.Speaker,
@@ -112,15 +112,10 @@ func (e *Engine) loadConvMeta() {
 	}
 }
 
-// resolveCharacter 确定本次会话绑定的老师形象。
-// conversationId 在 auth() 中已强制要求必填，character_id 由 loadConvMeta 从会话 DB 回查，
-// 前端本次携带的 characterId 仅在会话 character_id 缺失时兜底。
-func (e *Engine) resolveCharacter(characters []*core_api.Character) *core.CharacterInfo {
-	return pickCharacterByID(characters, e.characterID)
-}
-
-// pickCharacterByID 从角色列表中按指定 ID 匹配老师形象。
-// characterID 为空时返回首个启用角色（与历史 pickCharacter 语义保持一致）。
+// pickCharacterByID 确定本次会话绑定的老师形象。
+// conversationId 在 auth() 中已强制要求必填，characterID 由 loadConvMeta 从会话 DB 回查，
+// 前端本次携带的 characterId 仅在会话 character_id 缺失时兜底；为空时返回首个启用角色
+// （与历史 pickCharacter 语义保持一致）。
 func pickCharacterByID(characters []*core_api.Character, characterID string) *core.CharacterInfo {
 	if len(characters) == 0 {
 		return nil

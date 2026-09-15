@@ -25,6 +25,7 @@ const (
 	UpdateTime     = "update_time"
 	DeleteTime     = "delete_time"
 	EndTime        = "end_time"
+	ReportEnd      = "end" // report 对话结束时间字段
 	StartTime      = "start_time"
 	Code           = "code"
 	CodeType       = "code_type"
@@ -86,6 +87,7 @@ const (
 	EventMessageContentTypeCode     = 3 // 代码
 	EventMessageContentTypeCodeType = 4 // 代码
 	MessageStatus                   = 0
+	MsgDeleted                      = -1 // message.status 软删标记, 查询用 status != -1 过滤
 )
 
 // Message相关枚举值

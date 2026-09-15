@@ -9,6 +9,7 @@ import (
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
+	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
@@ -67,7 +68,7 @@ func (d *DashboardDomain) GetConversationMessages(ctx context.Context, scope *Sc
 func (d *DashboardDomain) userConvRecords(ctx context.Context, userOID bson.ObjectID, targetUser *user.User, req *core_api.DashboardUserConvRecordsReq) (*core_api.DashboardUserConvRecordsResp, error) {
 	totalRounds, err := d.ReportMapper.CountCompletedByUser(ctx, userOID)
 	if err != nil {
-		return nil, errorx.New(errno.ErrDashboardGetConversations)
+		return nil, errorx.New(errno.ErrDashboardGetReport)
 	}
 	// 获取用户对话频率趋势
 	userConvTrend, err := d.getUserConvTrend(ctx, userOID)
@@ -145,22 +146,10 @@ func (d *DashboardDomain) unitConvRecords4Unit(ctx context.Context, rs *resolved
 		}, nil
 	}
 
-	reports, err := d.ReportMapper.FindCompletedByUnit(ctx, unitOID, util.PagedFindOpt(req.PaginationOptions).SetSort(bson.D{{"end", -1}}))
+	reports, err := d.ReportMapper.FindCompletedByUnit(ctx, unitOID, util.PagedFindOpt(req.PaginationOptions).SetSort(bson.D{{Key: cst.ReportEnd, Value: -1}}))
 	if err != nil {
 		logs.Errorf("get report error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardGetReport)
-	}
-
-	usrIds := make([]bson.ObjectID, 0, len(reports))
-	for _, rpt := range reports {
-		usrIds = append(usrIds, rpt.UserID)
-	}
-
-	// 批量查询用户信息
-	users, err := d.UserMapper.BatchFindByIDs(ctx, usrIds)
-	if err != nil {
-		logs.Errorf("get user error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "用户"))
 	}
 
 	unitDAO, err := d.UnitMapper.FindOneById(ctx, unitOID)
@@ -168,29 +157,9 @@ func (d *DashboardDomain) unitConvRecords4Unit(ctx context.Context, rs *resolved
 		return nil, errorx.WrapByCode(err, errno.ErrInternalError)
 	}
 
-	// 构建响应
-	convOverviews := make([]*core_api.ConvOverview, 0, len(reports))
-	for _, rpt := range reports {
-		usr := users[rpt.UserID]
-		if usr == nil {
-			continue
-		}
-		calculatedGrade := usr.CalculateGrade(unitDAO.StartGrade)
-		convOverviews = append(convOverviews, &core_api.ConvOverview{
-			User: &core_api.UserVO{
-				Id:     usr.ID.Hex(),
-				Name:   usr.Name,
-				Grade:  int32(calculatedGrade),
-				Class:  int32(usr.Class),
-				Code:   usr.Code,
-				Gender: int32(usr.Gender),
-			},
-			ConvId:    rpt.ConversationID.Hex(),
-			ReportId:  rpt.ID.Hex(),
-			Title:     rpt.Title,
-			Time:      rpt.End.Unix(),
-			NeedAlarm: rpt.NeedAlarm,
-		})
+	convOverviews, err := d.buildConvOverviews(ctx, reports, unitDAO.StartGrade)
+	if err != nil {
+		return nil, err
 	}
 
 	return &core_api.DashboardUnitConvRecordsResp{
@@ -246,32 +215,44 @@ func (d *DashboardDomain) unitConvRecords4ClsTch(ctx context.Context, rs *resolv
 		return emptyResp(pg), nil
 	}
 
-	reports, err := d.ReportMapper.FindCompletedByUserIDs(ctx, userIds, util.PagedFindOpt(req.PaginationOptions).SetSort(bson.D{{"end", -1}}))
+	reports, err := d.ReportMapper.FindCompletedByUserIDs(ctx, userIds, util.PagedFindOpt(req.PaginationOptions).SetSort(bson.D{{Key: cst.ReportEnd, Value: -1}}))
 	if err != nil {
 		logs.Errorf("get report error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrDashboardGetReport)
 	}
 
+	convOverviews, err := d.buildConvOverviews(ctx, reports, rs.startGrade)
+	if err != nil {
+		return nil, err
+	}
+
+	return &core_api.DashboardUnitConvRecordsResp{
+		ConversationList: convOverviews,
+		Pagination:       pg,
+		Code:             0,
+		Msg:              "success",
+	}, nil
+}
+
+// buildConvOverviews 报表列表 → 批量取用户 → 构建 ConvOverview (用户缺失的报告跳过)
+func (d *DashboardDomain) buildConvOverviews(ctx context.Context, reports []*report.Report, startGrade int) ([]*core_api.ConvOverview, error) {
 	usrIds := make([]bson.ObjectID, 0, len(reports))
 	for _, rpt := range reports {
 		usrIds = append(usrIds, rpt.UserID)
 	}
-
-	// 批量查询用户信息
 	userMap, err := d.UserMapper.BatchFindByIDs(ctx, usrIds)
 	if err != nil {
 		logs.Errorf("get user error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "用户"))
 	}
 
-	// 构建响应
 	convOverviews := make([]*core_api.ConvOverview, 0, len(reports))
 	for _, rpt := range reports {
 		usr := userMap[rpt.UserID]
 		if usr == nil {
 			continue
 		}
-		calculatedGrade := usr.CalculateGrade(rs.startGrade)
+		calculatedGrade := usr.CalculateGrade(startGrade)
 		convOverviews = append(convOverviews, &core_api.ConvOverview{
 			User: &core_api.UserVO{
 				Id:     usr.ID.Hex(),
@@ -288,13 +269,7 @@ func (d *DashboardDomain) unitConvRecords4ClsTch(ctx context.Context, rs *resolv
 			NeedAlarm: rpt.NeedAlarm,
 		})
 	}
-
-	return &core_api.DashboardUnitConvRecordsResp{
-		ConversationList: convOverviews,
-		Pagination:       pg,
-		Code:             0,
-		Msg:              "success",
-	}, nil
+	return convOverviews, nil
 }
 
 // getUserConvTrend 获取用户对话趋势数据

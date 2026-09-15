@@ -576,7 +576,7 @@ func (m *mongoMapper) ListUsers(ctx context.Context, opts *ListUserOptions) ([]*
 					"$expr":  bson.M{"$eq": bson.A{"$" + cst.UserID, "$$uid"}},
 					"status": 2, // ReportStatusSuccess
 				}},
-				{"$sort": bson.M{"end": -1}},
+				{"$sort": bson.M{cst.ReportEnd: -1}},
 				{"$limit": 1},
 				{"$project": bson.M{cst.Keywords: 1}},
 			},
