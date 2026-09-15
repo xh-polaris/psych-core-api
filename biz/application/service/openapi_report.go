@@ -254,7 +254,7 @@ func nonNilSlice[T any](items []T) []T {
 }
 
 // emotionItemsToDTO converts report analysis emotion items to DTO
-func emotionItemsToDTO(items []report.AnalysisEmotion) []*core_api.AnalysisEmotion {
+func emotionItemsToDTO(items report.AnalysisEmotions) []*core_api.AnalysisEmotion {
 	if len(items) == 0 {
 		return make([]*core_api.AnalysisEmotion, 0)
 	}
