@@ -2,6 +2,7 @@ package report
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -59,14 +60,93 @@ func (e *AnalysisEmotions) UnmarshalBSONValue(typ byte, data []byte) error {
 		*e = values
 		return nil
 	case bson.TypeEmbeddedDocument:
-		var value AnalysisEmotion
-		if err := raw.Unmarshal(&value); err != nil {
-			return err
-		}
-		*e = AnalysisEmotions{value}
-		return nil
+		return e.unmarshalLegacyDocument(raw)
 	default:
 		return fmt.Errorf("unsupported analysis.emotion BSON type %s", raw.Type)
+	}
+}
+
+// unmarshalLegacyDocument 兼容旧版对象格式。其中 type / intensity 既可能是单值，
+// 也可能分别是等长数组；后者按下标还原成多条情绪记录。
+func (e *AnalysisEmotions) unmarshalLegacyDocument(raw bson.RawValue) error {
+	var doc bson.M
+	if err := raw.Unmarshal(&doc); err != nil {
+		return err
+	}
+
+	types := legacyEmotionStrings(doc["type"])
+	if len(types) == 0 {
+		return fmt.Errorf("legacy analysis.emotion.type is empty or invalid")
+	}
+	intensities := legacyEmotionIntensities(doc["intensity"])
+
+	values := make(AnalysisEmotions, 0, len(types))
+	for i, emotionType := range types {
+		intensity := 1.0 // 历史数据未记录或无法解析强度时，以中等强度兜底展示
+		if len(intensities) == 1 {
+			intensity = intensities[0]
+		} else if i < len(intensities) {
+			intensity = intensities[i]
+		}
+		values = append(values, AnalysisEmotion{Type: emotionType, Intensity: intensity})
+	}
+	*e = values
+	return nil
+}
+
+func legacyEmotionStrings(value any) []string {
+	switch v := value.(type) {
+	case string:
+		if v == "" {
+			return nil
+		}
+		return []string{v}
+	case bson.A:
+		values := make([]string, 0, len(v))
+		for _, item := range v {
+			if text, ok := item.(string); ok && text != "" {
+				values = append(values, text)
+			}
+		}
+		return values
+	default:
+		return nil
+	}
+}
+
+func legacyEmotionIntensities(value any) []float64 {
+	if values, ok := value.(bson.A); ok {
+		result := make([]float64, 0, len(values))
+		for _, item := range values {
+			if intensity, ok := legacyEmotionIntensity(item); ok {
+				result = append(result, intensity)
+			}
+		}
+		return result
+	}
+	if intensity, ok := legacyEmotionIntensity(value); ok {
+		return []float64{intensity}
+	}
+	return nil
+}
+
+func legacyEmotionIntensity(value any) (float64, bool) {
+	switch v := value.(type) {
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int32:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case string:
+		parsed, err := strconv.ParseFloat(v, 64)
+		return parsed, err == nil
+	default:
+		return 0, false
 	}
 }
 
