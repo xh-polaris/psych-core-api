@@ -28,13 +28,16 @@ type IMongoMapper interface {
 	mapper.IMongoMapper[Report]
 	ExistByUser(ctx context.Context, userId bson.ObjectID) (bool, error)
 	CountCompletedByUser(ctx context.Context, userId bson.ObjectID) (int32, error)
+	CountCompletedByUnit(ctx context.Context, unitID bson.ObjectID) (int32, error)
+	CountCompletedByUserIDs(ctx context.Context, userIDs []bson.ObjectID) (int32, error)
+	FindCompletedByUnit(ctx context.Context, unitID bson.ObjectID, opts options.Lister[options.FindOptions]) ([]*Report, error)
+	FindCompletedByUserIDs(ctx context.Context, userIDs []bson.ObjectID, opts options.Lister[options.FindOptions]) ([]*Report, error)
 	FindUserLatest(ctx context.Context, userId bson.ObjectID) (*Report, error)
 	FindAllByUser(ctx context.Context, userId bson.ObjectID) ([]*Report, error)
 	BatchFindUserLatest(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*Report, error)
 	FindByConversation(ctx context.Context, sessionId bson.ObjectID) (*Report, error)
 	FindByConversationPreferSuccess(ctx context.Context, sessionId bson.ObjectID) (*Report, error)
 	FindVisibleByID(ctx context.Context, reportID bson.ObjectID) (*Report, error)
-	FindVisibleByConversation(ctx context.Context, sessionID bson.ObjectID) ([]*Report, error)
 	BatchFindBySession(ctx context.Context, sessionIds []bson.ObjectID) (map[bson.ObjectID]*Report, error)
 	// 词云相关接口
 	// 关键词词云（v2 报表 simple_report.keywords 聚合）
@@ -73,6 +76,42 @@ func (m *mongoMapper) CountCompletedByUser(ctx context.Context, userId bson.Obje
 		cst.Status: enum.ReportStatusSuccess,
 	})
 	return int32(count), err
+}
+
+func (m *mongoMapper) CountCompletedByUnit(ctx context.Context, unitID bson.ObjectID) (int32, error) {
+	count, err := m.conn.CountDocuments(ctx, bson.M{
+		cst.UnitID: unitID,
+		cst.Status: enum.ReportStatusSuccess,
+	})
+	return int32(count), err
+}
+
+func (m *mongoMapper) CountCompletedByUserIDs(ctx context.Context, userIDs []bson.ObjectID) (int32, error) {
+	if len(userIDs) == 0 {
+		return 0, nil
+	}
+	count, err := m.conn.CountDocuments(ctx, bson.M{
+		cst.UserID: bson.M{cst.In: userIDs},
+		cst.Status: enum.ReportStatusSuccess,
+	})
+	return int32(count), err
+}
+
+func (m *mongoMapper) FindCompletedByUnit(ctx context.Context, unitID bson.ObjectID, opts options.Lister[options.FindOptions]) ([]*Report, error) {
+	return m.FindManyWithOption(ctx, bson.M{
+		cst.UnitID: unitID,
+		cst.Status: enum.ReportStatusSuccess,
+	}, opts)
+}
+
+func (m *mongoMapper) FindCompletedByUserIDs(ctx context.Context, userIDs []bson.ObjectID, opts options.Lister[options.FindOptions]) ([]*Report, error) {
+	if len(userIDs) == 0 {
+		return []*Report{}, nil
+	}
+	return m.FindManyWithOption(ctx, bson.M{
+		cst.UserID: bson.M{cst.In: userIDs},
+		cst.Status: enum.ReportStatusSuccess,
+	}, opts)
 }
 
 // FindUserLatest 查找某单位某用户的最新报表，注意报表可能不存在
@@ -175,15 +214,6 @@ func (m *mongoMapper) FindVisibleByID(ctx context.Context, reportID bson.ObjectI
 		return nil, err
 	}
 	return report, nil
-}
-
-// FindVisibleByConversation 查询会话下全部未删除报表，按结束时间倒序
-func (m *mongoMapper) FindVisibleByConversation(ctx context.Context, sessionID bson.ObjectID) ([]*Report, error) {
-	filter := bson.M{
-		cst.ConversationID: sessionID,
-		cst.Status:         bson.M{cst.NE: enum.ReportStatusDeleted},
-	}
-	return m.FindManyWithOption(ctx, filter, options.Find().SetSort(bson.D{{reportEndField, -1}}))
 }
 
 // GetUnitKWByClassList 按班级列表统计报表 simple_report.keywords 的词频

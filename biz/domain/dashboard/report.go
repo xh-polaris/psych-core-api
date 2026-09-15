@@ -8,11 +8,8 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
-	"github.com/xh-polaris/psych-core-api/pkg/errorx"
-	"github.com/xh-polaris/psych-core-api/pkg/logs"
 	"github.com/xh-polaris/psych-core-api/types/enum"
 	"github.com/xh-polaris/psych-core-api/types/errno"
-	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // —— v0 旧版报表兼容取值 ——
@@ -50,33 +47,6 @@ func DigestOf(rpt *report.Report) string {
 		return ""
 	}
 	return rpt.Digest
-}
-
-// GetConversationReports 获取指定会话下的历史报表列表（班主任需目标学生在所带班级）
-func (d *DashboardDomain) GetConversationReports(ctx context.Context, scope *Scope, convOID bson.ObjectID, targetUser *user.User) (*core_api.DashboardGetConversationReportsResp, error) {
-	if scope.IsClassTeacher() {
-		rs, err := d.resolveScope(ctx, scope)
-		if err != nil {
-			return nil, err
-		}
-		if err := d.ensureStudentInScope(ctx, rs, targetUser); err != nil {
-			return nil, err
-		}
-	}
-	reports, err := d.ReportMapper.FindVisibleByConversation(ctx, convOID)
-	if err != nil {
-		logs.Errorf("get conversation reports error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrDashboardGetReport)
-	}
-	reportList := make([]*core_api.DashboardConversationReport, 0, len(reports))
-	for _, rpt := range reports {
-		reportList = append(reportList, reportSummaryToPB(rpt))
-	}
-	return &core_api.DashboardGetConversationReportsResp{
-		ReportList: reportList,
-		Code:       0,
-		Msg:        "success",
-	}, nil
 }
 
 // GetReport 查看指定报表详情（班主任需目标学生在所带班级）
@@ -125,17 +95,6 @@ func (d *DashboardDomain) GetReport(ctx context.Context, scope *Scope, rpt *repo
 	}
 
 	return resp, nil
-}
-
-func reportSummaryToPB(rpt *report.Report) *core_api.DashboardConversationReport {
-	return &core_api.DashboardConversationReport{
-		ReportId:             rpt.ID.Hex(),
-		ReportStatus:         int32(rpt.Status),
-		Title:                rpt.Title,
-		ConversationRounds:   int32(rpt.Round / 2),
-		StartTime:            rpt.Start.Unix(),
-		LastConversationTime: rpt.End.Unix(),
-	}
 }
 
 func rankedKeywords(words []string) map[string]float64 {

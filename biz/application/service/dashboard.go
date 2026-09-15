@@ -38,7 +38,6 @@ type IDashboardService interface {
 	DashboardUserConvRecords(ctx context.Context, req *core_api.DashboardUserConvRecordsReq) (*core_api.DashboardUserConvRecordsResp, error)
 	DashboardUnitConvRecords(ctx context.Context, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error)
 	DashboardGetConversationMessages(ctx context.Context, req *core_api.DashboardGetConversationMessagesReq) (*core_api.DashboardGetConversationMessagesResp, error)
-	DashboardGetConversationReports(ctx context.Context, req *core_api.DashboardGetConversationReportsReq) (*core_api.DashboardGetConversationReportsResp, error)
 	DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error)
 
 	// 预警
@@ -207,35 +206,6 @@ func (s *DashboardService) DashboardUserConvRecords(ctx context.Context, req *co
 	return s.DashboardDomain.UserConvRecords(ctx, scope, userOID, targetUser, req)
 }
 
-// DashboardGetConversationReports 获取指定会话下的历史报表列表
-func (s *DashboardService) DashboardGetConversationReports(ctx context.Context, req *core_api.DashboardGetConversationReportsReq) (*core_api.DashboardGetConversationReportsResp, error) {
-	convOID, err := bson.ObjectIDFromHex(req.GetConversationId())
-	if err != nil {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "ConversationId"), errorx.KV("value", "对话ID"))
-	}
-
-	conv, err := s.ConversationMapper.FindOneById(ctx, convOID)
-	if err != nil {
-		logs.Errorf("get conversation error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "对话"))
-	}
-	usr, err := s.UserMapper.FindOneById(ctx, conv.UserID)
-	if err != nil {
-		logs.Errorf("get user error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "用户"))
-	}
-
-	meta, role, err := s.AuthDomain.IdentifyRole(ctx, usr.UnitID.Hex())
-	if err != nil {
-		return nil, err
-	}
-	scope, err := s.buildScope(usr.UnitID.Hex(), meta, role)
-	if err != nil {
-		return nil, err
-	}
-	return s.DashboardDomain.GetConversationReports(ctx, scope, convOID, usr)
-}
-
 // DashboardGetReport 查看指定报表详情
 func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error) {
 	reportOID, err := bson.ObjectIDFromHex(req.GetReportId())
@@ -269,13 +239,18 @@ func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api
 	return s.DashboardDomain.GetReport(ctx, scope, rpt, usr)
 }
 
-// DashboardGetConversationMessages 获取管理端报表关联的原始对话消息。
+// DashboardGetConversationMessages 获取指定报告覆盖的原始对话消息
 func (s *DashboardService) DashboardGetConversationMessages(ctx context.Context, req *core_api.DashboardGetConversationMessagesReq) (*core_api.DashboardGetConversationMessagesResp, error) {
-	convOID, err := bson.ObjectIDFromHex(req.ConversationId)
+	reportOID, err := bson.ObjectIDFromHex(req.GetReportId())
 	if err != nil {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "ConversationId"), errorx.KV("value", "对话ID"))
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "ReportId"), errorx.KV("value", "报表ID"))
 	}
-	conv, err := s.ConversationMapper.FindOneById(ctx, convOID)
+	rpt, err := s.ReportMapper.FindVisibleByID(ctx, reportOID)
+	if err != nil {
+		logs.Errorf("get report error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "报表"))
+	}
+	conv, err := s.ConversationMapper.FindOneById(ctx, rpt.ConversationID)
 	if err != nil {
 		logs.Errorf("get conversation error: %s", errorx.ErrorWithoutStack(err))
 		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "对话"))
@@ -293,7 +268,7 @@ func (s *DashboardService) DashboardGetConversationMessages(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	return s.DashboardDomain.GetConversationMessages(ctx, scope, convOID, usr, req)
+	return s.DashboardDomain.GetConversationMessages(ctx, scope, rpt, usr, req)
 }
 
 // DashboardUnitConvRecords 单位/平台对话记录列表
