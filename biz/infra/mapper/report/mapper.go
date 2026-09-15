@@ -21,7 +21,6 @@ const (
 	collection     = "report"
 	userCollection = "user"
 	cacheKeyPrefix = "cache:report:"
-	reportEndField = "end"
 )
 
 type IMongoMapper interface {
@@ -159,7 +158,7 @@ func (m *mongoMapper) FindCompletedByUserIDs(ctx context.Context, userIDs []bson
 // FindUserLatest 查找某单位某用户的最新报表，注意报表可能不存在
 func (m *mongoMapper) FindUserLatest(ctx context.Context, userId bson.ObjectID) (*Report, error) {
 	report := &Report{}
-	if err := m.conn.FindOneNoCache(ctx, report, bson.M{cst.UserID: userId}, options.FindOne().SetSort(bson.M{"end": -1})); err != nil {
+	if err := m.conn.FindOneNoCache(ctx, report, bson.M{cst.UserID: userId}, options.FindOne().SetSort(bson.M{cst.ReportEnd: -1})); err != nil {
 		return nil, err
 	}
 
@@ -180,7 +179,7 @@ func (m *mongoMapper) BatchFindUserLatest(ctx context.Context, userIds []bson.Ob
 		}},
 		// 按 userId 分组，并获取每个组中 End 最新的文档
 		{{
-			Key: "$sort", Value: bson.M{"end": -1}, // 先按时间倒序排序
+			Key: "$sort", Value: bson.M{cst.ReportEnd: -1}, // 先按时间倒序排序
 		}},
 		{{
 			Key: "$group", Value: bson.M{
@@ -238,7 +237,7 @@ func (m *mongoMapper) FindByConversationPreferSuccess(ctx context.Context, sessi
 		cst.ConversationID: sessionId,
 		cst.Status:         bson.M{cst.NE: enum.ReportStatusDeleted},
 	}
-	opt := options.FindOne().SetSort(bson.D{{cst.Status, -1}, {reportEndField, -1}})
+	opt := options.FindOne().SetSort(bson.D{{Key: cst.Status, Value: -1}, {Key: cst.ReportEnd, Value: -1}})
 	if err := m.conn.FindOneNoCache(ctx, report, filter, opt); err != nil {
 		return nil, err
 	}

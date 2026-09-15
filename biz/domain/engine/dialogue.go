@@ -125,6 +125,7 @@ func (e *Engine) loadDayMsgs(ctx context.Context, userId string) []*message.Mess
 	// 退化为当前会话消息，并转为升序
 	convMsgs, err := his.Mgr.GetConversationMessages(ctx, e.uSession, -1)
 	if err != nil {
+		logs.Errorf("[engine] [dialogue] GetConversationMessages err: %v, dialogue proceeds without history", err)
 		return nil
 	}
 	asc := make([]*message.Message, len(convMsgs))
@@ -176,15 +177,20 @@ func (e *Engine) buildDialogueMsgs(ctx context.Context, baseMsgs []*schema.Messa
 		sb.WriteString("\n## Micro Skill References\n")
 		sb.WriteString(skillsText)
 	}
+	return buildDialogueMsgsP(baseMsgs, sb.String(), tpl)
+}
 
-	// baseMsgs 最新在前 (首位为本次用户消息), ChatModel 内部 reverse 后:
-	// system 置首、历史正序、策略尾注位于最新用户消息之前
+// buildDialogueMsgsP 组装对话请求消息: system 只承载静态模板; 每轮变化的
+// strategy/skills 独立成尾注消息. baseMsgs 最新在前 (首位为本次用户消息).
+// wire 终序 (ChatModel reverse 后): [对话模板 system, 历史asc..., 尾注 system, 本次用户消息].
+// 与 buildStrategyMsgs 同构, 排序回归由 dialogue_test.go 锁定.
+func buildDialogueMsgsP(baseMsgs []*schema.Message, tailNote, tpl string) []*schema.Message {
 	msgs := make([]*schema.Message, 0, len(baseMsgs)+2)
 	if len(baseMsgs) > 0 {
 		msgs = append(msgs, baseMsgs[0])
 	}
-	if sb.Len() > 0 {
-		msgs = append(msgs, &schema.Message{Role: schema.System, Content: sb.String()})
+	if tailNote != "" {
+		msgs = append(msgs, &schema.Message{Role: schema.System, Content: tailNote})
 	}
 	msgs = append(msgs, baseMsgs[1:]...)
 	msgs = append(msgs, &schema.Message{Role: schema.System, Content: tpl})
