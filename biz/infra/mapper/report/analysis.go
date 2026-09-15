@@ -76,7 +76,10 @@ func (e *AnalysisEmotions) unmarshalLegacyDocument(raw bson.RawValue) error {
 
 	types := legacyEmotionStrings(doc["type"])
 	if len(types) == 0 {
-		return fmt.Errorf("legacy analysis.emotion.type is empty or invalid")
+		// 部分历史报告的 emotion 对象没有可用 type；情绪分析为空不应阻断
+		// 整份报告的列表或详情读取。
+		*e = AnalysisEmotions{}
+		return nil
 	}
 	intensities := legacyEmotionIntensities(doc["intensity"])
 
