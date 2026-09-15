@@ -94,7 +94,7 @@ func simpleReportToPB(sr *report.SimpleReport) *core_api.SimpleReportMsg {
 }
 
 // emotionItemsToPB converts report analysis emotion items to PB
-func emotionItemsToPB(items []report.AnalysisEmotion) []*core_api.AnalysisEmotion {
+func emotionItemsToPB(items report.AnalysisEmotions) []*core_api.AnalysisEmotion {
 	if len(items) == 0 {
 		return make([]*core_api.AnalysisEmotion, 0)
 	}

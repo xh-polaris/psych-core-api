@@ -1,6 +1,7 @@
 package report
 
 import (
+	"fmt"
 	"strings"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -10,7 +11,7 @@ import (
 
 type Analysis struct {
 	Problem     AnalysisProblem    `bson:"problem" json:"problem"`
-	Emotion     []AnalysisEmotion  `bson:"emotion" json:"emotion"` // 情绪列表（1-3 项，按影响程度排序）
+	Emotion     AnalysisEmotions   `bson:"emotion" json:"emotion"` // 情绪列表（1-3 项，按影响程度排序）
 	Cognition   []string           `bson:"cognition,omitempty" json:"cognition,omitempty"`
 	Behavior    []string           `bson:"behavior,omitempty" json:"behavior,omitempty"`
 	Duration    string             `bson:"duration" json:"duration"`
@@ -38,6 +39,35 @@ type AnalysisProblem struct {
 type AnalysisEmotion struct {
 	Type      string  `bson:"type" json:"type"`
 	Intensity float64 `bson:"intensity" json:"intensity"` // 0.5~2.0，中度基准 1.0
+}
+
+// AnalysisEmotions 兼容历史报告的两种存储格式：
+// 新版为数组，旧版曾将单项情绪直接存为对象。对外统一表现为数组
+type AnalysisEmotions []AnalysisEmotion
+
+func (e *AnalysisEmotions) UnmarshalBSONValue(typ byte, data []byte) error {
+	raw := bson.RawValue{Type: bson.Type(typ), Value: data}
+	switch raw.Type {
+	case bson.TypeNull:
+		*e = nil
+		return nil
+	case bson.TypeArray:
+		var values []AnalysisEmotion
+		if err := raw.Unmarshal(&values); err != nil {
+			return err
+		}
+		*e = values
+		return nil
+	case bson.TypeEmbeddedDocument:
+		var value AnalysisEmotion
+		if err := raw.Unmarshal(&value); err != nil {
+			return err
+		}
+		*e = AnalysisEmotions{value}
+		return nil
+	default:
+		return fmt.Errorf("unsupported analysis.emotion BSON type %s", raw.Type)
+	}
 }
 
 type AnalysisSupport struct {
