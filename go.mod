@@ -34,7 +34,6 @@ require (
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.3.50
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms v1.1.49
 	github.com/tencentyun/cos-go-sdk-v5 v0.7.72
-	github.com/yanyiwu/gojieba v1.4.6
 	go.mongodb.org/mongo-driver/v2 v2.3.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0
