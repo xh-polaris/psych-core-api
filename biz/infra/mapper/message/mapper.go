@@ -28,6 +28,7 @@ const (
 type IMongoMapper interface {
 	mapper.IMongoMapper[Message]
 	RetrieveMessage(ctx context.Context, conversation string, size int) ([]*Message, error)
+	FindByConversationAndTimeRange(ctx context.Context, conversationID bson.ObjectID, start, end time.Time) ([]*Message, error)
 	FindByConversationIds(ctx context.Context, convIds []bson.ObjectID, opts options.Lister[options.FindOptions]) ([]*Message, error)
 	BatchMessageStats(ctx context.Context, userIds []bson.ObjectID) (map[bson.ObjectID]*MsgStats, error)
 }
@@ -58,6 +59,18 @@ func (m *mongoMapper) RetrieveMessage(ctx context.Context, conversation string, 
 		return nil, err
 	}
 	return msgs, nil
+}
+
+// FindByConversationAndTimeRange 按报告的时间边界获取该报告段内消息，按时间正序返回
+func (m *mongoMapper) FindByConversationAndTimeRange(ctx context.Context, conversationID bson.ObjectID, start, end time.Time) ([]*Message, error) {
+	return m.FindManyWithOption(ctx, bson.M{
+		cst.ConversationID: conversationID,
+		cst.Status:         bson.M{cst.NE: -1},
+		cst.CreateTime: bson.M{
+			cst.GTE: start,
+			cst.LTE: end,
+		},
+	}, options.Find().SetSort(bson.D{{cst.CreateTime, 1}}))
 }
 
 type MsgStats struct {

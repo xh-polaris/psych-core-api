@@ -9,8 +9,8 @@ import (
 
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
-	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
@@ -34,8 +34,8 @@ func (d *DashboardDomain) UserConvRecords(ctx context.Context, scope *Scope, use
 	return d.userConvRecords(ctx, userOID, targetUser, req)
 }
 
-// GetConversationMessages 返回已获授权的管理端原始对话消息
-func (d *DashboardDomain) GetConversationMessages(ctx context.Context, scope *Scope, convOID bson.ObjectID, targetUser *user.User, req *core_api.DashboardGetConversationMessagesReq) (*core_api.DashboardGetConversationMessagesResp, error) {
+// GetConversationMessages 返回指定报告覆盖的原始对话消息。
+func (d *DashboardDomain) GetConversationMessages(ctx context.Context, scope *Scope, rpt *report.Report, targetUser *user.User, req *core_api.DashboardGetConversationMessagesReq) (*core_api.DashboardGetConversationMessagesResp, error) {
 	if scope.IsClassTeacher() {
 		rs, err := d.resolveScope(ctx, scope)
 		if err != nil {
@@ -45,7 +45,7 @@ func (d *DashboardDomain) GetConversationMessages(ctx context.Context, scope *Sc
 			return nil, err
 		}
 	}
-	messages, err := d.MessageMapper.RetrieveMessage(ctx, convOID.Hex(), -1)
+	messages, err := d.MessageMapper.FindByConversationAndTimeRange(ctx, rpt.ConversationID, rpt.Start, rpt.End)
 	if err != nil {
 		return nil, errorx.New(errno.ErrFetchMessages)
 	}
@@ -121,21 +121,21 @@ func (d *DashboardDomain) UnitConvRecords(ctx context.Context, scope *Scope, req
 	return d.unitConvRecords4Unit(ctx, rs, req)
 }
 
-// unitConvRecords4Unit 单位端-获取单位下对话记录列表
+// unitConvRecords4Unit 单位端-获取单位下已完成报告列表
 func (d *DashboardDomain) unitConvRecords4Unit(ctx context.Context, rs *resolvedScope, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error) {
 	unitOID, err := bson.ObjectIDFromHex(req.GetUnitId())
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "UnitId"), errorx.KV("value", "单位ID"))
 	}
 
-	total, err := d.ConversationMapper.CountByUnit(ctx, &unitOID)
+	total, err := d.ReportMapper.CountCompletedByUnit(ctx, unitOID)
 	if err != nil {
-		return nil, errorx.New(errno.ErrDashboardGetConversations)
+		return nil, errorx.New(errno.ErrDashboardGetReport)
 	}
 
 	pg := util.PaginationRes(total, req.PaginationOptions)
 
-	// 若对话数为0
+	// 若报告数为0
 	if total == 0 {
 		return &core_api.DashboardUnitConvRecordsResp{
 			ConversationList: make([]*core_api.ConvOverview, 0),
@@ -145,19 +145,15 @@ func (d *DashboardDomain) unitConvRecords4Unit(ctx context.Context, rs *resolved
 		}, nil
 	}
 
-	// 至少有1条对话
-	convs, err := d.ConversationMapper.FindManyByUnitId(ctx, &unitOID, util.PagedFindOpt(req.PaginationOptions).SetSort(bson.D{{cst.EndTime, -1}}))
-	if err != nil || len(convs) == 0 {
-		logs.Errorf("get conversation error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "对话"))
+	reports, err := d.ReportMapper.FindCompletedByUnit(ctx, unitOID, util.PagedFindOpt(req.PaginationOptions).SetSort(bson.D{{"end", -1}}))
+	if err != nil {
+		logs.Errorf("get report error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrDashboardGetReport)
 	}
 
-	// 提取 userId / convId 列表
-	usrIds := make([]bson.ObjectID, 0, len(convs))
-	convIds := make([]bson.ObjectID, 0, len(convs))
-	for _, conv := range convs {
-		usrIds = append(usrIds, conv.UserID)
-		convIds = append(convIds, conv.ID)
+	usrIds := make([]bson.ObjectID, 0, len(reports))
+	for _, rpt := range reports {
+		usrIds = append(usrIds, rpt.UserID)
 	}
 
 	// 批量查询用户信息
@@ -167,22 +163,15 @@ func (d *DashboardDomain) unitConvRecords4Unit(ctx context.Context, rs *resolved
 		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "用户"))
 	}
 
-	// 批量判断会话是否存在待处理预警
-	needsAlarm, err := d.AlarmMapper.BatchExistsByConvId(ctx, convIds)
-	if err != nil {
-		logs.Errorf("batch check need alarm error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrDashboardGetConversations)
-	}
-
 	unitDAO, err := d.UnitMapper.FindOneById(ctx, unitOID)
 	if err != nil {
 		return nil, errorx.WrapByCode(err, errno.ErrInternalError)
 	}
 
 	// 构建响应
-	convOverviews := make([]*core_api.ConvOverview, 0, len(convs))
-	for _, conv := range convs {
-		usr := users[conv.UserID]
+	convOverviews := make([]*core_api.ConvOverview, 0, len(reports))
+	for _, rpt := range reports {
+		usr := users[rpt.UserID]
 		if usr == nil {
 			continue
 		}
@@ -196,10 +185,11 @@ func (d *DashboardDomain) unitConvRecords4Unit(ctx context.Context, rs *resolved
 				Code:   usr.Code,
 				Gender: int32(usr.Gender),
 			},
-			ConvId:    conv.ID.Hex(),
-			Title:     conv.Title,
-			Time:      conv.EndTime.Unix(),
-			NeedAlarm: needsAlarm[conv.ID],
+			ConvId:    rpt.ConversationID.Hex(),
+			ReportId:  rpt.ID.Hex(),
+			Title:     rpt.Title,
+			Time:      rpt.End.Unix(),
+			NeedAlarm: rpt.NeedAlarm,
 		})
 	}
 
@@ -211,7 +201,7 @@ func (d *DashboardDomain) unitConvRecords4Unit(ctx context.Context, rs *resolved
 	}, nil
 }
 
-// unitConvRecords4ClsTch 班主任端-获取所带班级学生的对话记录
+// unitConvRecords4ClsTch 班主任端-获取所带班级学生的已完成报告列表。
 func (d *DashboardDomain) unitConvRecords4ClsTch(ctx context.Context, rs *resolvedScope, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error) {
 	emptyResp := func(pg *basic.Pagination) *core_api.DashboardUnitConvRecordsResp {
 		return &core_api.DashboardUnitConvRecordsResp{
@@ -244,31 +234,27 @@ func (d *DashboardDomain) unitConvRecords4ClsTch(ctx context.Context, rs *resolv
 		userIds[i] = u.ID
 	}
 
-	total, err := d.ConversationMapper.CountByUserIds(ctx, userIds)
+	total, err := d.ReportMapper.CountCompletedByUserIDs(ctx, userIds)
 	if err != nil {
-		return nil, errorx.New(errno.ErrDashboardGetConversations)
+		return nil, errorx.New(errno.ErrDashboardGetReport)
 	}
 
 	pg := util.PaginationRes(total, req.PaginationOptions)
 
-	// 若对话数为 0
+	// 若报告数为 0
 	if total == 0 {
 		return emptyResp(pg), nil
 	}
 
-	// 查询对话列表
-	convs, err := d.ConversationMapper.FindManyByUserIds(ctx, userIds, util.PagedFindOpt(req.PaginationOptions).SetSort(bson.D{{cst.EndTime, -1}}))
-	if err != nil || len(convs) == 0 {
-		logs.Errorf("get conversation error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "对话"))
+	reports, err := d.ReportMapper.FindCompletedByUserIDs(ctx, userIds, util.PagedFindOpt(req.PaginationOptions).SetSort(bson.D{{"end", -1}}))
+	if err != nil {
+		logs.Errorf("get report error: %s", errorx.ErrorWithoutStack(err))
+		return nil, errorx.New(errno.ErrDashboardGetReport)
 	}
 
-	// 提取 userId / convId 列表
-	usrIds := make([]bson.ObjectID, 0, len(convs))
-	convIds := make([]bson.ObjectID, 0, len(convs))
-	for _, conv := range convs {
-		usrIds = append(usrIds, conv.UserID)
-		convIds = append(convIds, conv.ID)
+	usrIds := make([]bson.ObjectID, 0, len(reports))
+	for _, rpt := range reports {
+		usrIds = append(usrIds, rpt.UserID)
 	}
 
 	// 批量查询用户信息
@@ -278,17 +264,10 @@ func (d *DashboardDomain) unitConvRecords4ClsTch(ctx context.Context, rs *resolv
 		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "用户"))
 	}
 
-	// 批量判断会话是否存在待处理预警
-	needsAlarm, err := d.AlarmMapper.BatchExistsByConvId(ctx, convIds)
-	if err != nil {
-		logs.Errorf("batch check need alarm error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrDashboardGetConversations)
-	}
-
 	// 构建响应
-	convOverviews := make([]*core_api.ConvOverview, 0, len(convs))
-	for _, conv := range convs {
-		usr := userMap[conv.UserID]
+	convOverviews := make([]*core_api.ConvOverview, 0, len(reports))
+	for _, rpt := range reports {
+		usr := userMap[rpt.UserID]
 		if usr == nil {
 			continue
 		}
@@ -302,10 +281,11 @@ func (d *DashboardDomain) unitConvRecords4ClsTch(ctx context.Context, rs *resolv
 				Code:   usr.Code,
 				Gender: int32(usr.Gender),
 			},
-			ConvId:    conv.ID.Hex(),
-			Title:     conv.Title,
-			Time:      conv.EndTime.Unix(),
-			NeedAlarm: needsAlarm[conv.ID],
+			ConvId:    rpt.ConversationID.Hex(),
+			ReportId:  rpt.ID.Hex(),
+			Title:     rpt.Title,
+			Time:      rpt.End.Unix(),
+			NeedAlarm: rpt.NeedAlarm,
 		})
 	}
 
