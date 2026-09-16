@@ -65,7 +65,7 @@ func (d *DashboardDomain) GetConversationMessages(ctx context.Context, scope *Sc
 
 // userConvRecords 用户对话记录（对话频率趋势 + 分页详情）
 func (d *DashboardDomain) userConvRecords(ctx context.Context, userOID bson.ObjectID, targetUser *user.User, req *core_api.DashboardUserConvRecordsReq) (*core_api.DashboardUserConvRecordsResp, error) {
-	totalRounds, err := d.ReportMapper.CountCompletedByUser(ctx, userOID)
+	totalRounds, err := d.ReportMapper.SumCompletedRoundsByUser(ctx, userOID)
 	if err != nil {
 		return nil, errorx.New(errno.ErrDashboardGetConversations)
 	}

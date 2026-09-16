@@ -72,7 +72,7 @@ func (d *DashboardDomain) GetReport(ctx context.Context, scope *Scope, rpt *repo
 		NeedAlarm:            rpt.NeedAlarm,
 		KeywordPercent:       rpt.Keywords, // legacy: 仅 v0 报表有值
 		ReportStatus:         int32(rpt.Status),
-		ConversationRounds:   int32(rpt.Round / 2),
+		ConversationRounds:   int32(rpt.Round),
 		LastConversationTime: rpt.End.Unix(),
 		Analysis:             analysisToPB(rpt.Analysis),
 		SimpleReport:         simpleReportToPB(rpt.SimpleReport),
