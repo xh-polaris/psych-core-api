@@ -183,19 +183,27 @@ func (d *DashboardDomain) completeRiskUser(ctx context.Context, dbUsers []*user.
 		}
 	}
 
-	// 三路并行：学生消息轮数、AlarmRecord（高危学生）、最新 SimpleReport（全部，作剩余学生数据源及高危回退）
+	// 四路并行：最近学生消息时间、已完成报告轮数、AlarmRecord（高危学生）、最新 SimpleReport（全部，作剩余学生数据源及高危回退）
 	var msgStats map[bson.ObjectID]*message.MsgStats
+	var reportRounds map[bson.ObjectID]int32
 	var alarmMap map[bson.ObjectID]*alarm.Alarm
 	var latestReports map[bson.ObjectID]*report.Report
-	var msgErr, alarmErr, rptErr error
+	var msgErr, roundsErr, alarmErr, rptErr error
 
 	var wg sync.WaitGroup
-	wg.Add(3)
+	wg.Add(4)
 	go func() {
 		defer wg.Done()
 		msgStats, msgErr = d.MessageMapper.BatchMessageStats(ctx, uids)
 		if msgErr != nil {
 			logs.Warnf("查询对话统计失败: %v", errorx.ErrorWithoutStack(msgErr))
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		reportRounds, roundsErr = d.ReportMapper.BatchSumCompletedRoundsByUserIDs(ctx, uids)
+		if roundsErr != nil {
+			logs.Errorf("查询已完成报告轮数失败: %v", errorx.ErrorWithoutStack(roundsErr))
 		}
 	}()
 	go func() {
@@ -215,6 +223,9 @@ func (d *DashboardDomain) completeRiskUser(ctx context.Context, dbUsers []*user.
 	wg.Wait()
 
 	if msgErr != nil || msgStats == nil {
+		return nil, errorx.New(errno.ErrDashboardGetUserConversationStatic)
+	}
+	if roundsErr != nil {
 		return nil, errorx.New(errno.ErrDashboardGetUserConversationStatic)
 	}
 	if rptErr != nil {
@@ -244,8 +255,8 @@ func (d *DashboardDomain) completeRiskUser(ctx context.Context, dbUsers []*user.
 			Level:    int32(dbUser.RiskLevel),
 			Keywords: make([]string, 0),
 		}
+		riskUsers[i].TotalConversationRounds = reportRounds[dbUser.ID]
 		if msgStats[dbUser.ID] != nil {
-			riskUsers[i].TotalConversationRounds = msgStats[dbUser.ID].Rounds
 			riskUsers[i].LastConversationTime = msgStats[dbUser.ID].LatestTime
 		}
 

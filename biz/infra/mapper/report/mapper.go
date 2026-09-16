@@ -30,6 +30,8 @@ type IMongoMapper interface {
 	CountCompletedByUser(ctx context.Context, userId bson.ObjectID) (int32, error)
 	CountCompletedByUnit(ctx context.Context, unitID bson.ObjectID) (int32, error)
 	CountCompletedByUserIDs(ctx context.Context, userIDs []bson.ObjectID) (int32, error)
+	SumCompletedRoundsByUser(ctx context.Context, userID bson.ObjectID) (int32, error)
+	BatchSumCompletedRoundsByUserIDs(ctx context.Context, userIDs []bson.ObjectID) (map[bson.ObjectID]int32, error)
 	FindCompletedByUnit(ctx context.Context, unitID bson.ObjectID, opts options.Lister[options.FindOptions]) ([]*Report, error)
 	FindCompletedByUserIDs(ctx context.Context, userIDs []bson.ObjectID, opts options.Lister[options.FindOptions]) ([]*Report, error)
 	FindUserLatest(ctx context.Context, userId bson.ObjectID) (*Report, error)
@@ -95,6 +97,46 @@ func (m *mongoMapper) CountCompletedByUserIDs(ctx context.Context, userIDs []bso
 		cst.Status: enum.ReportStatusSuccess,
 	})
 	return int32(count), err
+}
+
+// SumCompletedRoundsByUser 汇总用户已完成报告覆盖的对话轮数。
+func (m *mongoMapper) SumCompletedRoundsByUser(ctx context.Context, userID bson.ObjectID) (int32, error) {
+	rounds, err := m.BatchSumCompletedRoundsByUserIDs(ctx, []bson.ObjectID{userID})
+	if err != nil {
+		return 0, err
+	}
+	return rounds[userID], nil
+}
+
+// BatchSumCompletedRoundsByUserIDs 按用户汇总已完成报告覆盖的对话轮数。
+func (m *mongoMapper) BatchSumCompletedRoundsByUserIDs(ctx context.Context, userIDs []bson.ObjectID) (map[bson.ObjectID]int32, error) {
+	result := make(map[bson.ObjectID]int32, len(userIDs))
+	if len(userIDs) == 0 {
+		return result, nil
+	}
+
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{
+			cst.UserID: bson.M{cst.In: userIDs},
+			cst.Status: enum.ReportStatusSuccess,
+		}}},
+		{{Key: "$group", Value: bson.M{
+			"_id":    "$" + cst.UserID,
+			"rounds": bson.M{"$sum": bson.M{"$ifNull": bson.A{"$round", 0}}},
+		}}},
+	}
+
+	var rows []struct {
+		UserID bson.ObjectID `bson:"_id"`
+		Rounds int32         `bson:"rounds"`
+	}
+	if err := m.conn.Aggregate(ctx, &rows, pipeline); err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		result[row.UserID] = row.Rounds
+	}
+	return result, nil
 }
 
 func (m *mongoMapper) FindCompletedByUnit(ctx context.Context, unitID bson.ObjectID, opts options.Lister[options.FindOptions]) ([]*Report, error) {

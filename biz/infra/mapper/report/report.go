@@ -18,7 +18,7 @@ type Report struct {
 	ReportUsage    *core.LLMUsage         `bson:"report_usage" json:"reportUsage,omitempty"`                 // 报表生成消耗
 	ASRUsage       *core.ASRUsage         `bson:"asr_usage,omitempty" json:"asrUsage,omitempty"`             // asr消耗
 	TTSUsage       *core.TTSUsage         `bson:"tts_usage,omitempty" json:"ttsUsage,omitempty"`             // tts消耗
-	Round          int                    `bson:"round" json:"round"`                                        // 对话中的消息总数
+	Round          int                    `bson:"round" json:"round"`                                        // 学生消息数，即本报告覆盖的对话轮数
 	Start          time.Time              `bson:"start" json:"start"`                                        // 对话开始时间
 	End            time.Time              `bson:"end" json:"end"`                                            // 对话结束时间
 	CreateTime     time.Time              `bson:"create_time,omitempty" json:"createTime,omitempty"`         // 报表创建时间

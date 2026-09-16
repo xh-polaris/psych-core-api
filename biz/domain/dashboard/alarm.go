@@ -215,10 +215,11 @@ func (d *DashboardDomain) completeAlarm(ctx context.Context, dbAlarms []*alarm.A
 
 	var userInfo map[bson.ObjectID]*user.User
 	var msgStats map[bson.ObjectID]*message.MsgStats
-	var userErr, msgErr error
+	var reportRounds map[bson.ObjectID]int32
+	var userErr, msgErr, roundsErr error
 
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
 	go func() {
 		defer wg.Done()
 		userInfo, userErr = d.UserMapper.BatchFindByIDs(ctx, userIds)
@@ -233,12 +234,22 @@ func (d *DashboardDomain) completeAlarm(ctx context.Context, dbAlarms []*alarm.A
 			logs.Errorf("查询对话统计失败: %v", errorx.ErrorWithoutStack(msgErr))
 		}
 	}()
+	go func() {
+		defer wg.Done()
+		reportRounds, roundsErr = d.ReportMapper.BatchSumCompletedRoundsByUserIDs(ctx, userIds)
+		if roundsErr != nil {
+			logs.Errorf("查询已完成报告轮数失败: %v", errorx.ErrorWithoutStack(roundsErr))
+		}
+	}()
 	wg.Wait()
 
 	if userErr != nil {
 		return nil, errorx.New(errno.ErrUserNotFound)
 	}
 	if msgErr != nil {
+		return nil, errorx.New(errno.ErrDashboardConversationStat)
+	}
+	if roundsErr != nil {
 		return nil, errorx.New(errno.ErrDashboardConversationStat)
 	}
 
@@ -285,9 +296,9 @@ func (d *DashboardDomain) completeAlarm(ctx context.Context, dbAlarms []*alarm.A
 			}
 		}
 		if msgExists {
-			records[i].TotalConversationRounds = stats.Rounds
 			records[i].LastConversationTime = stats.LatestTime
 		}
+		records[i].TotalConversationRounds = reportRounds[al.UserID]
 	}
 
 	return records, nil
