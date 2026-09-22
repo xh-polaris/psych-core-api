@@ -17,7 +17,8 @@ import (
 )
 
 const (
-	DeepSeek = "deepseek"
+	DeepSeek            = "deepseek"
+	chatCompletionsPath = "/chat/completions"
 )
 
 type deepseekChatReq struct {
@@ -44,17 +45,24 @@ type deepseekMessage struct {
 	ReasoningContent string `json:"reasoning_content,omitempty"`
 }
 
+type deepseekChoice struct {
+	Message      *deepseekMessage `json:"message,omitempty"`
+	Delta        *deepseekMessage `json:"delta,omitempty"`
+	FinishReason *string          `json:"finish_reason,omitempty"`
+}
+
+type deepseekUsage struct {
+	PromptTokens          int `json:"prompt_tokens"`
+	PromptCacheHitTokens  int `json:"prompt_cache_hit_tokens"`
+	PromptCacheMissTokens int `json:"prompt_cache_miss_tokens"`
+	CompletionTokens      int `json:"completion_tokens"`
+	TotalTokens           int `json:"total_tokens"`
+}
+
 type deepseekChatResp struct {
-	Choices []struct {
-		Message      *deepseekMessage `json:"message,omitempty"`
-		Delta        *deepseekMessage `json:"delta,omitempty"`
-		FinishReason *string          `json:"finish_reason,omitempty"`
-	} `json:"choices"`
-	Usage *struct {
-		PromptTokens     int `json:"prompt_tokens"`
-		CompletionTokens int `json:"completion_tokens"`
-		TotalTokens      int `json:"total_tokens"`
-	} `json:"usage"`
+	ID      string           `json:"id"`
+	Choices []deepseekChoice `json:"choices"`
+	Usage   *deepseekUsage   `json:"usage"`
 }
 
 type DeepSeekModel struct {
@@ -96,116 +104,120 @@ func buildChatReq(modelName string, msgs []*deepseekMessage, stream bool, opts [
 	return body
 }
 
-func (d *DeepSeekModel) Generate(ctx context.Context, in []*schema.Message, opts ...model.Option) (*schema.Message, error) {
-	msgs := e2ds(in)
-	body := buildChatReq(d.model, msgs, false, opts)
-	// 策略模型固定输出 JSON，并关闭思考模式以缩短响应时间
-	body.ResponseFormat = &chatRespFormat{Type: "json_object"}
-	body.Thinking = &chatThinking{Type: "disabled"}
-
-	reqBytes, err := sonic.Marshal(body)
+// post 序列化并发送 chat/completions 请求; 响应 Body 由调用方关闭
+func (d *DeepSeekModel) post(ctx context.Context, body *deepseekChatReq, accept string) (*http.Response, error) {
+	data, err := sonic.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, d.url+"/chat/completions", bytes.NewReader(reqBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, d.url+chatCompletionsPath, bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept", accept)
 	req.Header.Set("Authorization", "Bearer "+d.apiKey)
-	resp, err := d.cli.Do(req)
+	return d.cli.Do(req)
+}
+
+// usageToE DeepSeek usage → eino TokenUsage; 缓存命中部分单独计费, 记入 CachedTokens 供前缀缓存命中率观测
+func usageToE(u *deepseekUsage) *schema.TokenUsage {
+	return &schema.TokenUsage{
+		PromptTokens:       u.PromptTokens,
+		PromptTokenDetails: schema.PromptTokenDetails{CachedTokens: u.PromptCacheHitTokens},
+		CompletionTokens:   u.CompletionTokens,
+		TotalTokens:        u.TotalTokens,
+	}
+}
+
+// Generate 非流式调用: 策略模型固定输出 JSON, 并关闭思考模式以缩短响应时间
+func (d *DeepSeekModel) Generate(ctx context.Context, in []*schema.Message, opts ...model.Option) (*schema.Message, error) {
+	body := buildChatReq(d.model, e2ds(in), false, opts)
+	body.ResponseFormat = &chatRespFormat{Type: "json_object"}
+	body.Thinking = &chatThinking{Type: "disabled"}
+
+	resp, err := d.post(ctx, body, "application/json")
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	// 记录上游请求标识，便于排查调用和计费问题
-	if rid := resp.Header.Get("X-Request-Id"); rid != "" {
-		logs.Infof("[deepseek] generate provider request_id: %s", rid)
-	}
+	rid := resp.Header.Get("X-Request-Id")
 	if resp.StatusCode != http.StatusOK {
 		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		logs.Errorf("[deepseek] generate status %d: model=%s request_id=%s body=%s",
+			resp.StatusCode, d.model, rid, string(data))
 		return nil, fmt.Errorf("deepseek generate status %d: %s", resp.StatusCode, string(data))
 	}
+
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 	var chatResp deepseekChatResp
-	if err := sonic.Unmarshal(data, &chatResp); err != nil {
+	if err = sonic.Unmarshal(data, &chatResp); err != nil {
+		head := data
+		if len(head) > 200 {
+			head = head[:200]
+		}
+		logs.Errorf("[deepseek] generate unmarshal err: model=%s request_id=%s body_head=%q",
+			d.model, rid, string(head))
 		return nil, err
 	}
 
-	msg := &schema.Message{Role: schema.Assistant}
-	if len(chatResp.Choices) > 0 {
-		if chatResp.Choices[0].Message != nil {
-			msg.Content = chatResp.Choices[0].Message.Content
-			msg.ReasoningContent = chatResp.Choices[0].Message.ReasoningContent
-		}
-		msg.ResponseMeta = &schema.ResponseMeta{}
-		if chatResp.Choices[0].FinishReason != nil {
-			msg.ResponseMeta.FinishReason = *chatResp.Choices[0].FinishReason
-		} else {
-			msg.ResponseMeta.FinishReason = "stop"
-		}
+	msg := ds2e(&chatResp)
+	meta := &schema.ResponseMeta{FinishReason: "stop"}
+	if len(chatResp.Choices) > 0 && chatResp.Choices[0].FinishReason != nil {
+		meta.FinishReason = *chatResp.Choices[0].FinishReason
 	}
 	if chatResp.Usage != nil {
-		if msg.ResponseMeta == nil {
-			msg.ResponseMeta = &schema.ResponseMeta{}
-		}
-		msg.ResponseMeta.Usage = &schema.TokenUsage{
-			PromptTokens:     chatResp.Usage.PromptTokens,
-			CompletionTokens: chatResp.Usage.CompletionTokens,
-			TotalTokens:      chatResp.Usage.TotalTokens,
-		}
+		meta.Usage = usageToE(chatResp.Usage)
 	}
-	if msg.Content == "" {
-		fr, ct := "", 0
-		if msg.ResponseMeta != nil {
-			fr = msg.ResponseMeta.FinishReason
-			if msg.ResponseMeta.Usage != nil {
-				ct = msg.ResponseMeta.Usage.CompletionTokens
-			}
+	msg.ResponseMeta = meta
+
+	// 空内容诊断: 正常路径不打日志. json_object 模式下 DS 会退化为纯空白输出
+	// (finish_reason=stop, 无 reasoning), TrimSpace 判空而非 == "" 才能捕获该形态;
+	// content 用 %q 保证空白可见.
+	if strings.TrimSpace(msg.Content) == "" {
+		var in, cached, miss, out, total int
+		if u := chatResp.Usage; u != nil {
+			in, cached, miss, out, total =
+				u.PromptTokens, u.PromptCacheHitTokens, u.PromptCacheMissTokens, u.CompletionTokens, u.TotalTokens
 		}
-		logs.Errorf("[deepseek] generate empty content: choices=%d finish_reason=%s completion_tokens=%d reasoning_len=%d",
-			len(chatResp.Choices), fr, ct, len(msg.ReasoningContent))
+		content := msg.Content
+		if len(content) > 80 {
+			content = content[:80]
+		}
+		logs.Errorf("[deepseek] generate empty content: model=%s finish_reason=%s choices=%d resp_id=%s request_id=%s "+
+			"content=%q reasoning_len=%d usage: prompt=%d cached=%d miss=%d completion=%d total=%d",
+			d.model, meta.FinishReason, len(chatResp.Choices), chatResp.ID, rid,
+			content, len(msg.ReasoningContent), in, cached, miss, out, total)
 	}
 	return msg, nil
 }
 
+// Stream 流式调用: 成功响应交给后台 goroutine 按 SSE 解析
 func (d *DeepSeekModel) Stream(ctx context.Context, in []*schema.Message, opts ...model.Option) (sr *schema.StreamReader[*schema.Message], err error) {
-	msgs := e2ds(in)
-	body := buildChatReq(d.model, msgs, true, opts)
-	reqBytes, err := sonic.Marshal(body)
+	body := buildChatReq(d.model, e2ds(in), true, opts)
+
+	resp, err := d.post(ctx, body, "text/event-stream")
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, d.url+"/chat/completions", bytes.NewReader(reqBytes))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+d.apiKey)
-	req.Header.Set("Accept", "text/event-stream")
-	resp, err := d.cli.Do(req)
-	if err != nil {
-		return nil, err
-	}
+	rid := resp.Header.Get("X-Request-Id")
 	// 非成功响应不是 SSE 数据，必须直接返回错误，不能交给流解析器静默处理。
 	if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
 		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		logs.Errorf("[deepseek] stream status %d: model=%s request_id=%s body=%s",
+			resp.StatusCode, d.model, rid, string(data))
 		return nil, fmt.Errorf("deepseek stream status %d: %s", resp.StatusCode, string(data))
-	}
-	// 记录上游请求标识，便于排查调用和计费问题。
-	if rid := resp.Header.Get("X-Request-Id"); rid != "" {
-		logs.Infof("[deepseek] stream provider request_id: %s", rid)
 	}
 	sr, sw := schema.Pipe[*schema.Message](5)
 	go d.processStream(resp.Body, sw)
 	return sr, nil
 }
 
+// processStream 按 SSE 逐行解析增量 chunk, EOF/[DONE] 结束
 func (d *DeepSeekModel) processStream(body io.ReadCloser, sw *schema.StreamWriter[*schema.Message]) {
 	defer body.Close()
 	defer sw.Close()
@@ -222,29 +234,21 @@ func (d *DeepSeekModel) processStream(body io.ReadCloser, sw *schema.StreamWrite
 			return
 		}
 		var chunk deepseekChatResp
-		if err := sonic.Unmarshal([]byte(data), &chunk); err != nil {
+		if err := sonic.UnmarshalString(data, &chunk); err != nil {
 			logs.Errorf("[deepseek] unmarshal err: %s", err)
 			sw.Send(nil, err)
 			return
 		}
 		msg := ds2e(&chunk)
-
 		if len(chunk.Choices) > 0 && chunk.Choices[0].FinishReason != nil {
-			msg.ResponseMeta = &schema.ResponseMeta{
-				FinishReason: *chunk.Choices[0].FinishReason,
-			}
+			msg.ResponseMeta = &schema.ResponseMeta{FinishReason: *chunk.Choices[0].FinishReason}
 		}
 		if chunk.Usage != nil {
 			if msg.ResponseMeta == nil {
 				msg.ResponseMeta = &schema.ResponseMeta{}
 			}
-			msg.ResponseMeta.Usage = &schema.TokenUsage{
-				PromptTokens:     chunk.Usage.PromptTokens,
-				CompletionTokens: chunk.Usage.CompletionTokens,
-				TotalTokens:      chunk.Usage.TotalTokens,
-			}
+			msg.ResponseMeta.Usage = usageToE(chunk.Usage)
 		}
-
 		if closed := sw.Send(msg, nil); closed {
 			return
 		}

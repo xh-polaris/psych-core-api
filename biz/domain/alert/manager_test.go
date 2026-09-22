@@ -226,6 +226,18 @@ func (m *mockConfigMapper) FindOneById(ctx context.Context, id bson.ObjectID) (*
 func (m *mockConfigMapper) FindOneByUnitID(ctx context.Context, unitID bson.ObjectID) (*config.Config, error) {
 	return m.findByUnitIDResult, m.findByUnitIDErr
 }
+func (m *mockConfigMapper) PushCharacter(ctx context.Context, configID bson.ObjectID, ch *config.Character) error {
+	m.fatal("PushCharacter")
+	return nil
+}
+func (m *mockConfigMapper) SetCharacter(ctx context.Context, configID bson.ObjectID, chID bson.ObjectID, update bson.M) error {
+	m.fatal("SetCharacter")
+	return nil
+}
+func (m *mockConfigMapper) SetCharacterStatus(ctx context.Context, configID bson.ObjectID, chID bson.ObjectID, status int) error {
+	m.fatal("SetCharacterStatus")
+	return nil
+}
 
 var _ config.IMongoMapper = (*mockConfigMapper)(nil)
 

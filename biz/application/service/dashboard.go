@@ -208,63 +208,48 @@ func (s *DashboardService) DashboardUserConvRecords(ctx context.Context, req *co
 
 // DashboardGetReport 查看指定报表详情
 func (s *DashboardService) DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error) {
-	reportOID, err := bson.ObjectIDFromHex(req.GetReportId())
-	if err != nil {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "ReportId"), errorx.KV("value", "报表ID"))
-	}
-	rpt, err := s.ReportMapper.FindVisibleByID(ctx, reportOID)
-	if err != nil {
-		logs.Errorf("get report error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "报表"))
-	}
-	conv, err := s.ConversationMapper.FindOneById(ctx, rpt.ConversationID)
-	if err != nil {
-		logs.Errorf("get conversation error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "对话"))
-	}
-	usr, err := s.UserMapper.FindOneById(ctx, conv.UserID)
-	if err != nil {
-		logs.Errorf("get user error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "用户"))
-	}
-
-	meta, role, err := s.AuthDomain.IdentifyRole(ctx, usr.UnitID.Hex())
-	if err != nil {
-		return nil, err
-	}
-	scope, err := s.buildScope(usr.UnitID.Hex(), meta, role)
+	rpt, usr, scope, err := s.loadReportScope(ctx, req.GetReportId())
 	if err != nil {
 		return nil, err
 	}
 	return s.DashboardDomain.GetReport(ctx, scope, rpt, usr)
 }
 
-// DashboardGetConversationMessages 获取指定报告覆盖的原始对话消息
-func (s *DashboardService) DashboardGetConversationMessages(ctx context.Context, req *core_api.DashboardGetConversationMessagesReq) (*core_api.DashboardGetConversationMessagesResp, error) {
-	reportOID, err := bson.ObjectIDFromHex(req.GetReportId())
+// loadReportScope 报表详情公共链路: reportId → 可见性校验 → 关联对话 → 归属用户 → 权限 scope
+func (s *DashboardService) loadReportScope(ctx context.Context, reportId string) (*report.Report, *user.User, *dashboard.Scope, error) {
+	reportOID, err := bson.ObjectIDFromHex(reportId)
 	if err != nil {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "ReportId"), errorx.KV("value", "报表ID"))
+		return nil, nil, nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "ReportId"), errorx.KV("value", "报表ID"))
 	}
 	rpt, err := s.ReportMapper.FindVisibleByID(ctx, reportOID)
 	if err != nil {
 		logs.Errorf("get report error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "报表"))
+		return nil, nil, nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "报表"))
 	}
 	conv, err := s.ConversationMapper.FindOneById(ctx, rpt.ConversationID)
 	if err != nil {
 		logs.Errorf("get conversation error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "对话"))
+		return nil, nil, nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "对话"))
 	}
 	usr, err := s.UserMapper.FindOneById(ctx, conv.UserID)
 	if err != nil {
 		logs.Errorf("get user error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "用户"))
+		return nil, nil, nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "用户"))
 	}
 	meta, role, err := s.AuthDomain.IdentifyRole(ctx, usr.UnitID.Hex())
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	scope, err := s.buildScope(usr.UnitID.Hex(), meta, role)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return rpt, usr, scope, nil
+}
+
+// DashboardGetConversationMessages 获取指定报告覆盖的原始对话消息
+func (s *DashboardService) DashboardGetConversationMessages(ctx context.Context, req *core_api.DashboardGetConversationMessagesReq) (*core_api.DashboardGetConversationMessagesResp, error) {
+	rpt, usr, scope, err := s.loadReportScope(ctx, req.GetReportId())
 	if err != nil {
 		return nil, err
 	}

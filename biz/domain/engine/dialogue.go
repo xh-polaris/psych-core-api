@@ -125,6 +125,7 @@ func (e *Engine) loadDayMsgs(ctx context.Context, userId string) []*message.Mess
 	// 退化为当前会话消息，并转为升序
 	convMsgs, err := his.Mgr.GetConversationMessages(ctx, e.uSession, -1)
 	if err != nil {
+		logs.Errorf("[engine] [dialogue] GetConversationMessages err: %v, dialogue proceeds without history", err)
 		return nil
 	}
 	asc := make([]*message.Message, len(convMsgs))
@@ -150,9 +151,10 @@ func (e *Engine) buildContextMsgs(dayAsc []*message.Message, usrMsg *message.Mes
 	return out
 }
 
-// buildDialogueMsgs 拼装对话 agent 的消息列表:
-// System = 对话模板 + Conversation Strategy Plan + Micro Skill References.
-// 仅 DeepSeek 注入; Coze 单元沿用平台 bot 提示词, 直接返回原列表.
+// buildDialogueMsgs 拼装对话 agent 的消息列表 (仅 DeepSeek 注入; Coze 直接返回原列表):
+// wire 顺序 = [system: 静态对话模板, 历史正序, 尾注: Conversation Strategy Plan + Micro Skill References, 本次用户消息].
+// system 只承载静态模板; 每轮变化的 strategy/skills 独立成尾注消息,
+// 保证 [system, 历史...] 前缀跨轮字节稳定, 命中 DeepSeek 前缀缓存.
 func (e *Engine) buildDialogueMsgs(ctx context.Context, baseMsgs []*schema.Message, strategyJSON, skillsText string) []*schema.Message {
 	if e.dialogue.provider != llm.ProviderDeepSeek {
 		return baseMsgs
@@ -167,24 +169,36 @@ func (e *Engine) buildDialogueMsgs(ctx context.Context, baseMsgs []*schema.Messa
 	logs.Infof("[engine] [dialogue] get dialogue template in %dms", time.Since(tplStart).Milliseconds())
 
 	var sb strings.Builder
-	sb.WriteString(tpl)
 	if strategyJSON != "" {
-		sb.WriteString("\n\n## Conversation Strategy Plan\n")
+		sb.WriteString("\n## Conversation Strategy Plan\n")
 		sb.WriteString(strategyJSON)
 	}
 	if skillsText != "" {
-		sb.WriteString("\n\n## Micro Skill References\n")
+		sb.WriteString("\n## Micro Skill References\n")
 		sb.WriteString(skillsText)
 	}
+	return buildDialogueMsgsP(baseMsgs, sb.String(), tpl)
+}
 
-	// baseMsgs 最新在前, System 追加末尾, ChatModel 内部 reverse 后 System 置首、历史正序
-	msgs := make([]*schema.Message, 0, len(baseMsgs)+1)
-	msgs = append(msgs, baseMsgs...)
-	msgs = append(msgs, &schema.Message{Role: schema.System, Content: sb.String()})
+// buildDialogueMsgsP 组装对话请求消息: system 只承载静态模板; 每轮变化的
+// strategy/skills 独立成尾注消息. baseMsgs 最新在前 (首位为本次用户消息).
+// wire 终序 (ChatModel reverse 后): [对话模板 system, 历史asc..., 尾注 system, 本次用户消息].
+// 与 buildStrategyMsgs 同构, 排序回归由 dialogue_test.go 锁定.
+func buildDialogueMsgsP(baseMsgs []*schema.Message, tailNote, tpl string) []*schema.Message {
+	msgs := make([]*schema.Message, 0, len(baseMsgs)+2)
+	if len(baseMsgs) > 0 {
+		msgs = append(msgs, baseMsgs[0])
+	}
+	if tailNote != "" {
+		msgs = append(msgs, &schema.Message{Role: schema.System, Content: tailNote})
+	}
+	msgs = append(msgs, baseMsgs[1:]...)
+	msgs = append(msgs, &schema.Message{Role: schema.System, Content: tpl})
 	return msgs
 }
 
 // execLLMResponse 负责将大模型响应返回给前端 [task]
+// 消费llm响应流，读取尾包记录用量
 func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.StreamReader[*schema.Message], astMsg *message.Message, execStart time.Time) {
 	defer e.llmWg.Done()
 	defer stream.Close()
@@ -204,6 +218,7 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 	var finish string
 	var index uint64
 	first := true
+	var lastUsage *schema.TokenUsage // 最后一个 chunk 携带的本轮用量 (含缓存命中)
 	for {
 		select {
 		case <-ctx.Done():
@@ -224,6 +239,9 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 			}
 			if msg.ResponseMeta != nil {
 				e.llmUsage(msg.ResponseMeta) // 记录用量
+				if msg.ResponseMeta.Usage != nil {
+					lastUsage = msg.ResponseMeta.Usage
+				}
 			}
 			logs.Infof("llm msg:%v", msg.Content)
 			// 流式输出期间持续刷新活动时间，避免长回复被空闲看门狗误截断
@@ -244,8 +262,15 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 			// 收集消息
 			collect.WriteString(msg.Content)
 			if finish == "stop" {
-				logs.Infof("[engine] [dialogue] stream done in %dms, out_chars=%d",
-					time.Since(streamStart).Milliseconds(), collect.Len())
+				if lastUsage != nil {
+					// cached/in 反映前缀缓存命中率: 上一轮 in ≈ 本轮 cached 说明前缀稳定生效
+					logs.Infof("[engine] [dialogue] stream done in %dms, out_chars=%d, in_tokens=%d, cached_tokens=%d, out_tokens=%d",
+						time.Since(streamStart).Milliseconds(), collect.Len(),
+						lastUsage.PromptTokens, lastUsage.PromptTokenDetails.CachedTokens, lastUsage.CompletionTokens)
+				} else {
+					logs.Infof("[engine] [dialogue] stream done in %dms, out_chars=%d",
+						time.Since(streamStart).Milliseconds(), collect.Len())
+				}
 				return
 			}
 		}
