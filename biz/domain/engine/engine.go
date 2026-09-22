@@ -68,7 +68,7 @@ type Engine struct {
 	uSession     string         // uSession 对话ID
 	usage        *core.Usage    // 用量
 	conf         *core.Config
-	Character    *core.CharacterInfo // 心理老师形象, 由前端指定或取config默认
+	Character    *core.CharacterInfo // 心理老师形象, 来自会话绑定的角色 (resolveCharacter: DB 优先, config 兜底)
 
 	// 空闲自动截断与当日上下文
 	lastActive  atomic.Int64 // 最近一次对话活动时间 (UnixNano)，用户命令/模型流式输出/TTS 均会刷新

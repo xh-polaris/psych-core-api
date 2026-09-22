@@ -57,6 +57,13 @@ type strategyOutput struct {
 	Bound bool   // 是否成功绑定到 strategyPlan
 }
 
+// strategyNudge 输出护栏: DeepSeek json_object + 思维关闭 + 大上下文场景下, 空白输出
+// 卡死在特定请求内容形态 (同 msgs 重放 13 次 whitespace 11-12 次). 常开实证:
+// 无 nudge 基线 whitespace 15%~22% 且 round3+ 每轮初试必中 (线上日志一致);
+// nudge 常开 0/40 复发且 attempt1 一轮成功, 省掉每轮双份调用.
+// wire 终位为最后一条 system, 位于本次用户消息之后, 不影响 [模板,历史,尾注] 前缀缓存.
+const strategyNudge = "## 输出要求\n禁止输出空白内容，必须直接给出策略 JSON 对象。"
+
 // execIntention 意图识别阶段: 用策略 agent 生成 Conversation Strategy Plan JSON,
 // 并按其中 micro_skills 加载微技能文本. 任何失败都降级为空 (纯对话), 不阻塞主流程.
 // 策略输出不依赖 JSON 绑定成功与否都会返回, 由调用方决定是否入库.
@@ -82,31 +89,48 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 	}
 	logs.Infof("[engine] [strategy-statistic] get strategy template in %dms", time.Since(tplStart).Milliseconds())
 
-	var sb strings.Builder
-	sb.WriteString(tpl)
-	if e.strategy.lastPlan != "" { // 注入上一轮策略作为上下文
-		sb.WriteString("\n\n## 上一轮策略\n")
-		sb.WriteString(e.strategy.lastPlan)
-	}
-	msgs := make([]*schema.Message, 0, len(baseMsgs)+1)
-	msgs = append(msgs, baseMsgs...)
-	msgs = append(msgs, &schema.Message{Role: schema.System, Content: sb.String()})
+	// baseMsgs 最新在前 (首位为本次用户消息). buildStrategyMsgs 负责组装,
+	// ChatModel 内部 reverse 后顺序为 [策略模板, 历史asc, 尾注, 本次用户消息],
+	// 保证 [策略模板, 历史...] 前缀跨轮字节稳定, 命中 DeepSeek 前缀缓存.
+	msgs := buildStrategyMsgs(baseMsgs, e.strategy.lastPlan, tpl)
 
 	sctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	genStart := time.Now()
 	var msg *schema.Message
-	var inTokens, outTokens int
+	var inTokens, outTokens, cachedTokens int
+	nudged := false
 	for attempt := 1; ; attempt++ {
+		inTokens, outTokens, cachedTokens = 0, 0, 0 // 成功统计只用本次成功轮的用量
+		// 尝试失败时二次扰动 (再 prepend 一条护栏, wire 收尾重复出现): 改变请求字节
+		// 以释放内容形态 latch; attempt1 已常开护栏, 理论极少走到
+		if attempt == 2 {
+			msgs = append([]*schema.Message{{Role: schema.System, Content: strategyNudge}}, msgs...)
+			nudged = true
+			logs.Errorf("[engine] [strategy] retry with nudge (attempt %d)", attempt)
+		}
 		msg, err = e.strategy.app.Generate(sctx, msgs)
 		if err == nil && msg != nil && strings.TrimSpace(msg.Content) != "" {
 			break
 		}
-		// 失败轮次的 token 用量也记录 (上游可能已计费)
-		if err == nil && msg != nil && msg.ResponseMeta != nil && msg.ResponseMeta.Usage != nil {
-			e.llmUsage(msg.ResponseMeta)
-			logs.Infof("[engine] [strategy-statistic] failed attempt %d tokens: in=%d out=%d",
-				attempt, msg.ResponseMeta.Usage.PromptTokens, msg.ResponseMeta.Usage.CompletionTokens)
+		// 失败轮次的 token 用量也记录 (上游可能已计费); content/finish 可判空白形态
+		if err == nil && msg != nil {
+			content := msg.Content
+			if len(content) > 80 {
+				content = content[:80]
+			}
+			finish := ""
+			if msg.ResponseMeta != nil {
+				finish = msg.ResponseMeta.FinishReason
+				if msg.ResponseMeta.Usage != nil {
+					e.llmUsage(msg.ResponseMeta)
+					inTokens = msg.ResponseMeta.Usage.PromptTokens
+					outTokens = msg.ResponseMeta.Usage.CompletionTokens
+					cachedTokens = msg.ResponseMeta.Usage.PromptTokenDetails.CachedTokens
+				}
+			}
+			logs.Errorf("[engine] [strategy] failed attempt %d: finish=%s reasoning_len=%d content=%q tokens: in=%d cached=%d out=%d",
+				attempt, finish, len(msg.ReasoningContent), content, inTokens, cachedTokens, outTokens)
 		}
 		if attempt >= 2 {
 			logs.Errorf("[engine] [strategy] generate failed after retry, err: %v", err)
@@ -114,18 +138,16 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 		}
 		logs.Errorf("[engine] [strategy] generate empty or err (attempt %d), retry: %v", attempt, err)
 	}
-	if msg == nil {
-		logs.Errorf("[engine] [strategy] nil response")
-		return nil, ""
-	}
 	if msg.ResponseMeta != nil && msg.ResponseMeta.Usage != nil {
 		e.llmUsage(msg.ResponseMeta) // 策略调用 token 用量
 		inTokens = msg.ResponseMeta.Usage.PromptTokens
 		outTokens = msg.ResponseMeta.Usage.CompletionTokens
+		cachedTokens = msg.ResponseMeta.Usage.PromptTokenDetails.CachedTokens
 	}
 	plan := strings.TrimSpace(msg.Content)
-	logs.Infof("[engine] [strategy-statistic] generate done in %dms, plan_chars=%d, in_tokens=%d, out_tokens=%d",
-		time.Since(genStart).Milliseconds(), len(plan), inTokens, outTokens)
+	// cached/in 反映前缀缓存命中率: 上一轮 in ≈ 本轮 cached 说明前缀稳定生效
+	logs.Infof("[engine] [strategy-statistic] generate done in %dms, plan_chars=%d, in_tokens=%d, cached_tokens=%d, out_tokens=%d, nudged=%t",
+		time.Since(genStart).Milliseconds(), len(plan), inTokens, cachedTokens, outTokens, nudged)
 	if plan == "" {
 		logs.Errorf("[engine] [strategy] empty plan")
 		return nil, ""
@@ -133,7 +155,11 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 
 	sp, ok := e.parseStrategyPlan(plan)
 	if !ok {
-		logs.Errorf("[engine] [strategy] parse plan err")
+		head := plan
+		if len(head) > 200 {
+			head = head[:200]
+		}
+		logs.Errorf("[engine] [strategy] parse plan err, plan_chars=%d out=%d head=%q", len(plan), outTokens, head)
 		return &strategyOutput{Raw: plan}, ""
 	}
 	e.strategy.lastPlan = plan
@@ -155,6 +181,29 @@ func (e *Engine) execIntention(ctx context.Context, baseMsgs []*schema.Message) 
 		logs.Infof("[engine] [strategy-statistic] loaded skills in %dms: %v", time.Since(skillsStart).Milliseconds(), names)
 	}
 	return &strategyOutput{Raw: plan, Bound: true}, e.joinSkills(names, skills)
+}
+
+// buildStrategyMsgs 组装策略请求消息: system 只承载静态模板; 上一轮策略 (每轮变化)
+// 独立成尾注消息, 位于历史之后、最新用户消息之前. baseMsgs 最新在前 (首位为本次用户消息).
+// strategyNudge 常驻护栏追加在最前 (pre-reverse 首位 = wire 终位, 每轮字节恒定).
+// wire 终序 (ChatModel reverse 后):
+// [策略模板 system, 历史asc..., 尾注 system, 本次用户消息, 输出护栏 system].
+// 回归背景: 部署版曾将 lastPlan 融入策略模板 system, 在 response_format=json_object 下
+// DeepSeek 会以 ~13% 概率输出纯空格内容 (finish_reason=stop) 导致策略轮空; 见
+// strategyNudge 注释与 deepseek.go 空内容诊断日志.
+func buildStrategyMsgs(baseMsgs []*schema.Message, lastPlan, tpl string) []*schema.Message {
+	msgs := make([]*schema.Message, 0, len(baseMsgs)+3)
+	// 输出护栏: pre-reverse 置顶, reverse 后成为 wire 最后一条 (用户消息之后)
+	msgs = append(msgs, &schema.Message{Role: schema.System, Content: strategyNudge})
+	if len(baseMsgs) > 0 {
+		msgs = append(msgs, baseMsgs[0])
+	}
+	if lastPlan != "" {
+		msgs = append(msgs, &schema.Message{Role: schema.System, Content: "## 上一轮策略\n" + lastPlan})
+	}
+	msgs = append(msgs, baseMsgs[1:]...)
+	msgs = append(msgs, &schema.Message{Role: schema.System, Content: tpl})
+	return msgs
 }
 
 // parseStrategyPlan 解析策略 JSON (容忍 markdown fence). ok=false 表示 JSON 解析失败.

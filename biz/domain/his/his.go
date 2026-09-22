@@ -119,7 +119,6 @@ func (h *HistoryManager) GetDailyMessages(ctx context.Context, userId, date, cha
 	if err != nil {
 		return nil, err
 	}
-	sort.SliceStable(msgs, func(i, j int) bool { return msgs[i].CreateTime.Before(msgs[j].CreateTime) })
 	// 跨会话重新编号，保证整日消息 index 连续
 	for i, msg := range msgs {
 		msg.Index = i
