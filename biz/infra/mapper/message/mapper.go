@@ -61,7 +61,7 @@ func (m *mongoMapper) RetrieveMessage(ctx context.Context, conversation string, 
 	return msgs, nil
 }
 
-// FindByConversationAndTimeRange 按报告的时间边界获取该报告段内消息，按时间正序返回
+// FindByConversationAndTimeRange 按报告的时间边界获取该报告段内消息，按时间倒叙返回
 func (m *mongoMapper) FindByConversationAndTimeRange(ctx context.Context, conversationID bson.ObjectID, start, end time.Time) ([]*Message, error) {
 	return m.FindManyWithOption(ctx, bson.M{
 		cst.ConversationID: conversationID,
@@ -70,7 +70,7 @@ func (m *mongoMapper) FindByConversationAndTimeRange(ctx context.Context, conver
 			cst.GTE: start,
 			cst.LTE: end,
 		},
-	}, options.Find().SetSort(bson.D{{cst.CreateTime, 1}}))
+	}, options.Find().SetSort(bson.D{{cst.CreateTime, -1}}))
 }
 
 type MsgStats struct {
