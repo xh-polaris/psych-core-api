@@ -81,10 +81,18 @@ func (e *Engine) execCmd(ctx context.Context, cmd *core.Cmd) (err error) {
 		return e.execASR(ctx, cmd)
 	case core.CUserText: // 常规文本
 		e.touchActive()
-		return e.execLLM(ctx, cmd)
+		input, err := core.DecodeUserTextInput(cmd.Content)
+		if err != nil {
+			return errorx.New(errno.InvalidCmdContent)
+		}
+		return e.execLLM(ctx, cmd, input)
 	case core.CUserAudio: // 暂不支持
 	case core.CInterrupt:
-		e.execInterrupt(ctx, cmd)
+		input, err := core.DecodeInterruptInput(cmd.Content)
+		if err != nil {
+			return errorx.New(errno.InvalidCmdContent)
+		}
+		e.execInterrupt(ctx, cmd, input)
 	default:
 		return errorx.New(errno.InvalidCmdContent)
 	}

@@ -14,23 +14,43 @@ import (
 // execTTS 用于文字转语音(发送端) [task]
 func (e *Engine) execTTS(ctx context.Context, id uint, stream *schema.StreamReader[*schema.Message]) {
 	var sendLast bool
+	recvStarted := false
 	defer e.llmWg.Done()
+	defer func() {
+		// execLLM 已为 TTS 接收协程预先 Add(1)；若发送端在建连前
+		// 就退出，需要在这里平衡该计数，避免中断时 Wait 永远阻塞
+		if !recvStarted {
+			e.llmWg.Done()
+		}
+	}()
 	defer stream.Close()
 	if err := e.tts.Dial(ctx); err != nil {
+		if ctx.Err() != nil {
+			return
+		}
 		e.unexpected(err, "tts dial err")
+		return
 	}
 	if err := e.tts.Send(ctx, app.FirstTTS); err != nil { // 首包
+		if ctx.Err() != nil {
+			return
+		}
 		e.unexpected(err, "tts first send err")
+		return
 	}
 	logs.Infof("[tts] send FirstTTS")
 	// 启用tts接收
 	go e.execTTSRecv(ctx, id)
+	recvStarted = true
 	var stop bool
 	for {
 		select {
 		case <-ctx.Done():
 			if !sendLast {
-				if err := e.tts.Send(ctx, app.LastTTS); err != nil {
+				if err := e.tts.Send(context.Background(), app.LastTTS); err != nil {
+					if ctx.Err() != nil {
+						return
+					}
 					e.unexpected(err, "tts send err")
 				}
 			}
@@ -54,6 +74,9 @@ func (e *Engine) execTTS(ctx context.Context, id uint, stream *schema.StreamRead
 				return
 			}
 			if err = e.tts.Send(ctx, msg.Content); err != nil {
+				if ctx.Err() != nil {
+					return
+				}
 				// 正常发送失败, 不需要再发last
 				sendLast = true
 				e.unexpected(err, "tts send err")
@@ -67,6 +90,7 @@ func (e *Engine) execTTS(ctx context.Context, id uint, stream *schema.StreamRead
 // execTTSRecv 文字转语音识别结果(接收端) [task]
 func (e *Engine) execTTSRecv(ctx context.Context, id uint) {
 	defer e.llmWg.Done()
+	defer e.clearActiveTurn(id)
 	for {
 		select {
 		case <-ctx.Done():
@@ -74,7 +98,13 @@ func (e *Engine) execTTSRecv(ctx context.Context, id uint) {
 		default:
 			audio, last, err := e.tts.Receive(ctx)
 			if err != nil && !wsx.IsNormal(err) {
+				if ctx.Err() != nil {
+					return
+				}
 				e.unexpected(err, "tts receive err")
+				return
+			}
+			if !e.isActiveTurn(id) {
 				return
 			}
 			// TTS 音频帧持续到达期间保持活动，避免语音播报被空闲看门狗截断

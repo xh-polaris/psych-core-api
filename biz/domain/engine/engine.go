@@ -47,12 +47,14 @@ type Engine struct {
 	lock   lock.DistributionLock // 分布式锁, 确保一个用户只有一个进行中对话
 
 	// 应用
-	asr       app.ASRApp         // asr 管理文字转语音
-	tts       app.TTSApp         // tts 管理语言转文字
-	strategy  *strategyAgent     // 策略 agent (意图识别), 仅 DeepSeek, Coze 时为 nil
-	dialogue  *dialogueAgent     // 对话 agent
-	llmCancel context.CancelFunc // 用于中断大模型输出
-	llmWg     sync.WaitGroup     // llmWg 中断时等待各子线程退出
+	asr          app.ASRApp         // asr 管理文字转语音
+	tts          app.TTSApp         // tts 管理语言转文字
+	strategy     *strategyAgent     // 策略 agent (意图识别), 仅 DeepSeek, Coze 时为 nil
+	dialogue     *dialogueAgent     // 对话 agent
+	turnMu       sync.Mutex         // 保护当前轮次的取消与状态切换
+	llmCancel    context.CancelFunc // 用于中断大模型输出
+	llmWg        sync.WaitGroup     // llmWg 中断时等待各子线程退出
+	activeTurnID atomic.Uint64      // 当前允许向前端输出的 CUserText.ID + 1，0 表示无活动轮次
 
 	// ws 与前端的websocket链接
 	wsx             *wsx.HZWSClient // wsx 是与前端的连接
