@@ -137,9 +137,10 @@ type (
 	}
 
 	// InterruptInput 指定要中断的对话轮次。TargetID 是被中断的
-	// CUserText.ID，而不是本条 CInterrupt 命令自身的 ID。
+	// CUserText.ID，而不是本条 CInterrupt 命令自身的 ID。nil 用于
+	// 兼容旧客户端：由服务端中断当前活动轮次。
 	InterruptInput struct {
-		TargetID uint `json:"targetId"`
+		TargetID *uint `json:"targetId,omitempty"`
 	}
 
 	// Resp 响应消息
@@ -172,6 +173,14 @@ func DecodeUserTextInput(content any) (*UserTextInput, error) {
 
 // DecodeInterruptInput 解析中断目标轮次。
 func DecodeInterruptInput(content any) (*InterruptInput, error) {
+	// 旧协议忽略 CInterrupt 的 content，历史客户端可能传 nil、字符串等任意值。
+	// 非对象内容统一视为“中断当前活动轮次”。
+	if content == nil {
+		return &InterruptInput{}, nil
+	}
+	if _, ok := content.(map[string]any); !ok {
+		return &InterruptInput{}, nil
+	}
 	return decodeContent[InterruptInput](content)
 }
 

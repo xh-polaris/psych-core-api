@@ -311,7 +311,11 @@ func (e *Engine) llmUsage(usage *schema.ResponseMeta) {
 // execInterrupt 中断模型运行
 func (e *Engine) execInterrupt(ctx context.Context, cmd *core.Cmd, input *core.InterruptInput) {
 	e.turnMu.Lock()
-	if !e.isActiveTurn(input.TargetID) {
+	targetID, active := e.activeTurn()
+	if input.TargetID != nil {
+		targetID, active = *input.TargetID, e.isActiveTurn(*input.TargetID)
+	}
+	if !active {
 		e.turnMu.Unlock()
 		return
 	}
@@ -324,7 +328,7 @@ func (e *Engine) execInterrupt(ctx context.Context, cmd *core.Cmd, input *core.I
 	e.turnMu.Unlock()
 
 	// 回执使用被中断的轮次 ID；前端可据此更新该轮状态
-	if err := e.MWrite(core.MResp, &core.Resp{ID: input.TargetID, Type: core.RInterrupt, Content: "interrupt"}); err != nil {
+	if err := e.MWrite(core.MResp, &core.Resp{ID: targetID, Type: core.RInterrupt, Content: "interrupt"}); err != nil {
 		e.unexpected(err, "llm interrupt write err")
 	}
 
@@ -339,6 +343,16 @@ func (e *Engine) execInterrupt(ctx context.Context, cmd *core.Cmd, input *core.I
 
 func (e *Engine) isActiveTurn(id uint) bool {
 	return e.activeTurnID.Load() == uint64(id)+1
+}
+
+// activeTurn 返回当前活动轮次。ID 在协议中可从 0 开始，因此内部以 ID+1
+// 存储，0 专用于表示没有活动轮次。
+func (e *Engine) activeTurn() (uint, bool) {
+	turn := e.activeTurnID.Load()
+	if turn == 0 {
+		return 0, false
+	}
+	return uint(turn - 1), true
 }
 
 func (e *Engine) clearActiveTurn(id uint) {
