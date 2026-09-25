@@ -39,7 +39,7 @@ func (e *Engine) buildDialogueApp(cfg *app.ChatSetting) error {
 
 // execLLM 调用大模型回复 [engine]:
 // 先执行意图识别 (策略 agent), 再拼装对话 system prompt, 最后流式返回给前端与 TTS
-func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
+func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd, input *core.UserTextInput) (err error) {
 	execStart := time.Now()
 	userId := e.info[cst.JsonUserID].(string)
 
@@ -64,7 +64,7 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 	if len(convMsgs) > 0 {
 		index = int(convMsgs[0].Index) + 1
 	}
-	usrMsg := convert.UserMMsg(oids[0], oids[1], cmd.Content.(string), index)
+	usrMsg := convert.UserMMsg(oids[0], oids[1], input.Text, index)
 	hisStart = time.Now()
 	err = his.Mgr.AddMessage(ctx, usrMsg)
 	if err != nil {
@@ -94,21 +94,36 @@ func (e *Engine) execLLM(ctx context.Context, cmd *core.Cmd) (err error) {
 		time.Since(execStart).Milliseconds(), len(eMsgs))
 
 	var subctx context.Context
+	e.turnMu.Lock()
 	subctx, e.llmCancel = context.WithCancel(ctx)
+	e.activeTurnID.Store(uint64(cmd.ID) + 1) // 0 保留为“无活动轮次”哨兵
+	e.turnMu.Unlock()
 	stream, err := e.dialogue.app.Stream(subctx, eMsgs)
 	if err != nil {
+		e.clearActiveTurn(cmd.ID)
 		return errorx.WrapByCode(err, errno.LLMStreamErr)
 	}
 
 	// 过滤流并拷贝以用作不同用途
 	stream = e.checkBracket(subctx, stream)
-	streams := stream.Copy(2)
-	ret, tts := streams[0], streams[1] // 分别用于返回给前端与TTS音频生成
+	audioEnabled := input.AudioEnabled == nil || *input.AudioEnabled
+	ret := stream
+	var tts *schema.StreamReader[*schema.Message]
+	if audioEnabled {
+		streams := stream.Copy(2)
+		ret, tts = streams[0], streams[1]
+	}
 	// 返回给前端
-	go e.execLLMResponse(subctx, cmd.ID, ret, astMsg, execStart)
-	// 启用tts发送
-	go e.execTTS(subctx, cmd.ID, tts)
-	e.llmWg.Add(3) // 模型, tts发送, tts响应三个子线程
+	if audioEnabled {
+		e.llmWg.Add(3) // 文本输出、TTS 发送、TTS 接收
+	} else {
+		e.llmWg.Add(1) // 仅文本输出
+	}
+	go e.execLLMResponse(subctx, cmd.ID, ret, astMsg, execStart, !audioEnabled)
+	if audioEnabled {
+		// 启用tts发送
+		go e.execTTS(subctx, cmd.ID, tts)
+	}
 	return err
 }
 
@@ -199,7 +214,7 @@ func buildDialogueMsgsP(baseMsgs []*schema.Message, tailNote, tpl string) []*sch
 
 // execLLMResponse 负责将大模型响应返回给前端 [task]
 // 消费llm响应流，读取尾包记录用量
-func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.StreamReader[*schema.Message], astMsg *message.Message, execStart time.Time) {
+func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.StreamReader[*schema.Message], astMsg *message.Message, execStart time.Time, clearOnExit bool) {
 	defer e.llmWg.Done()
 	defer stream.Close()
 	var collect strings.Builder
@@ -213,6 +228,9 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 		}
 		// 模型回复结束同样视为一次活动，避免长回复期间被空闲看门狗误截断
 		e.touchActive()
+		if clearOnExit {
+			e.clearActiveTurn(id)
+		}
 	}(&collect, astMsg)
 
 	var finish string
@@ -253,6 +271,9 @@ func (e *Engine) execLLMResponse(ctx context.Context, id uint, stream *schema.St
 					time.Since(execStart).Milliseconds(), time.Since(streamStart).Milliseconds())
 			}
 			frame := &app.ChatFrame{Id: index, Content: msg.Content, SessionId: e.uSession, Timestamp: time.Now().Unix(), Finish: finish}
+			if !e.isActiveTurn(id) {
+				return
+			}
 			// 写回给前端
 			if err = e.MWrite(core.MResp, &core.Resp{ID: id, Type: core.RModelText, Content: frame}); err != nil {
 				e.unexpected(err, "llm response write err")
@@ -288,13 +309,43 @@ func (e *Engine) llmUsage(usage *schema.ResponseMeta) {
 }
 
 // execInterrupt 中断模型运行
-func (e *Engine) execInterrupt(ctx context.Context, cmd *core.Cmd) {
+func (e *Engine) execInterrupt(ctx context.Context, cmd *core.Cmd, input *core.InterruptInput) {
+	e.turnMu.Lock()
+	if !e.isActiveTurn(input.TargetID) {
+		e.turnMu.Unlock()
+		return
+	}
+
+	// 先使旧轮次失效，阻止其文本与音频尾包继续下发。
+	e.activeTurnID.Store(0)
 	if e.llmCancel != nil {
 		e.llmCancel()
-		e.llmWg.Wait()
+	}
+	e.turnMu.Unlock()
+
+	// 回执使用被中断的轮次 ID；前端可据此更新该轮状态
+	if err := e.MWrite(core.MResp, &core.Resp{ID: input.TargetID, Type: core.RInterrupt, Content: "interrupt"}); err != nil {
+		e.unexpected(err, "llm interrupt write err")
+	}
+
+	// Receive 可能阻塞于 TTS websocket；关闭它以确保旧轮协程能够退出
+	appClose(e.tts)
+	e.llmWg.Wait()
+
+	e.turnMu.Lock()
+	e.llmCancel = nil
+	e.turnMu.Unlock()
+}
+
+func (e *Engine) isActiveTurn(id uint) bool {
+	return e.activeTurnID.Load() == uint64(id)+1
+}
+
+func (e *Engine) clearActiveTurn(id uint) {
+	e.turnMu.Lock()
+	defer e.turnMu.Unlock()
+	if e.isActiveTurn(id) {
+		e.activeTurnID.Store(0)
 		e.llmCancel = nil
-		if err := e.MWrite(core.MResp, &core.Resp{ID: cmd.ID, Type: core.RInterrupt, Content: "interrupt"}); err != nil {
-			e.unexpected(err, "llm interrupt write err")
-		}
 	}
 }

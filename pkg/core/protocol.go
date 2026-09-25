@@ -131,6 +131,17 @@ type (
 		Content any    `json:"content"` // 命令内容
 	}
 
+	UserTextInput struct {
+		Text         string `json:"text"`                   // 用户发起一轮文本对话的内容
+		AudioEnabled *bool  `json:"audioEnabled,omitempty"` // 开启语音播报
+	}
+
+	// InterruptInput 指定要中断的对话轮次。TargetID 是被中断的
+	// CUserText.ID，而不是本条 CInterrupt 命令自身的 ID。
+	InterruptInput struct {
+		TargetID uint `json:"targetId"`
+	}
+
 	// Resp 响应消息
 	Resp struct {
 		ID      uint  `json:"id"`
@@ -149,6 +160,32 @@ type (
 		Data string `json:"ping;omitempty"`
 	}
 )
+
+// DecodeUserTextInput 解析文本输入，同时兼容旧协议的 content: "文本"
+// 旧客户端未声明 audioEnabled 时，维持原有行为：默认生成语音
+func DecodeUserTextInput(content any) (*UserTextInput, error) {
+	if text, ok := content.(string); ok {
+		return &UserTextInput{Text: text}, nil
+	}
+	return decodeContent[UserTextInput](content)
+}
+
+// DecodeInterruptInput 解析中断目标轮次。
+func DecodeInterruptInput(content any) (*InterruptInput, error) {
+	return decodeContent[InterruptInput](content)
+}
+
+func decodeContent[T any](content any) (*T, error) {
+	data, err := json.Marshal(content)
+	if err != nil {
+		return nil, err
+	}
+	var value T
+	if err = json.Unmarshal(data, &value); err != nil {
+		return nil, err
+	}
+	return &value, nil
+}
 
 // MMarshal 序列化消息
 func MMarshal(m *Message, compression, serialization int8) (data []byte, err error) {
