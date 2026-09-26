@@ -14,8 +14,8 @@ import (
 
 type OpenAPIChatService struct{}
 
-func (s *OpenAPIChatService) Stream(ctx context.Context, req openapichat.Request, sessionID string) (*openapichat.Result, error) {
-	setting, err := openAPIChatSetting()
+func (s *OpenAPIChatService) Stream(ctx context.Context, req openapichat.Request, sessionID, upstream string) (*openapichat.Result, error) {
+	setting, err := openAPIChatSetting(upstream)
 	if err != nil {
 		return nil, err
 	}
@@ -35,20 +35,22 @@ func (s *OpenAPIChatService) Stream(ctx context.Context, req openapichat.Request
 	return workflow.Stream(ctx, req)
 }
 
-func openAPIChatSetting() (*app.ChatSetting, error) {
-	cfg := conf.GetConfig()
-	if cfg == nil || cfg.ModelConfig == nil {
-		return nil, fmt.Errorf("model configuration is unavailable")
+// openAPIChatSetting 按平台密钥绑定的上游名解析对话模型配置。
+// 每个开放接口密钥对应一把独立的上游 Key，因此这里不再读全局
+// ModelConfig.Chat.deepseek —— 那把 Key 由学生端内部业务使用。
+func openAPIChatSetting(upstream string) (*app.ChatSetting, error) {
+	found, err := conf.GetConfig().OpenAPIUpstream(upstream)
+	if err != nil {
+		return nil, err
 	}
-	deepseek, ok := cfg.ModelConfig.Chat[llm.ProviderDeepSeek]
-	if !ok || deepseek == nil || deepseek.URL == "" || deepseek.AccessKey == "" || deepseek.Model == "" {
-		return nil, fmt.Errorf("deepseek configuration is unavailable")
+	if found.URL == "" || found.Model == "" || found.AccessKey == "" {
+		return nil, fmt.Errorf("openapi upstream %q is incomplete", upstream)
 	}
 	return &app.ChatSetting{
 		Provider:  llm.ProviderDeepSeek,
-		Url:       deepseek.URL,
-		Model:     deepseek.Model,
-		AccessKey: deepseek.AccessKey,
+		Url:       found.URL,
+		Model:     found.Model,
+		AccessKey: found.AccessKey,
 	}, nil
 }
 

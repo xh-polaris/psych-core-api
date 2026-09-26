@@ -136,7 +136,7 @@ func OpenApiChatCompletion(ctx context.Context, c *app.RequestContext) {
 	var req core_api.OpenApiChatCompletionReq
 	err := c.BindAndValidate(&req)
 	if err != nil {
-		logOpenAPICompletion(ctx, requestID, "", "invalid_request", startedAt, nil, nil, false)
+		logOpenAPICompletion(ctx, requestID, "", "invalid_request", "", startedAt, nil, nil, false)
 		writeJSONError(c, consts.StatusBadRequest, "invalid_request_error", err.Error(), requestID)
 		return
 	}
@@ -144,30 +144,30 @@ func OpenApiChatCompletion(ctx context.Context, c *app.RequestContext) {
 	// 校验访问密钥及调用范围。未配置密钥时默认拒绝全部请求。
 	token := strings.TrimSpace(strings.TrimPrefix(string(c.GetHeader("Authorization")), "Bearer "))
 	pepper, keys := openAPIAuth()
-	_, authErr := openapiauth.Verify(pepper, keys, token, openAPIScopeChat)
+	key, authErr := openapiauth.Verify(pepper, keys, token, openAPIScopeChat)
 	if authErr != nil {
 		status, code, message := authError(authErr)
-		logOpenAPICompletion(ctx, requestID, req.Model, code, startedAt, nil, nil, false)
+		logOpenAPICompletion(ctx, requestID, req.Model, code, key.Upstream, startedAt, nil, nil, false)
 		writeJSONError(c, status, code, message, requestID)
 		return
 	}
 	if !req.Stream {
-		logOpenAPICompletion(ctx, requestID, req.Model, "invalid_request", startedAt, nil, nil, false)
+		logOpenAPICompletion(ctx, requestID, req.Model, "invalid_request", key.Upstream, startedAt, nil, nil, false)
 		writeJSONError(c, consts.StatusBadRequest, "unsupported_stream_mode", "stream must be true", requestID)
 		return
 	}
 	if req.Model != publicChatModel {
-		logOpenAPICompletion(ctx, requestID, req.Model, "invalid_request", startedAt, nil, nil, false)
+		logOpenAPICompletion(ctx, requestID, req.Model, "invalid_request", key.Upstream, startedAt, nil, nil, false)
 		writeJSONError(c, consts.StatusBadRequest, "unsupported_model", "model must be psych-chat-v1", requestID)
 		return
 	}
 	if req.Temperature != nil && (math.IsNaN(*req.Temperature) || math.IsInf(*req.Temperature, 0)) {
-		logOpenAPICompletion(ctx, requestID, req.Model, "invalid_request", startedAt, nil, nil, false)
+		logOpenAPICompletion(ctx, requestID, req.Model, "invalid_request", key.Upstream, startedAt, nil, nil, false)
 		writeJSONError(c, consts.StatusBadRequest, "invalid_request_error", "temperature must be a finite number", requestID)
 		return
 	}
 	if err := validateMetadata(req.Metadata); err != nil {
-		logOpenAPICompletion(ctx, requestID, req.Model, "invalid_request", startedAt, nil, nil, false)
+		logOpenAPICompletion(ctx, requestID, req.Model, "invalid_request", key.Upstream, startedAt, nil, nil, false)
 		writeJSONError(c, consts.StatusBadRequest, "invalid_request_error", err.Error(), requestID)
 		return
 	}
@@ -178,28 +178,28 @@ func OpenApiChatCompletion(ctx context.Context, c *app.RequestContext) {
 		if errors.As(err, &cle) {
 			status, code = consts.StatusRequestEntityTooLarge, "context_too_large"
 		}
-		logOpenAPICompletion(ctx, requestID, req.Model, "invalid_request", startedAt, nil, nil, false)
+		logOpenAPICompletion(ctx, requestID, req.Model, "invalid_request", key.Upstream, startedAt, nil, nil, false)
 		writeJSONError(c, status, code, err.Error(), requestID)
 		return
 	}
 
 	workflowReq, err := applicationservice.NewOpenAPIChatRequest(dtoMessages(req.Messages), req.MaxTokens, req.Temperature)
 	if err != nil {
-		logOpenAPICompletion(ctx, requestID, req.Model, "invalid_request", startedAt, nil, nil, false)
+		logOpenAPICompletion(ctx, requestID, req.Model, "invalid_request", key.Upstream, startedAt, nil, nil, false)
 		writeJSONError(c, consts.StatusBadRequest, "invalid_request_error", err.Error(), requestID)
 		return
 	}
 	if err := openapichat.ValidateMessages(workflowReq.Messages); err != nil {
-		logOpenAPICompletion(ctx, requestID, req.Model, "invalid_request", startedAt, nil, nil, false)
+		logOpenAPICompletion(ctx, requestID, req.Model, "invalid_request", key.Upstream, startedAt, nil, nil, false)
 		writeJSONError(c, consts.StatusBadRequest, "invalid_request_error", err.Error(), requestID)
 		return
 	}
 	requestCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	result, err := (&applicationservice.OpenAPIChatService{}).Stream(requestCtx, workflowReq, requestID)
+	result, err := (&applicationservice.OpenAPIChatService{}).Stream(requestCtx, workflowReq, requestID, key.Upstream)
 	if err != nil {
 		status, code, message := upstreamStartError(err)
-		logOpenAPICompletion(ctx, requestID, req.Model, code, startedAt, nil, nil, false)
+		logOpenAPICompletion(ctx, requestID, req.Model, code, key.Upstream, startedAt, nil, nil, false)
 		writeJSONError(c, status, code, message, requestID)
 		return
 	}
@@ -212,7 +212,7 @@ func OpenApiChatCompletion(ctx context.Context, c *app.RequestContext) {
 	w := resp.NewChunkedBodyWriter(&c.Response, c.GetWriter())
 	c.Response.HijackWriter(w)
 	completion, err := streamCompletion(requestCtx, w, result, req.Model, requestID)
-	logOpenAPICompletion(ctx, requestID, req.Model, completion.Status, startedAt, result.StrategyUsage, completion.DialogueUsage, result.StrategyError != nil)
+	logOpenAPICompletion(ctx, requestID, req.Model, completion.Status, key.Upstream, startedAt, result.StrategyUsage, completion.DialogueUsage, result.StrategyError != nil)
 	if err != nil {
 		// 写入失败通常表示客户端已经断开；取消上下文会释放上游连接。
 		return
@@ -226,10 +226,12 @@ func validateMetadata(metadata *core_api.OpenApiChatMetadata) error {
 	return nil
 }
 
-func logOpenAPICompletion(ctx context.Context, requestID, modelName, status string, startedAt time.Time, strategyUsage, dialogueUsage *schema.TokenUsage, strategyDegraded bool) {
+// upstream 为空表示请求未通过鉴权：校验通过的密钥必然绑定了上游，
+// 该约束由 Config.validateOpenAPIUpstreams 在启动期保证。
+func logOpenAPICompletion(ctx context.Context, requestID, modelName, status, upstream string, startedAt time.Time, strategyUsage, dialogueUsage *schema.TokenUsage, strategyDegraded bool) {
 	logs.CtxInfof(ctx,
-		"[openapi] request_id=%s model=%s status=%s duration_ms=%d strategy_degraded=%t strategy_usage=%s dialogue_usage=%s",
-		requestID, modelName, status, time.Since(startedAt).Milliseconds(), strategyDegraded,
+		"[openapi] request_id=%s model=%s status=%s upstream=%s duration_ms=%d strategy_degraded=%t strategy_usage=%s dialogue_usage=%s",
+		requestID, modelName, status, upstream, time.Since(startedAt).Milliseconds(), strategyDegraded,
 		usageLogValue(strategyUsage), usageLogValue(dialogueUsage))
 }
 
@@ -407,27 +409,27 @@ func OpenApiGenerateReport(ctx context.Context, c *app.RequestContext) {
 	var req core_api.OpenApiGenerateReportReq
 	err := c.BindAndValidate(&req)
 	if err != nil {
-		logOpenAPIReport(ctx, requestID, "", "invalid_request", startedAt, nil)
+		logOpenAPIReport(ctx, requestID, "", "invalid_request", "", startedAt, nil)
 		writeJSONError(c, consts.StatusBadRequest, "invalid_request_error", err.Error(), requestID)
 		return
 	}
 
 	token := strings.TrimSpace(strings.TrimPrefix(string(c.GetHeader("Authorization")), "Bearer "))
 	pepper, keys := openAPIAuth()
-	_, authErr := openapiauth.Verify(pepper, keys, token, openAPIScopeReport)
+	key, authErr := openapiauth.Verify(pepper, keys, token, openAPIScopeReport)
 	if authErr != nil {
 		status, code, message := authError(authErr)
-		logOpenAPIReport(ctx, requestID, req.Model, code, startedAt, nil)
+		logOpenAPIReport(ctx, requestID, req.Model, code, key.Upstream, startedAt, nil)
 		writeJSONError(c, status, code, message, requestID)
 		return
 	}
 	if req.Model != publicReportModel {
-		logOpenAPIReport(ctx, requestID, req.Model, "invalid_request", startedAt, nil)
+		logOpenAPIReport(ctx, requestID, req.Model, "invalid_request", key.Upstream, startedAt, nil)
 		writeJSONError(c, consts.StatusBadRequest, "unsupported_model", "model must be psych-report-v1", requestID)
 		return
 	}
 	if err := validateMetadata(req.Metadata); err != nil {
-		logOpenAPIReport(ctx, requestID, req.Model, "invalid_request", startedAt, nil)
+		logOpenAPIReport(ctx, requestID, req.Model, "invalid_request", key.Upstream, startedAt, nil)
 		writeJSONError(c, consts.StatusBadRequest, "invalid_request_error", err.Error(), requestID)
 		return
 	}
@@ -438,40 +440,42 @@ func OpenApiGenerateReport(ctx context.Context, c *app.RequestContext) {
 		if errors.As(err, &limitErr) {
 			status, code = consts.StatusRequestEntityTooLarge, "context_too_large"
 		}
-		logOpenAPIReport(ctx, requestID, req.Model, "invalid_request", startedAt, nil)
+		logOpenAPIReport(ctx, requestID, req.Model, "invalid_request", key.Upstream, startedAt, nil)
 		writeJSONError(c, status, code, err.Error(), requestID)
 		return
 	}
 	workflowReq, err := applicationservice.NewOpenAPIReportRequest(&req)
 	if err != nil {
-		logOpenAPIReport(ctx, requestID, req.Model, "invalid_request", startedAt, nil)
+		logOpenAPIReport(ctx, requestID, req.Model, "invalid_request", key.Upstream, startedAt, nil)
 		writeJSONError(c, consts.StatusBadRequest, "invalid_request_error", err.Error(), requestID)
 		return
 	}
 	if err := openapichat.ValidateMessages(dtoMessages(req.Messages)); err != nil {
-		logOpenAPIReport(ctx, requestID, req.Model, "invalid_request", startedAt, nil)
+		logOpenAPIReport(ctx, requestID, req.Model, "invalid_request", key.Upstream, startedAt, nil)
 		writeJSONError(c, consts.StatusBadRequest, "invalid_request_error", err.Error(), requestID)
 		return
 	}
-	result, err := (&applicationservice.OpenAPIReportService{}).Generate(ctx, workflowReq, requestID)
+	result, err := (&applicationservice.OpenAPIReportService{}).Generate(ctx, workflowReq, requestID, key.Upstream)
 	if err != nil {
 		status, code, message := consts.StatusBadGateway, "upstream_error", "报告服务暂时不可用，请稍后重试"
 		if applicationservice.IsOpenAPIReportTimeout(err) {
 			status, code, message = consts.StatusGatewayTimeout, "upstream_timeout", "报告服务响应超时，请稍后重试"
 		}
-		logOpenAPIReport(ctx, requestID, req.Model, code, startedAt, nil)
+		logOpenAPIReport(ctx, requestID, req.Model, code, key.Upstream, startedAt, nil)
 		writeJSONError(c, status, code, message, requestID)
 		return
 	}
-	logOpenAPIReport(ctx, requestID, req.Model, "completed", startedAt, result.Usage)
+	logOpenAPIReport(ctx, requestID, req.Model, "completed", key.Upstream, startedAt, result.Usage)
 	c.Response.Header.Set("X-Request-ID", requestID)
 	c.JSON(consts.StatusOK, result)
 }
 
-func logOpenAPIReport(ctx context.Context, requestID, modelName, status string, startedAt time.Time, usage *core_api.OpenApiUsage) {
+// upstream 为空表示请求未通过鉴权：校验通过的密钥必然绑定了上游，
+// 该约束由 Config.validateOpenAPIUpstreams 在启动期保证。
+func logOpenAPIReport(ctx context.Context, requestID, modelName, status, upstream string, startedAt time.Time, usage *core_api.OpenApiUsage) {
 	usageValue := "unavailable"
 	if usage != nil {
 		usageValue = fmt.Sprintf("prompt=%d,completion=%d,total=%d", usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens)
 	}
-	logs.CtxInfof(ctx, "[openapi report] request_id=%s model=%s status=%s duration_ms=%d usage=%s", requestID, modelName, status, time.Since(startedAt).Milliseconds(), usageValue)
+	logs.CtxInfof(ctx, "[openapi report] request_id=%s model=%s status=%s upstream=%s duration_ms=%d usage=%s", requestID, modelName, status, upstream, time.Since(startedAt).Milliseconds(), usageValue)
 }

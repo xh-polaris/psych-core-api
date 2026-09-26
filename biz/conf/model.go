@@ -107,6 +107,22 @@ func (c *Config) ASRConf() (*app.ASRSetting, error) {
 		ResultType: asr.ResultType, ShowUtterances: asr.ShowUtterances, VADSegmentDuration: asr.VADSegmentDuration, EndWindowSize: asr.EndWindowSize}, nil
 }
 
+// OpenAPIUpstream 按名字解析开放接口的上游凭据。
+// 名字来自 OpenApiKey.Upstream，1:1 映射下即一把 DeepSeek Key；
+// 解析失败表示配置缺失，由调用方映射为 502，不向调用方暴露细节。
+func (c *Config) OpenAPIUpstream(name string) (*UpstreamKey, error) {
+	if c == nil || c.OpenApi == nil {
+		return nil, errorx.New(errno.ConfigErr, errorx.KV("app", "openapi"))
+	}
+	if name == "" {
+		return nil, errorx.New(errno.ConfigErr, errorx.KV("app", "openapi"), errorx.KV("upstream", "empty"))
+	}
+	if upstream, ok := c.OpenApi.Upstreams[name]; ok && upstream != nil {
+		return upstream, nil
+	}
+	return nil, errorx.New(errno.ConfigErr, errorx.KV("app", "openapi"), errorx.KV("upstream", name))
+}
+
 // ReportConf 获取报表配置
 func (c *Config) ReportConf(report *core_api.ReportApp) (*app.ReportSetting, error) {
 	if report == nil {

@@ -33,8 +33,9 @@ var (
 )
 
 type Key struct {
-	Prefix string
-	Scopes []string
+	Prefix   string
+	Scopes   []string
+	Upstream string
 }
 
 func Verify(pepper string, keys []conf.OpenApiKey, token, requiredScope string) (Key, error) {
@@ -58,7 +59,7 @@ func Verify(pepper string, keys []conf.OpenApiKey, token, requiredScope string) 
 	if !hasScope(candidate.Scopes, requiredScope) {
 		return Key{}, ErrInsufficientScope
 	}
-	return Key{Prefix: candidate.Prefix, Scopes: candidate.Scopes}, nil
+	return Key{Prefix: candidate.Prefix, Scopes: candidate.Scopes, Upstream: candidate.Upstream}, nil
 }
 
 func parseToken(token string) (prefix, secret string, err error) {

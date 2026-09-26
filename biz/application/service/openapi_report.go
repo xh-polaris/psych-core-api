@@ -23,6 +23,10 @@ const (
 	maxOpenAPIProfileNameRunes  = 128
 )
 
+// internalUpstreamHeader 把平台密钥绑定的上游名透传给 psych-post
+// 由对端从自身配置解析出实际的模型密钥，避免明文凭据跨服务传递
+const internalUpstreamHeader = "X-Psych-Upstream"
+
 var ErrOpenAPIReportTimeout = errors.New("openapi report upstream timeout")
 
 // OpenAPIReportService 调用 psych-post 私有报告接口，不接触平台会话和报告数据。
@@ -99,8 +103,26 @@ func NewOpenAPIReportRequest(req *core_api.OpenApiGenerateReportReq) (openAPIRep
 	return openAPIReportRequest{Messages: req.Messages, SubjectProfile: req.SubjectProfile, MaxTokens: req.MaxTokens}, nil
 }
 
+// newInternalReportRequest 构造转发到 psych-post 的私有请求。
+// 调用方需保证 oa.ReportInternalURL 与 oa.ReportInternalToken 非空。
+// upstream 为平台密钥绑定的上游名，透传给 psych-post 由其选择模型密钥；
+// 为空时不写该 header，由对端使用自身默认配置。
+func newInternalReportRequest(ctx context.Context, oa *conf.OpenApi, body []byte, upstream string) (*http.Request, error) {
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, oa.ReportInternalURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+oa.ReportInternalToken)
+	httpReq.Header.Set("Content-Type", "application/json")
+	if upstream != "" {
+		httpReq.Header.Set(internalUpstreamHeader, upstream)
+	}
+	return httpReq, nil
+}
+
 // Generate 将验证后的请求转发给 psych-post 并映射为对外冻结的 DTO。
-func (s *OpenAPIReportService) Generate(ctx context.Context, req openAPIReportRequest, requestID string) (*core_api.OpenApiGenerateReportResp, error) {
+// upstream 为平台密钥绑定的上游名，由 psych-post 解析为实际的模型密钥。
+func (s *OpenAPIReportService) Generate(ctx context.Context, req openAPIReportRequest, requestID, upstream string) (*core_api.OpenApiGenerateReportResp, error) {
 	cfg := conf.GetConfig()
 	if cfg == nil || cfg.OpenApi == nil || cfg.OpenApi.ReportInternalURL == "" || cfg.OpenApi.ReportInternalToken == "" {
 		return nil, fmt.Errorf("report internal service configuration is unavailable")
@@ -113,12 +135,10 @@ func (s *OpenAPIReportService) Generate(ctx context.Context, req openAPIReportRe
 	if err != nil {
 		return nil, err
 	}
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, cfg.OpenApi.ReportInternalURL, bytes.NewReader(body))
+	httpReq, err := newInternalReportRequest(ctx, cfg.OpenApi, body, upstream)
 	if err != nil {
 		return nil, err
 	}
-	httpReq.Header.Set("Authorization", "Bearer "+cfg.OpenApi.ReportInternalToken)
-	httpReq.Header.Set("Content-Type", "application/json")
 	doer := s.Doer
 	if doer == nil {
 		timeout := defaultOpenAPIReportTimeout
