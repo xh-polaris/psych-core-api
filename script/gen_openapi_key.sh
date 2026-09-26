@@ -2,28 +2,31 @@
 
 # 生成开放接口 API Key 及其配置摘要。明文 Key 仅会输出一次，不应写入仓库或日志。
 # 用法：
-#   OPENAPI_PEPPER='<OpenApi.Pepper>' ./script/gen_openapi_key.sh
-#   OPENAPI_PEPPER='<OpenApi.Pepper>' ./script/gen_openapi_key.sh -n 2 -s psych:report
+#   OPENAPI_PEPPER='<OpenApi.Pepper>' ./script/gen_openapi_key.sh -u ds-tenant-a
+#   OPENAPI_PEPPER='<OpenApi.Pepper>' ./script/gen_openapi_key.sh -n 2 -s psych:report -u ds-tenant-a
 
 set -euo pipefail
 
 readonly secret_length=36
 count=1
 scopes='psych:chat,psych:report'
+upstream=''
 
 usage() {
   cat <<'EOF'
-用法：OPENAPI_PEPPER='<OpenApi.Pepper>' ./script/gen_openapi_key.sh [-n 数量] [-s 权限列表]
+用法：OPENAPI_PEPPER='<OpenApi.Pepper>' ./script/gen_openapi_key.sh -u 上游名 [-n 数量] [-s 权限列表]
 
+  -u  上游 Key 名，须与 OpenApi.Upstreams 中的条目一致；必填
   -n  生成数量，默认 1
   -s  逗号分隔的权限列表，默认 psych:chat,psych:report
 EOF
 }
 
-while getopts ':n:s:h' option; do
+while getopts ':n:s:u:h' option; do
   case "$option" in
     n) count="$OPTARG" ;;
     s) scopes="$OPTARG" ;;
+    u) upstream="$OPTARG" ;;
     h)
       usage
       exit 0
@@ -47,6 +50,10 @@ if [[ -z "$scopes" ]]; then
   echo '错误：-s 不能为空。' >&2
   exit 1
 fi
+if [[ -z "$upstream" ]]; then
+  echo '错误：必须通过 -u 指定上游 Key 名，且须与 OpenApi.Upstreams 中的条目一致。' >&2
+  exit 1
+fi
 
 yaml_scopes="[$(printf '%s' "$scopes" | sed 's/,/, /g')]"
 
@@ -62,5 +69,6 @@ for ((i = 1; i <= count; i++)); do
   printf '# ===== 第 %d 把 Key（仅展示一次，请勿写入日志或仓库）=====\n' "$i"
   printf 'API Key: sk_live_%s_%s\n' "$prefix" "$secret"
   printf '配置片段：\n'
-  printf '  - Prefix: %s\n    Digest: %s\n    Status: active\n    Scopes: %s\n\n' "$prefix" "$digest" "$yaml_scopes"
+  printf '  - Prefix: %s\n    Digest: %s\n    Status: active\n    Scopes: %s\n    Upstream: %s\n\n' \
+    "$prefix" "$digest" "$yaml_scopes" "$upstream"
 done

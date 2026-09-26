@@ -9,11 +9,13 @@ import (
 
 const testPepper = "unit-test-pepper"
 
+const testUpstream = "ds-unit-test"
+
 func makeKeys() []conf.OpenApiKey {
 	active := "UnitTestSecretKey0123456789abcdef"
 	revoked := "RevokedSecretKey0123456789"
 	return []conf.OpenApiKey{
-		{Prefix: PrefixOf(active), Digest: Digest(active, testPepper), Status: "active", Scopes: []string{"psych:chat"}},
+		{Prefix: PrefixOf(active), Digest: Digest(active, testPepper), Status: "active", Scopes: []string{"psych:chat"}, Upstream: testUpstream},
 		{Prefix: PrefixOf(revoked), Digest: Digest(revoked, testPepper), Status: "revoked", Scopes: []string{"psych:chat"}},
 	}
 }
@@ -30,6 +32,10 @@ func TestVerifyAcceptsActiveKeyWithScope(t *testing.T) {
 	}
 	if key.Prefix != PrefixOf(secret) {
 		t.Errorf("prefix = %q, want %q", key.Prefix, PrefixOf(secret))
+	}
+	// 上游名必须原样透传，控制器据此选择 DeepSeek 密钥。
+	if key.Upstream != testUpstream {
+		t.Errorf("upstream = %q, want %q", key.Upstream, testUpstream)
 	}
 }
 
