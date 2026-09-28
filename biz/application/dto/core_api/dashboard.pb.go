@@ -3767,7 +3767,7 @@ type SimpleReportMsg struct {
 	Keywords []string `protobuf:"bytes,1,rep,name=keywords,proto3" form:"keywords" json:"keywords" query:"keywords"`
 	// 情绪类型列表（1-3 项，与 analysis.emotion 顺序一致）
 	Emotion []string `protobuf:"bytes,2,rep,name=emotion,proto3" form:"emotion" json:"emotion" query:"emotion"`
-	// 风险等级 0-4: Unknown | High | MediumHigh | MediumLow | Low
+	// 风险等级 -1-3: Unknown | Low | MediumLow | MediumHigh | High。数值越大风险越高。
 	RiskLevel int32 `protobuf:"varint,3,opt,name=riskLevel,proto3" form:"riskLevel" json:"riskLevel" query:"riskLevel"`
 	// 困扰程度 0-4: Normal | Mild | Moderate | Severe | HighRisk
 	DistressLevel int32 `protobuf:"varint,4,opt,name=distressLevel,proto3" form:"distressLevel" json:"distressLevel" query:"distressLevel"`

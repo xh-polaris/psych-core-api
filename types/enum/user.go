@@ -33,51 +33,55 @@ var UserRoleI2S = map[int32]string{
 	UserRoleSuperAdmin:   "SuperAdmin",
 }
 
-// UserRiskLevel（与新报表 simple_report.riskLevel 数值对齐）
+// UserRiskLevel（与新报表 simple_report.riskLevel 数值对齐，数值越大风险越高）
 const (
-	UserRiskLevelUnknown = 0 // 未明确提及
-	UserRiskLevelHigh    = 1 // 高风险
-	UserRiskLevelMedium  = 2 // 中高风险
-	UserRiskLevelLow     = 3 // 中低风险
-	UserRiskLevelNormal  = 4 // 低风险
+	UserRiskLevelUnknown    = -1 // 未明确提及
+	UserRiskLevelLow        = 0  // 低风险
+	UserRiskLevelMediumLow  = 1  // 中低风险
+	UserRiskLevelMediumHigh = 2  // 中高风险
+	UserRiskLevelHigh       = 3  // 高风险
 )
 
 // RiskLevelLabel 将数值风险等级映射为中文标签
 func RiskLevelLabel(level int32) string {
 	switch level {
+	case UserRiskLevelLow:
+		return "低风险"
+	case UserRiskLevelMediumLow:
+		return "中低风险"
+	case UserRiskLevelMediumHigh:
+		return "中高风险"
 	case UserRiskLevelHigh:
 		return "高风险"
-	case UserRiskLevelMedium:
-		return "中高风险"
-	case UserRiskLevelLow:
-		return "中低风险"
-	case UserRiskLevelNormal:
-		return "低风险"
 	default:
 		return "未明确提及"
 	}
 }
 
-// RiskLevelToInt 将报表的字符串风险等级映射为 1-4: High | Medium | Low | Normal
+// RiskLevelToInt 将报表的字符串风险等级映射为 -1-3：Unknown | Low | MediumLow | MediumHigh | High。
 func RiskLevelToInt(level string) int {
 	s := strings.TrimSpace(level)
 	switch {
-	case s == "1":
-		return UserRiskLevelHigh
-	case s == "2":
-		return UserRiskLevelMedium
-	case s == "3":
+	case s == "-1":
+		return UserRiskLevelUnknown
+	case s == "0":
 		return UserRiskLevelLow
-	case s == "4":
-		return UserRiskLevelNormal
+	case s == "1":
+		return UserRiskLevelMediumLow
+	case s == "2":
+		return UserRiskLevelMediumHigh
+	case s == "3":
+		return UserRiskLevelHigh
 	case strings.Contains(s, "高危") || strings.Contains(s, "严重") || strings.Contains(s, "紧急"):
 		return UserRiskLevelHigh
-	case strings.Contains(s, "较高") || strings.Contains(s, "中"):
-		return UserRiskLevelMedium
+	case strings.Contains(s, "中高") || strings.Contains(s, "较高"):
+		return UserRiskLevelMediumHigh
+	case strings.Contains(s, "中低") || strings.Contains(s, "较低"):
+		return UserRiskLevelMediumLow
 	case strings.Contains(s, "低"):
 		return UserRiskLevelLow
 	default:
-		return UserRiskLevelNormal
+		return UserRiskLevelUnknown
 	}
 }
 

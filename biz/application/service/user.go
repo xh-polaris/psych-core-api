@@ -525,7 +525,7 @@ func tryBuildPsychUser(req *core_api.CreateUserReq, pUnit *unit.Unit) (*user.Use
 		Name:       req.Name,
 		Birth:      birth,
 		Gender:     int(req.Gender),
-		RiskLevel:  enum.UserRiskLevelNormal,
+		RiskLevel:  enum.UserRiskLevelLow,
 		Status:     enum.UserStatusActive,
 		EnrollYear: int(req.EnrollYear),
 		Role:       int(req.Role),

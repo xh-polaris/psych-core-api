@@ -141,7 +141,7 @@ type AnalysisConfidence struct {
 type SimpleReport struct {
 	Keywords      []string `bson:"keywords,omitempty" json:"keywords,omitempty"` // 2-3 个，源自学生讲到的话题
 	Emotion       []string `bson:"emotion" json:"emotion"`                       // 情绪类型列表（1-3 项，与 analysis.emotion 顺序一致）
-	RiskLevel     int32    `bson:"riskLevel" json:"riskLevel"`                   // 0未明确 | 1高风险 | 2中高风险 | 3中低风险 | 4低风险
+	RiskLevel     int32    `bson:"riskLevel" json:"riskLevel"`                   // -1未明确 | 0低风险 | 1中低风险 | 2中高风险 | 3高风险
 	DistressLevel int32    `bson:"distressLevel" json:"distressLevel"`           // 0正常波动 | 1轻度 | 2中度 | 3重度 | 4高危
 	Focus         string   `bson:"focus" json:"focus"`                           // 需要重点关注的问题
 	Suggestions   []string `bson:"suggestions" json:"suggestions"`               // 面向老师的 3 条建议

@@ -43,13 +43,13 @@ func (d *DashboardDomain) psychTrend(ctx context.Context, rs *resolvedScope, sta
 		RiskDashboard: buildLevelDashboard(stats, totalStudents, func(stat *report.UserPsychStat) int32 {
 			return stat.RiskLevel
 		}, func(level int32) bool {
-			return level == enum.UserRiskLevelHigh || level == enum.UserRiskLevelMedium
-		}),
+			return level == enum.UserRiskLevelHigh || level == enum.UserRiskLevelMediumHigh
+		}, enum.UserRiskLevelUnknown, enum.UserRiskLevelHigh),
 		DistressDashboard: buildLevelDashboard(stats, totalStudents, func(stat *report.UserPsychStat) int32 {
 			return stat.DistressLevel
 		}, func(level int32) bool {
 			return level == enum.DistressSevere || level == enum.DistressHighRisk
-		}),
+		}, enum.DistressNormal, enum.DistressHighRisk),
 		Code: 0,
 		Msg:  "success",
 	}, nil
@@ -76,19 +76,19 @@ func (d *DashboardDomain) countScopeStudents(ctx context.Context, rs *resolvedSc
 	return total, nil
 }
 
-// buildLevelDashboard counts one completed report per student. Level 0 is retained as
+// buildLevelDashboard counts one completed report per student. Level -1 is retained as
 // "未明确" so the chart makes missing assessments visible; it is not a matched risk.
-func buildLevelDashboard(stats []*report.UserPsychStat, totalStudents int32, levelOf func(*report.UserPsychStat) int32, matches func(int32) bool) *core_api.LevelDashboard {
-	distribution := make(map[int32]int32, 5)
-	for level := int32(0); level <= 4; level++ {
-		distribution[level] = 0
+func buildLevelDashboard(stats []*report.UserPsychStat, totalStudents int32, levelOf func(*report.UserPsychStat) int32, matches func(int32) bool, minLevel, maxLevel int) *core_api.LevelDashboard {
+	distribution := make(map[int32]int32, maxLevel-minLevel+1)
+	for level := minLevel; level <= maxLevel; level++ {
+		distribution[int32(level)] = 0
 	}
 
 	var matched int32
 	for _, stat := range stats {
 		level := levelOf(stat)
-		if level < 0 || level > 4 {
-			level = 0
+		if level < int32(minLevel) || level > int32(maxLevel) {
+			level = int32(minLevel)
 		}
 		distribution[level]++
 		if matches(level) {
