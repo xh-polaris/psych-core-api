@@ -262,11 +262,12 @@ func (d *DashboardDomain) buildConvOverviews(ctx context.Context, reports []*rep
 				Code:   usr.Code,
 				Gender: int32(usr.Gender),
 			},
-			ConvId:    rpt.ConversationID.Hex(),
-			ReportId:  rpt.ID.Hex(),
-			Title:     rpt.Title,
-			Time:      rpt.End.Unix(),
-			NeedAlarm: rpt.NeedAlarm,
+			ConvId:        rpt.ConversationID.Hex(),
+			ReportId:      rpt.ID.Hex(),
+			Title:         rpt.Title,
+			Time:          rpt.End.Unix(),
+			NeedAlarm:     rpt.NeedAlarm,
+			ReportSummary: reportSummaryToPB(rpt),
 		})
 	}
 	return convOverviews, nil

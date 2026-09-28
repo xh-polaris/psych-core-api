@@ -93,6 +93,21 @@ func simpleReportToPB(sr *report.SimpleReport) *core_api.SimpleReportMsg {
 	}
 }
 
+func reportSummaryToPB(rpt *report.Report) *core_api.ReportSummary {
+	if rpt == nil || rpt.SimpleReport == nil {
+		return nil
+	}
+	confidence := ""
+	if rpt.Analysis != nil {
+		confidence = rpt.Analysis.Confidence.Overall
+	}
+	return &core_api.ReportSummary{
+		RiskLevel:     rpt.SimpleReport.RiskLevel,
+		DistressLevel: rpt.SimpleReport.DistressLevel,
+		Confidence:    confidence,
+	}
+}
+
 // emotionItemsToPB converts report analysis emotion items to PB
 func emotionItemsToPB(items []report.AnalysisEmotion) []*core_api.AnalysisEmotion {
 	if len(items) == 0 {
