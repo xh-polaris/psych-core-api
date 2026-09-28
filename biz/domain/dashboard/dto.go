@@ -141,7 +141,7 @@ func buildEmotionRatio(stats []*report.UserPsychStat) *core_api.EmotionRatio {
 // buildRiskDistribution 按每用户最后一份报表的风险等级×性别统计分布
 func buildRiskDistribution(stats []*report.UserPsychStat) []*core_api.RiskDistribution {
 	res := make([]*core_api.RiskDistribution, 0, 8)
-	for lvl := int32(1); lvl <= 4; lvl++ {
+	for lvl := int32(enum.UserRiskLevelLow); lvl <= int32(enum.UserRiskLevelHigh); lvl++ {
 		for g := int32(1); g <= 2; g++ {
 			res = append(res, &core_api.RiskDistribution{Level: lvl, Gender: g, Count: 0})
 		}
@@ -151,10 +151,10 @@ func buildRiskDistribution(stats []*report.UserPsychStat) []*core_api.RiskDistri
 			continue
 		}
 		lvl := st.RiskLevel
-		if lvl < int32(enum.UserRiskLevelHigh) || lvl > int32(enum.UserRiskLevelNormal) {
-			continue // 0=未明确或旧数据，不计入分布
+		if lvl < int32(enum.UserRiskLevelLow) || lvl > int32(enum.UserRiskLevelHigh) {
+			continue // -1=未明确，不计入风险分布
 		}
-		idx := (lvl-1)*2 + (st.Gender - 1)
+		idx := lvl*2 + (st.Gender - 1)
 		res[idx].Count++
 	}
 	return res

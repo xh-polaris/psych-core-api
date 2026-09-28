@@ -259,7 +259,7 @@ func (m *mongoMapper) CountByClasses(ctx context.Context, unitId bson.ObjectID, 
 						"$cond": bson.M{
 							"if": bson.M{"$in": bson.A{
 								"$" + cst.RiskLevel,
-								bson.A{enum.UserRiskLevelHigh, enum.UserRiskLevelMedium, enum.UserRiskLevelLow},
+								bson.A{enum.UserRiskLevelMediumLow, enum.UserRiskLevelMediumHigh, enum.UserRiskLevelHigh},
 							}},
 							"then": 1,
 							"else": 0,

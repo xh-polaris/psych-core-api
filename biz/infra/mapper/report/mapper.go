@@ -53,7 +53,7 @@ type IMongoMapper interface {
 type UserPsychStat struct {
 	UserID        bson.ObjectID `bson:"_id"`
 	Emotion       string        `bson:"emotion"`       // SimpleReport.Emotion 首项
-	RiskLevel     int32         `bson:"riskLevel"`     // SimpleReport.RiskLevel（0未明确 1高 2中高 3中低 4低）
+	RiskLevel     int32         `bson:"riskLevel"`     // SimpleReport.RiskLevel（-1未明确 0低 1中低 2中高 3高）
 	DistressLevel int32         `bson:"distressLevel"` // SimpleReport.DistressLevel（0正常 1轻度 2中度 3重度 4高危）
 	Gender        int32         `bson:"gender"`        // user.gender
 }

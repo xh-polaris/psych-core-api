@@ -269,15 +269,15 @@ func (d *DashboardDomain) completeRiskUser(ctx context.Context, dbUsers []*user.
 			continue
 		}
 
-		// 剩余学生：最新 SimpleReport 提供风险等级（数值直出，0=未明确回退 Normal）；关键词经兼容层取值
+		// 剩余学生：最新 SimpleReport 提供风险等级（数值直出，-1=未明确回退低风险）；关键词经兼容层取值
 		if rpt := latestReports[dbUser.ID]; rpt != nil {
-			if sr := rpt.SimpleReport; sr != nil && sr.RiskLevel > 0 {
+			if sr := rpt.SimpleReport; sr != nil && sr.RiskLevel >= enum.UserRiskLevelLow {
 				riskUsers[i].Level = sr.RiskLevel
 			}
 			riskUsers[i].Keywords = KeywordsOf(rpt)
 		}
-		if riskUsers[i].Level <= 0 {
-			riskUsers[i].Level = int32(enum.UserRiskLevelNormal)
+		if riskUsers[i].Level < int32(enum.UserRiskLevelLow) {
+			riskUsers[i].Level = int32(enum.UserRiskLevelLow)
 		}
 	}
 
