@@ -7,7 +7,9 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
+	"github.com/xh-polaris/psych-core-api/types/enum"
 	"github.com/xh-polaris/psych-core-api/types/errno"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // GetPsychTrend 心理趋势：情绪分布、风险性别分布、关键词词云
@@ -26,6 +28,10 @@ func (d *DashboardDomain) psychTrend(ctx context.Context, rs *resolvedScope, sta
 	if err != nil {
 		return nil, err
 	}
+	totalStudents, err := d.countScopeStudents(ctx, rs)
+	if err != nil {
+		return nil, err
+	}
 	keywords, err := d.getKeywords(ctx, rs, start, end)
 	if err != nil {
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardGetUserKeywords)
@@ -34,9 +40,67 @@ func (d *DashboardDomain) psychTrend(ctx context.Context, rs *resolvedScope, sta
 		EmotionRatio: buildEmotionRatio(stats),
 		Risks:        buildRiskDistribution(stats),
 		Keywords:     keywords,
-		Code:         0,
-		Msg:          "success",
+		RiskDashboard: buildLevelDashboard(stats, totalStudents, func(stat *report.UserPsychStat) int32 {
+			return stat.RiskLevel
+		}, func(level int32) bool {
+			return level == enum.UserRiskLevelHigh || level == enum.UserRiskLevelMedium
+		}),
+		DistressDashboard: buildLevelDashboard(stats, totalStudents, func(stat *report.UserPsychStat) int32 {
+			return stat.DistressLevel
+		}, func(level int32) bool {
+			return level == enum.DistressSevere || level == enum.DistressHighRisk
+		}),
+		Code: 0,
+		Msg:  "success",
 	}, nil
+}
+
+// countScopeStudents returns the current number of students in the caller's data scope.
+func (d *DashboardDomain) countScopeStudents(ctx context.Context, rs *resolvedScope) (int32, error) {
+	var (
+		total int32
+		err   error
+	)
+	if rs.hasClass {
+		total, err = d.UserMapper.CountStudentsByClassList(ctx, *rs.unitID, rs.grades, rs.classes)
+	} else {
+		var unitID bson.ObjectID
+		if rs.unitID != nil {
+			unitID = *rs.unitID
+		}
+		total, err = d.UserMapper.CountStudents(ctx, unitID)
+	}
+	if err != nil {
+		return 0, errorx.New(errno.ErrDashboardTotalUserStat)
+	}
+	return total, nil
+}
+
+// buildLevelDashboard counts one completed report per student. Level 0 is retained as
+// "未明确" so the chart makes missing assessments visible; it is not a matched risk.
+func buildLevelDashboard(stats []*report.UserPsychStat, totalStudents int32, levelOf func(*report.UserPsychStat) int32, matches func(int32) bool) *core_api.LevelDashboard {
+	distribution := make(map[int32]int32, 5)
+	for level := int32(0); level <= 4; level++ {
+		distribution[level] = 0
+	}
+
+	var matched int32
+	for _, stat := range stats {
+		level := levelOf(stat)
+		if level < 0 || level > 4 {
+			level = 0
+		}
+		distribution[level]++
+		if matches(level) {
+			matched++
+		}
+	}
+	return &core_api.LevelDashboard{
+		Distribution:     distribution,
+		MatchedStudents:  matched,
+		TotalStudents:    totalStudents,
+		ReportedStudents: int32(len(stats)),
+	}
 }
 
 // reportStats 获取时间段内每个用户最后一份报表的心理统计

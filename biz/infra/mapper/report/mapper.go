@@ -51,10 +51,11 @@ type IMongoMapper interface {
 
 // UserPsychStat 用户心理状态（来自该用户时间段内最后一份报表）
 type UserPsychStat struct {
-	UserID    bson.ObjectID `bson:"_id"`
-	Emotion   string        `bson:"emotion"`   // SimpleReport.Emotion 首项
-	RiskLevel int32         `bson:"riskLevel"` // SimpleReport.RiskLevel（0未明确 1高 2中高 3中低 4低）
-	Gender    int32         `bson:"gender"`    // user.gender
+	UserID        bson.ObjectID `bson:"_id"`
+	Emotion       string        `bson:"emotion"`       // SimpleReport.Emotion 首项
+	RiskLevel     int32         `bson:"riskLevel"`     // SimpleReport.RiskLevel（0未明确 1高 2中高 3中低 4低）
+	DistressLevel int32         `bson:"distressLevel"` // SimpleReport.DistressLevel（0正常 1轻度 2中度 3重度 4高危）
+	Gender        int32         `bson:"gender"`        // user.gender
 }
 
 type mongoMapper struct {
@@ -350,7 +351,7 @@ func (m *mongoMapper) aggregateKWResult(ctx context.Context, pipeline []bson.M) 
 // unitOID 传 nil 统计全部单位；grades/classes 用于按班级筛选
 func (m *mongoMapper) GetUserPsychStats(ctx context.Context, unitOID *bson.ObjectID, start, end time.Time, grades, classes []int32) ([]*UserPsychStat, error) {
 	match := bson.M{
-		cst.Status:      bson.M{cst.NE: enum.ReportStatusDeleted},
+		cst.Status:      enum.ReportStatusSuccess,
 		"simple_report": bson.M{"$exists": true},
 	}
 	if unitOID != nil {
@@ -371,9 +372,10 @@ func (m *mongoMapper) GetUserPsychStats(ctx context.Context, unitOID *bson.Objec
 		{"$match": match},
 		{"$sort": bson.M{cst.CreateTime: -1}},
 		{"$group": bson.M{
-			"_id":       "$" + cst.UserID,
-			"emotion":   bson.M{"$first": "$simple_report.emotion"},
-			"riskLevel": bson.M{"$first": "$simple_report.riskLevel"},
+			"_id":           "$" + cst.UserID,
+			"emotion":       bson.M{"$first": "$simple_report.emotion"},
+			"riskLevel":     bson.M{"$first": "$simple_report.riskLevel"},
+			"distressLevel": bson.M{"$first": "$simple_report.distressLevel"},
 		}},
 		// emotion 为字符串数组（1-3 项），取首项（主导情绪）；空数组兜底"未明确提及"
 		{"$addFields": bson.M{
@@ -407,10 +409,11 @@ func (m *mongoMapper) GetUserPsychStats(ctx context.Context, unitOID *bson.Objec
 	}
 
 	pipeline = append(pipeline, bson.M{"$project": bson.M{
-		"_id":       1,
-		"emotion":   1,
-		"riskLevel": 1,
-		"gender":    "$userDoc.gender",
+		"_id":           1,
+		"emotion":       1,
+		"riskLevel":     1,
+		"distressLevel": 1,
+		"gender":        "$userDoc.gender",
 	}})
 
 	var results []*UserPsychStat

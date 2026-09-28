@@ -28,7 +28,7 @@ type CreateConversationReq struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// 目标 AI 心理老师角色；必填，缺失返回参数错误
+	// 目标 AI 心理老师角色；为空时回退为单位配置中的首个启用角色
 	CharacterId string `protobuf:"bytes,1,opt,name=characterId,proto3" form:"characterId" json:"characterId" query:"characterId"`
 }
 
@@ -490,7 +490,7 @@ type Message struct {
 	unknownFields protoimpl.UnknownFields
 
 	Content string `protobuf:"bytes,1,opt,name=content,proto3" form:"content" json:"content" query:"content"`
-	// 角色, system/assistant/user/tool, 依次为1,2,3,4
+	// 角色：system / assistant（AI）/ user（学生）/ tool，依次为 1 / 2 / 3 / 4
 	Role int32 `protobuf:"varint,2,opt,name=role,proto3" form:"role" json:"role" query:"role"`
 	// 消息索引
 	Index int32 `protobuf:"varint,3,opt,name=index,proto3" form:"index" json:"index" query:"index"`
@@ -700,9 +700,10 @@ type ConvByDateMessage struct {
 
 	ConversationId string `protobuf:"bytes,1,opt,name=conversationId,proto3" form:"conversationId" json:"conversationId" query:"conversationId"`
 	Content        string `protobuf:"bytes,2,opt,name=content,proto3" form:"content" json:"content" query:"content"`
-	Role           int32  `protobuf:"varint,3,opt,name=role,proto3" form:"role" json:"role" query:"role"`
-	Index          int32  `protobuf:"varint,4,opt,name=index,proto3" form:"index" json:"index" query:"index"`
-	CreateTime     int64  `protobuf:"varint,5,opt,name=createTime,proto3" form:"createTime" json:"createTime" query:"createTime"`
+	// 角色：system / assistant（AI）/ user（学生）/ tool，依次为 1 / 2 / 3 / 4
+	Role       int32 `protobuf:"varint,3,opt,name=role,proto3" form:"role" json:"role" query:"role"`
+	Index      int32 `protobuf:"varint,4,opt,name=index,proto3" form:"index" json:"index" query:"index"`
+	CreateTime int64 `protobuf:"varint,5,opt,name=createTime,proto3" form:"createTime" json:"createTime" query:"createTime"`
 }
 
 func (x *ConvByDateMessage) Reset() {

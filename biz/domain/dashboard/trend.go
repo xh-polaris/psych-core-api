@@ -94,14 +94,14 @@ func (d *DashboardDomain) riskDistribution(ctx context.Context, rs *resolvedScop
 		if err != nil {
 			return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 		}
-		return &core_api.RiskDistributionByGrade{Ratio: util.RiskDistributionCnt2Ratio(riskMap, total), Total: total}, nil
+		return &core_api.RiskDistributionByGrade{Ratio: util.RiskDistributionCnt2Ratio(riskMap, total), Count: riskMap, Total: total}, nil
 	}
 	if rs.unitID == nil {
-		return &core_api.RiskDistributionByGrade{Ratio: make(map[int32]int32), Total: 0}, nil
+		return &core_api.RiskDistributionByGrade{Ratio: make(map[int32]int32), Count: make(map[int32]int32), Total: 0}, nil
 	}
 	riskMap, total, err := d.AlarmMapper.CountAlarmUsersByGrade(ctx, *rs.unitID, rs.startGrade, start, end)
 	if err != nil {
 		return nil, errorx.WrapByCode(err, errno.ErrDashboardConversationStat)
 	}
-	return &core_api.RiskDistributionByGrade{Ratio: util.RiskDistributionCnt2Ratio(riskMap, total), Total: total}, nil
+	return &core_api.RiskDistributionByGrade{Ratio: util.RiskDistributionCnt2Ratio(riskMap, total), Count: riskMap, Total: total}, nil
 }
