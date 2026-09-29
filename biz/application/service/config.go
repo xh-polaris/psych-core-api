@@ -60,15 +60,18 @@ func (c *ConfigService) ConfigCreate(ctx context.Context, req *core_api.ConfigCr
 
 	now := time.Now()
 	confDAO := &config.Config{
-		ID:         bson.NewObjectID(),
-		Type:       int(req.Config.Type),
-		UnitID:     unitOID,
-		Characters: characterReq2DB(req.Config.Characters),
-		Scene:      req.Config.Scene,
-		AlertPhone: req.Config.AlertPhone,
-		Status:     enum.ConfigStatusActive,
-		CreateTime: now,
-		UpdateTime: now,
+		ID:              bson.NewObjectID(),
+		Type:            int(req.Config.Type),
+		UnitID:          unitOID,
+		Characters:      characterReq2DB(req.Config.Characters),
+		Scene:           req.Config.Scene,
+		BackgroundImage: req.Config.GetBackgroundImage(),
+		ContactPhone:    req.Config.GetContactPhone(),
+		ContactEmail:    req.Config.GetContactEmail(),
+		AlertPhone:      req.Config.AlertPhone,
+		Status:          enum.ConfigStatusActive,
+		CreateTime:      now,
+		UpdateTime:      now,
 	}
 	if cht := req.Config.GetChat(); cht != nil {
 		confDAO.Chat = &config.Chat{
@@ -237,10 +240,11 @@ func (c *ConfigService) ConfigGetCharacters(ctx context.Context, req *core_api.C
 	}
 
 	return &core_api.ConfigGetCharacterResp{
-		Characters: characterDB2Resp(uConf.Characters),
-		Scene:      uConf.Scene,
-		Code:       0,
-		Msg:        "success",
+		Characters:      characterDB2Resp(uConf.Characters),
+		Scene:           uConf.Scene,
+		BackgroundImage: uConf.BackgroundImage,
+		Code:            0,
+		Msg:             "success",
 	}, nil
 }
 
@@ -343,6 +347,15 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 	if scene := conf.GetScene(); len(scene) > 0 {
 		setUpdate["scene"] = scene
 	}
+	if backgroundImage := conf.GetBackgroundImage(); backgroundImage != "" {
+		setUpdate["background_image"] = backgroundImage
+	}
+	if conf.ContactPhone != nil {
+		setUpdate["contact_phone"] = conf.GetContactPhone()
+	}
+	if conf.ContactEmail != nil {
+		setUpdate["contact_email"] = conf.GetContactEmail()
+	}
 	if alertPhone := conf.GetAlertPhone(); len(alertPhone) > 0 {
 		setUpdate["alert_phone"] = alertPhone
 	}
@@ -393,14 +406,17 @@ func extractUpdateBSON(req *core_api.ConfigCreateOrUpdateReq) bson.M {
 // 将数据库Config对象字段转化为DTO对象
 func configDB2VO(cfg *config.Config) *core_api.ConfigVO {
 	vo := &core_api.ConfigVO{
-		UnitId:     cfg.UnitID.Hex(),
-		Type:       int32(cfg.Type),
-		Characters: characterDB2Resp(cfg.Characters),
-		Scene:      cfg.Scene,
-		AlertPhone: cfg.AlertPhone,
-		Status:     int32(cfg.Status),
-		CreateTime: cfg.CreateTime.Unix(),
-		UpdateTime: cfg.UpdateTime.Unix(),
+		UnitId:          cfg.UnitID.Hex(),
+		Type:            int32(cfg.Type),
+		Characters:      characterDB2Resp(cfg.Characters),
+		Scene:           cfg.Scene,
+		BackgroundImage: cfg.BackgroundImage,
+		ContactPhone:    optionalString(cfg.ContactPhone),
+		ContactEmail:    optionalString(cfg.ContactEmail),
+		AlertPhone:      cfg.AlertPhone,
+		Status:          int32(cfg.Status),
+		CreateTime:      cfg.CreateTime.Unix(),
+		UpdateTime:      cfg.UpdateTime.Unix(),
 	}
 	if cfg.Chat != nil {
 		vo.Chat = &core_api.ChatApp{
@@ -422,6 +438,13 @@ func configDB2VO(cfg *config.Config) *core_api.ConfigVO {
 		}
 	}
 	return vo
+}
+
+func optionalString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 // mask4Unit 对单位管理员隐藏 chat/tts/report

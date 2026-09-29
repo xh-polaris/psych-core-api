@@ -43,17 +43,20 @@ type Character struct {
 }
 
 type Config struct {
-	ID         bson.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	UnitID     bson.ObjectID `json:"unitId,omitempty" bson:"unit_id,omitempty"`
-	Characters []*Character  `json:"character,omitempty" bson:"character,omitempty"`
-	Scene      []string      `json:"scene,omitempty" bson:"scene,omitempty"`            // 对话背景图
-	AlertPhone []string      `json:"alertPhone,omitempty" bson:"alert_phone,omitempty"` // 接收告警的手机号
-	Type       int           `json:"type,omitempty" bson:"type,omitempty"`              // 1-2: Chain | End2End
-	Chat       *Chat         `json:"chat,omitempty" bson:"chat,omitempty"`
-	TTS        *TTS          `json:"tts,omitempty" bson:"tts,omitempty"`
-	Report     *Report       `json:"report,omitempty" bson:"report,omitempty"`
-	Status     int           `json:"status,omitempty" bson:"status,omitempty"` // 1-2: Active | Deleted
-	CreateTime time.Time     `json:"createTime,omitempty" bson:"create_time,omitempty"`
-	UpdateTime time.Time     `json:"updateTime,omitempty" bson:"update_time,omitempty"`
-	DeleteTime time.Time     `json:"deleteTime,omitempty" bson:"delete_time,omitempty"`
+	ID              bson.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	UnitID          bson.ObjectID `json:"unitId,omitempty" bson:"unit_id,omitempty"`
+	Characters      []*Character  `json:"character,omitempty" bson:"character,omitempty"`
+	Scene           []string      `json:"scene,omitempty" bson:"scene,omitempty"`                      // 对话背景图列表
+	BackgroundImage string        `json:"backgroundImage,omitempty" bson:"background_image,omitempty"` // 默认对话背景图
+	ContactPhone    string        `json:"contactPhone,omitempty" bson:"contact_phone,omitempty"`       // 对外联系手机
+	ContactEmail    string        `json:"contactEmail,omitempty" bson:"contact_email,omitempty"`       // 对外联系邮箱
+	AlertPhone      []string      `json:"alertPhone,omitempty" bson:"alert_phone,omitempty"`           // 接收告警的手机号
+	Type            int           `json:"type,omitempty" bson:"type,omitempty"`                        // 1-2: Chain | End2End
+	Chat            *Chat         `json:"chat,omitempty" bson:"chat,omitempty"`
+	TTS             *TTS          `json:"tts,omitempty" bson:"tts,omitempty"`
+	Report          *Report       `json:"report,omitempty" bson:"report,omitempty"`
+	Status          int           `json:"status,omitempty" bson:"status,omitempty"` // 1-2: Active | Deleted
+	CreateTime      time.Time     `json:"createTime,omitempty" bson:"create_time,omitempty"`
+	UpdateTime      time.Time     `json:"updateTime,omitempty" bson:"update_time,omitempty"`
+	DeleteTime      time.Time     `json:"deleteTime,omitempty" bson:"delete_time,omitempty"`
 }
