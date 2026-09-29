@@ -1084,7 +1084,7 @@ type RiskDistribution struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// 1-4: High | Medium | Low | Normal
+	// -1-3: Unknown | Low | MediumLow | MediumHigh | High；数值越大风险越高。
 	Level int32 `protobuf:"varint,1,opt,name=level,proto3" form:"level" json:"level" query:"level"`
 	// 0=all 1=male 2=female
 	Gender int32 `protobuf:"varint,2,opt,name=gender,proto3" form:"gender" json:"gender" query:"gender"`
