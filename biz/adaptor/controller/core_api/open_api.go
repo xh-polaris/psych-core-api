@@ -22,6 +22,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	openapiauth "github.com/xh-polaris/psych-core-api/biz/domain/openapi/auth"
 	openapichat "github.com/xh-polaris/psych-core-api/biz/domain/openapi/chat"
+	openapiusage "github.com/xh-polaris/psych-core-api/biz/domain/openapi/usage"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
 )
 
@@ -217,6 +218,9 @@ func OpenApiChatCompletion(ctx context.Context, c *app.RequestContext) {
 		// 写入失败通常表示客户端已经断开；取消上下文会释放上游连接。
 		return
 	}
+	if completion.Status == "completed" {
+		recordOpenAPIUsage(ctx, requestID, key.Prefix, key.Upstream, "chat", req.Model, completion.Usage, completion.UsageSource)
+	}
 }
 
 func validateMetadata(metadata *core_api.OpenApiChatMetadata) error {
@@ -282,6 +286,8 @@ type tokenUsage struct {
 type completionObservation struct {
 	Status        string
 	DialogueUsage *schema.TokenUsage
+	Usage         *tokenUsage
+	UsageSource   string
 }
 
 func streamCompletion(ctx context.Context, w sseWriter, result *openapichat.Result, modelName, requestID string) (completionObservation, error) {
@@ -340,7 +346,7 @@ func streamCompletion(ctx context.Context, w sseWriter, result *openapichat.Resu
 	if err := writeSSEData(w, "[DONE]"); err != nil {
 		return completionObservation{Status: "client_disconnected", DialogueUsage: dialogueUsage}, err
 	}
-	return completionObservation{Status: "completed", DialogueUsage: dialogueUsage}, nil
+	return completionObservation{Status: "completed", DialogueUsage: dialogueUsage, Usage: usage, UsageSource: usageSource}, nil
 }
 
 func writeCompletionChunk(w sseWriter, id string, created int64, modelName string, delta map[string]string, finishReason any, usage *tokenUsage, usageSource string) error {
@@ -466,8 +472,55 @@ func OpenApiGenerateReport(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 	logOpenAPIReport(ctx, requestID, req.Model, "completed", key.Upstream, startedAt, result.Usage)
+	recordOpenAPIUsage(ctx, requestID, key.Prefix, key.Upstream, "report", req.Model, reportUsage(result.Usage), result.UsageSource)
 	c.Response.Header.Set("X-Request-ID", requestID)
 	c.JSON(consts.StatusOK, result)
+}
+
+// recordOpenAPIUsage is intentionally best-effort from the caller's point of
+// view: an accounting failure is observable in logs but never changes a
+// completed business response. The recorder itself is transactional and
+// idempotent by request_id.
+func recordOpenAPIUsage(ctx context.Context, requestID, keyPrefix, upstream, endpoint, model string, value *tokenUsage, usageSource string) {
+	recorder := openapiusage.Recorder
+	if recorder == nil {
+		logs.CtxErrorf(ctx, "[openapi usage] request_id=%s status=recorder_unavailable", requestID)
+		return
+	}
+
+	var usage *openapiusage.Tokens
+	if value != nil {
+		usage = &openapiusage.Tokens{
+			PromptTokens:     int64(value.PromptTokens),
+			CompletionTokens: int64(value.CompletionTokens),
+			TotalTokens:      int64(value.TotalTokens),
+		}
+	}
+	recordCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
+	defer cancel()
+	if err := recorder.Record(recordCtx, openapiusage.Entry{
+		RequestID:   requestID,
+		KeyPrefix:   keyPrefix,
+		Upstream:    upstream,
+		Endpoint:    endpoint,
+		Model:       model,
+		Status:      "completed",
+		Usage:       usage,
+		UsageSource: usageSource,
+	}); err != nil {
+		logs.CtxErrorf(ctx, "[openapi usage] request_id=%s key_prefix=%s endpoint=%s status=record_failed err=%v", requestID, keyPrefix, endpoint, err)
+	}
+}
+
+func reportUsage(value *core_api.OpenApiUsage) *tokenUsage {
+	if value == nil {
+		return nil
+	}
+	return &tokenUsage{
+		PromptTokens:     int(value.PromptTokens),
+		CompletionTokens: int(value.CompletionTokens),
+		TotalTokens:      int(value.TotalTokens),
+	}
 }
 
 // upstream 为空表示请求未通过鉴权：校验通过的密钥必然绑定了上游，

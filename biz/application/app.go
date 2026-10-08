@@ -3,6 +3,7 @@ package application
 import (
 	"github.com/xh-polaris/psych-core-api/biz/domain/alert"
 	"github.com/xh-polaris/psych-core-api/biz/domain/his"
+	"github.com/xh-polaris/psych-core-api/biz/domain/openapi/usage"
 	"github.com/xh-polaris/psych-core-api/biz/domain/prompt"
 	"github.com/xh-polaris/psych-core-api/biz/infra/cache"
 	"github.com/xh-polaris/psych-core-api/biz/infra/cache/redis"
@@ -62,4 +63,7 @@ func InitDomain(app *AppDependency) {
 	his.New(app.Cache, app.MessageMapper, app.ConversationMapper)
 	alert.New(app.Cache, app.UserMapper, app.ConfigMapper, app.UnitMapper, app.SmsAlertMapper)
 	prompt.New(app.Cache, app.PromptMapper)
+	if err := usage.Init(provider.Get().Config); err != nil {
+		panic(err)
+	}
 }
