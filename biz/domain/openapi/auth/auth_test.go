@@ -81,3 +81,16 @@ func TestVerifyRejectsRevokedAndMissingScope(t *testing.T) {
 		t.Errorf("want ErrInsufficientScope, got %v", err)
 	}
 }
+
+func TestVerifyAnyAcceptsEitherScope(t *testing.T) {
+	secret := "ScopedKeyReportOnly0123456789"
+	keys := []conf.OpenApiKey{
+		{Prefix: PrefixOf(secret), Digest: Digest(secret, testPepper), Status: "active", Scopes: []string{"psych:report"}, Upstream: testUpstream},
+	}
+	if _, err := VerifyAny(testPepper, keys, tokenFor(secret), "psych:chat", "psych:report"); err != nil {
+		t.Fatalf("VerifyAny() error = %v, want nil", err)
+	}
+	if _, err := VerifyAny(testPepper, keys, tokenFor(secret), "psych:chat"); !errors.Is(err, ErrInsufficientScope) {
+		t.Fatalf("VerifyAny() error = %v, want ErrInsufficientScope", err)
+	}
+}

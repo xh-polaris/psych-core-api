@@ -1,6 +1,8 @@
 package application
 
 import (
+	"context"
+
 	"github.com/xh-polaris/psych-core-api/biz/domain/alert"
 	"github.com/xh-polaris/psych-core-api/biz/domain/his"
 	"github.com/xh-polaris/psych-core-api/biz/domain/prompt"
@@ -10,6 +12,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
+	openapiusagemapper "github.com/xh-polaris/psych-core-api/biz/infra/mapper/openapi_usage"
 	pmapper "github.com/xh-polaris/psych-core-api/biz/infra/mapper/prompt"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/sms_alert"
@@ -30,6 +33,7 @@ type AppDependency struct {
 	ConfigMapper       config.IMongoMapper
 	SmsAlertMapper     sms_alert.IMongoMapper
 	PromptMapper       pmapper.IMongoMapper
+	OpenAPIUsageMapper *openapiusagemapper.MongoMapper
 }
 
 func InitApplication() {
@@ -54,6 +58,10 @@ func InitInfra(app *AppDependency) {
 	app.ConfigMapper = provider.Get().ConfigMapper
 	app.SmsAlertMapper = provider.Get().SmsAlertMapper
 	app.PromptMapper = provider.Get().PromptMapper
+	app.OpenAPIUsageMapper = provider.Get().OpenAPIUsageMapper
+	if err := app.OpenAPIUsageMapper.EnsureIndexes(context.Background()); err != nil {
+		panic(err)
+	}
 	lock.New(app.Cache)
 	sms.New(provider.Get().Config)
 }

@@ -87,17 +87,17 @@ type headerProvider struct {
 	headers *protocol.ResponseHeader
 }
 
-// Get a value from metadata by key
+// Get 按键读取响应头元数据。
 func (m *headerProvider) Get(key string) string {
 	return m.headers.Get(key)
 }
 
-// Set a value to metadata by k/v
+// Set 按键值写入响应头元数据。
 func (m *headerProvider) Set(key, value string) {
 	m.headers.Set(key, value)
 }
 
-// Keys Iteratively get all keys of metadata
+// Keys 遍历获取全部响应头元数据键。
 func (m *headerProvider) Keys() []string {
 	out := make([]string, 0)
 
@@ -127,4 +127,56 @@ func JSONF(v any) string {
 		logs.Error("JSONF fail, v=%v, err=%v", v, err)
 	}
 	return string(data)
+}
+
+// OpenAPIStatusError 是公开 OpenAPI 协议的错误契约。
+// 它与 StatusError 分离，因为第三方 OpenAPI 客户端要求 HTTP 状态码和
+// {error: ...} 格式的响应体。
+type OpenAPIStatusError interface {
+	HTTPStatus() int
+	APIErrorCode() string
+	APIErrorMessage() string
+}
+
+type openAPIErrorResponse struct {
+	Error struct {
+		Code      string `json:"code"`
+		Message   string `json:"message"`
+		Type      string `json:"type"`
+		RequestID string `json:"request_id"`
+	} `json:"error"`
+}
+
+// OpenAPIPostProcess 是 OpenAPI 对应的响应处理方法。
+// 公开 OpenAPI 接口的响应契约固定，不能使用管理端的 {code,msg,data} 包装格式。
+func OpenAPIPostProcess(c *app.RequestContext, requestID string, resp any, err error) {
+	if requestID != "" {
+		c.Response.Header.Set("X-Request-ID", requestID)
+	}
+	if err == nil {
+		c.JSON(hertz.StatusOK, resp)
+		return
+	}
+	var openAPIErr OpenAPIStatusError
+	if !errors.As(err, &openAPIErr) {
+		c.JSON(hertz.StatusInternalServerError, map[string]any{
+			"error": map[string]string{
+				"code":       "internal_error",
+				"message":    "服务暂时不可用，请稍后重试",
+				"type":       "api_error",
+				"request_id": requestID,
+			},
+		})
+		return
+	}
+	errType := "invalid_request_error"
+	if openAPIErr.HTTPStatus() >= hertz.StatusInternalServerError || strings.HasPrefix(openAPIErr.APIErrorCode(), "upstream") {
+		errType = "api_error"
+	}
+	result := openAPIErrorResponse{}
+	result.Error.Code = openAPIErr.APIErrorCode()
+	result.Error.Message = openAPIErr.APIErrorMessage()
+	result.Error.Type = errType
+	result.Error.RequestID = requestID
+	c.JSON(openAPIErr.HTTPStatus(), result)
 }

@@ -17,12 +17,14 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/openapi_usage"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/prompt"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/sms_alert"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/voice"
+	"github.com/xh-polaris/psych-core-api/biz/infra/psychpost"
 	"github.com/xh-polaris/psych-core-api/biz/infra/storage"
 	"github.com/xh-polaris/psych-core-api/biz/infra/synapse"
 )
@@ -106,6 +108,17 @@ func NewProvider() (*Provider, error) {
 		ConfigMapper:       configIMongoMapper,
 		Cache:              cmdable,
 	}
+	openAPIChatService := service.NewOpenAPIChatService(confConfig)
+	psychpostClient := psychpost.NewClient(confConfig)
+	openAPIReportService := service.NewOpenAPIReportService(psychpostClient)
+	mongoMapper := openapi_usage.NewMongoMapper(confConfig)
+	openAPIUsageService := service.NewOpenAPIUsageService(mongoMapper)
+	openAPIService := service.OpenAPIService{
+		Config:        confConfig,
+		ChatService:   openAPIChatService,
+		ReportService: openAPIReportService,
+		UsageService:  openAPIUsageService,
+	}
 	sms_alertIMongoMapper := sms_alert.NewSmsAlertMongoMapper(confConfig)
 	promptIMongoMapper := prompt.NewPromptMongoMapper(confConfig)
 	providerProvider := &Provider{
@@ -117,6 +130,7 @@ func NewProvider() (*Provider, error) {
 		ConversationService: conversationService,
 		FileService:         fileService,
 		ChatReportService:   chatReportService,
+		OpenAPIService:      openAPIService,
 		MessageMapper:       messageIMongoMapper,
 		ConversationMapper:  conversationIMongoMapper,
 		ReportMapper:        reportIMongoMapper,
@@ -126,6 +140,7 @@ func NewProvider() (*Provider, error) {
 		SmsAlertMapper:      sms_alertIMongoMapper,
 		PromptMapper:        promptIMongoMapper,
 		VoiceMapper:         voiceIMongoMapper,
+		OpenAPIUsageMapper:  mongoMapper,
 	}
 	return providerProvider, nil
 }
