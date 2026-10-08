@@ -42,6 +42,7 @@ type Provider struct {
 	ConversationService service.ConversationService
 	FileService         service.FileService
 	ChatReportService   service.ChatReportService
+	OpenAPIService      service.OpenAPIService
 	MessageMapper       message.IMongoMapper
 	ConversationMapper  conversation.IMongoMapper
 	ReportMapper        report.IMongoMapper
@@ -67,6 +68,7 @@ var ApplicationSet = wire.NewSet(
 	service.ConversationServiceSet,
 	service.FileServiceSet,
 	service.ChatReportServiceSet,
+	service.OpenAPIServiceSet,
 )
 
 var DomainSet = wire.NewSet(

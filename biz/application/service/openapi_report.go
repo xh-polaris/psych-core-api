@@ -31,7 +31,12 @@ var ErrOpenAPIReportTimeout = errors.New("openapi report upstream timeout")
 
 // OpenAPIReportService 调用 psych-post 私有报告接口，不接触平台会话和报告数据。
 type OpenAPIReportService struct {
-	Doer httpDoer
+	Config *conf.Config
+	Doer   httpDoer
+}
+
+func NewOpenAPIReportService(config *conf.Config) OpenAPIReportService {
+	return OpenAPIReportService{Config: config}
 }
 
 type httpDoer interface {
@@ -123,7 +128,7 @@ func newInternalReportRequest(ctx context.Context, oa *conf.OpenApi, body []byte
 // Generate 将验证后的请求转发给 psych-post 并映射为对外冻结的 DTO。
 // upstream 为平台密钥绑定的上游名，由 psych-post 解析为实际的模型密钥。
 func (s *OpenAPIReportService) Generate(ctx context.Context, req openAPIReportRequest, requestID, upstream string) (*core_api.OpenApiGenerateReportResp, error) {
-	cfg := conf.GetConfig()
+	cfg := s.Config
 	if cfg == nil || cfg.OpenApi == nil || cfg.OpenApi.ReportInternalURL == "" || cfg.OpenApi.ReportInternalToken == "" {
 		return nil, fmt.Errorf("report internal service configuration is unavailable")
 	}

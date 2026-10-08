@@ -23,6 +23,13 @@ type OpenAPIUsageService struct {
 	Reader interface {
 		Query(context.Context, openapiusage.Query) (openapiusage.QueryResult, error)
 	}
+	Writer interface {
+		Record(context.Context, openapiusage.Entry) error
+	}
+}
+
+func NewOpenAPIUsageService() OpenAPIUsageService {
+	return OpenAPIUsageService{}
 }
 
 func (s *OpenAPIUsageService) Get(ctx context.Context, keyPrefix string, req *core_api.OpenApiGetUsageReq) (*core_api.OpenApiGetUsageResp, error) {
@@ -42,6 +49,20 @@ func (s *OpenAPIUsageService) Get(ctx context.Context, keyPrefix string, req *co
 		return nil, err
 	}
 	return usageQueryResponse(keyPrefix, query, result), nil
+}
+
+// Record persists one completed request through the injected usage service.
+// The startup-owned recorder remains the runtime default, while the service
+// field keeps callers independent from that package-level initialization.
+func (s *OpenAPIUsageService) Record(ctx context.Context, entry openapiusage.Entry) error {
+	writer := s.Writer
+	if writer == nil {
+		writer = openapiusage.Recorder
+	}
+	if writer == nil {
+		return fmt.Errorf("openapi usage recorder is unavailable")
+	}
+	return writer.Record(ctx, entry)
 }
 
 func newOpenAPIUsageQuery(keyPrefix string, req *core_api.OpenApiGetUsageReq) (openapiusage.Query, error) {

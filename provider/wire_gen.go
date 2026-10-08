@@ -106,6 +106,15 @@ func NewProvider() (*Provider, error) {
 		ConfigMapper:       configIMongoMapper,
 		Cache:              cmdable,
 	}
+	openAPIChatService := service.NewOpenAPIChatService(confConfig)
+	openAPIReportService := service.NewOpenAPIReportService(confConfig)
+	openAPIUsageService := service.NewOpenAPIUsageService()
+	openAPIService := service.OpenAPIService{
+		Config:        confConfig,
+		ChatService:   openAPIChatService,
+		ReportService: openAPIReportService,
+		UsageService:  openAPIUsageService,
+	}
 	sms_alertIMongoMapper := sms_alert.NewSmsAlertMongoMapper(confConfig)
 	promptIMongoMapper := prompt.NewPromptMongoMapper(confConfig)
 	providerProvider := &Provider{
@@ -117,6 +126,7 @@ func NewProvider() (*Provider, error) {
 		ConversationService: conversationService,
 		FileService:         fileService,
 		ChatReportService:   chatReportService,
+		OpenAPIService:      openAPIService,
 		MessageMapper:       messageIMongoMapper,
 		ConversationMapper:  conversationIMongoMapper,
 		ReportMapper:        reportIMongoMapper,

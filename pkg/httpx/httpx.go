@@ -128,3 +128,56 @@ func JSONF(v any) string {
 	}
 	return string(data)
 }
+
+// OpenAPIStatusError is the public OpenAPI protocol's error contract. It is
+// intentionally separate from StatusError because third-party OpenAPI clients
+// require HTTP status codes and the {error: ...} response body.
+type OpenAPIStatusError interface {
+	HTTPStatus() int
+	APIErrorCode() string
+	APIErrorMessage() string
+}
+
+type openAPIErrorResponse struct {
+	Error struct {
+		Code      string `json:"code"`
+		Message   string `json:"message"`
+		Type      string `json:"type"`
+		RequestID string `json:"request_id"`
+	} `json:"error"`
+}
+
+// OpenAPIPostProcess is the OpenAPI equivalent of PostProcess. Public
+// OpenAPI endpoints have a frozen response contract and therefore cannot use
+// the management API's {code,msg,data} envelope.
+func OpenAPIPostProcess(c *app.RequestContext, requestID string, resp any, err error) {
+	if requestID != "" {
+		c.Response.Header.Set("X-Request-ID", requestID)
+	}
+	if err == nil {
+		c.JSON(hertz.StatusOK, resp)
+		return
+	}
+	var openAPIErr OpenAPIStatusError
+	if !errors.As(err, &openAPIErr) {
+		c.JSON(hertz.StatusInternalServerError, map[string]any{
+			"error": map[string]string{
+				"code":       "internal_error",
+				"message":    "服务暂时不可用，请稍后重试",
+				"type":       "api_error",
+				"request_id": requestID,
+			},
+		})
+		return
+	}
+	errType := "invalid_request_error"
+	if openAPIErr.HTTPStatus() >= hertz.StatusInternalServerError || strings.HasPrefix(openAPIErr.APIErrorCode(), "upstream") {
+		errType = "api_error"
+	}
+	result := openAPIErrorResponse{}
+	result.Error.Code = openAPIErr.APIErrorCode()
+	result.Error.Message = openAPIErr.APIErrorMessage()
+	result.Error.Type = errType
+	result.Error.RequestID = requestID
+	c.JSON(openAPIErr.HTTPStatus(), result)
+}

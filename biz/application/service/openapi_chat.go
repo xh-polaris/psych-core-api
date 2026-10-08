@@ -12,10 +12,16 @@ import (
 	"github.com/xh-polaris/psych-core-api/pkg/app"
 )
 
-type OpenAPIChatService struct{}
+type OpenAPIChatService struct {
+	Config *conf.Config
+}
+
+func NewOpenAPIChatService(config *conf.Config) OpenAPIChatService {
+	return OpenAPIChatService{Config: config}
+}
 
 func (s *OpenAPIChatService) Stream(ctx context.Context, req openapichat.Request, sessionID, upstream string) (*openapichat.Result, error) {
-	setting, err := openAPIChatSetting(upstream)
+	setting, err := s.openAPIChatSetting(upstream)
 	if err != nil {
 		return nil, err
 	}
@@ -38,8 +44,12 @@ func (s *OpenAPIChatService) Stream(ctx context.Context, req openapichat.Request
 // openAPIChatSetting 按平台密钥绑定的上游名解析对话模型配置。
 // 每个开放接口密钥对应一把独立的上游 Key，因此这里不再读全局
 // ModelConfig.Chat.deepseek —— 那把 Key 由学生端内部业务使用。
-func openAPIChatSetting(upstream string) (*app.ChatSetting, error) {
-	found, err := conf.GetConfig().OpenAPIUpstream(upstream)
+func (s *OpenAPIChatService) openAPIChatSetting(upstream string) (*app.ChatSetting, error) {
+	config := s.Config
+	if config == nil {
+		return nil, fmt.Errorf("openapi configuration is unavailable")
+	}
+	found, err := config.OpenAPIUpstream(upstream)
 	if err != nil {
 		return nil, err
 	}
