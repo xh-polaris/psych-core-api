@@ -12,12 +12,14 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
+	openapiusagemapper "github.com/xh-polaris/psych-core-api/biz/infra/mapper/openapi_usage"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/prompt"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/sms_alert"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/voice"
+	"github.com/xh-polaris/psych-core-api/biz/infra/psychpost"
 	"github.com/xh-polaris/psych-core-api/biz/infra/storage"
 	"github.com/xh-polaris/psych-core-api/biz/infra/synapse"
 )
@@ -52,6 +54,7 @@ type Provider struct {
 	SmsAlertMapper      sms_alert.IMongoMapper
 	PromptMapper        prompt.IMongoMapper
 	VoiceMapper         voice.IMongoMapper
+	OpenAPIUsageMapper  *openapiusagemapper.MongoMapper
 }
 
 func Get() *Provider {
@@ -90,8 +93,10 @@ var InfrastructureSet = wire.NewSet(
 	sms_alert.NewSmsAlertMongoMapper,
 	prompt.NewPromptMongoMapper,
 	voice.NewVoiceMongoMapper,
+	openapiusagemapper.Set,
 	RpcSet,
 	synapse.New4b,
+	psychpost.NewClient,
 	storage.NewCOS,
 )
 

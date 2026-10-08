@@ -30,8 +30,7 @@ func OpenApiChatCompletion(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	// SSE response headers belong to the HTTP adapter. Streaming orchestration
-	// and its usage accounting remain in OpenAPIService.
+	// SSE 响应头属于 HTTP 适配层；流式编排和用量记账保留在 OpenAPIService。
 	c.Response.Header.SetContentType("text/event-stream; charset=utf-8")
 	c.Response.Header.Set("Cache-Control", "no-cache")
 	c.Response.Header.Set("X-Accel-Buffering", "no")

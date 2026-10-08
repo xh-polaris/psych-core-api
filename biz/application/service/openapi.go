@@ -34,8 +34,8 @@ const (
 	defaultMaxTotalChars   = 16000
 )
 
-// OpenAPIError is the transport-neutral error contract returned by OpenAPI
-// application services. Controllers translate it to the documented JSON body.
+// OpenAPIError 是 OpenAPI 应用服务返回的传输无关错误契约。
+// Controller 将其转换为接口文档约定的 JSON 响应体。
 type OpenAPIError struct {
 	Status    int
 	Code      string
@@ -55,9 +55,8 @@ func NewOpenAPIRequestID() string {
 	return "req_" + uuid.New().String()
 }
 
-// SSEWriter is the small transport boundary required by the streaming use
-// case. The HTTP adapter supplies Hertz's chunked writer; application logic is
-// otherwise independent from Hertz.
+// SSEWriter 是流式场景所需的最小传输边界。
+// HTTP 适配层提供 Hertz 的分块写入器，应用逻辑不直接依赖 Hertz。
 type SSEWriter interface {
 	Write(p []byte) (n int, err error)
 	Flush() error
@@ -73,8 +72,8 @@ type OpenAPIChatSession struct {
 	cancel    context.CancelFunc
 }
 
-// OpenAPIService contains the business flow for all public OpenAPI endpoints.
-// The controller only binds HTTP input and writes the resulting HTTP response.
+// OpenAPIService 承载所有公开 OpenAPI 接口的业务流程。
+// Controller 仅负责绑定 HTTP 输入和输出 HTTP 响应。
 type OpenAPIService struct {
 	Config        *conf.Config
 	ChatService   OpenAPIChatService
@@ -82,9 +81,8 @@ type OpenAPIService struct {
 	UsageService  OpenAPIUsageService
 }
 
-// IOpenAPIService keeps the public OpenAPI workflow behind the same service
-// contract used by the rest of the application layer. HTTP-specific response
-// rendering remains in the controller/httpx adapter.
+// IOpenAPIService 使公开 OpenAPI 工作流遵循应用层统一的服务契约。
+// HTTP 专属的响应渲染保留在 Controller/httpx 适配层。
 type IOpenAPIService interface {
 	StartChat(context.Context, string, string, *core_api.OpenApiChatCompletionReq) (*OpenAPIChatSession, error)
 	StreamChat(context.Context, SSEWriter, *OpenAPIChatSession) error
@@ -288,9 +286,8 @@ func invalidRequest(requestID, message string) *OpenAPIError {
 	return &OpenAPIError{Status: http.StatusBadRequest, Code: "invalid_request_error", Message: message, RequestID: requestID}
 }
 
-// NewInvalidOpenAPIRequest is used by the HTTP adapter when Hertz cannot bind
-// a request body. Keeping the response error creation in the application layer
-// prevents controllers from owning OpenAPI error semantics.
+// NewInvalidOpenAPIRequest 供 Hertz 无法绑定请求体时的 HTTP 适配层调用。
+// 错误响应语义保留在应用层，避免 Controller 承担 OpenAPI 错误分类。
 func NewInvalidOpenAPIRequest(requestID string, err error) *OpenAPIError {
 	if err == nil {
 		return invalidRequest(requestID, "invalid request")

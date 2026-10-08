@@ -17,19 +17,22 @@ const (
 
 var ErrInvalidOpenAPIUsageQuery = errors.New("invalid openapi usage query")
 
-// OpenAPIUsageService reads the calling API key's usage only. Its Reader can
-// be replaced in tests without requiring MongoDB.
+// OpenAPIUsageService 仅读取当前调用 API Key 的用量。
 type OpenAPIUsageService struct {
-	Reader interface {
-		Query(context.Context, openapiusage.Query) (openapiusage.QueryResult, error)
-	}
-	Writer interface {
-		Record(context.Context, openapiusage.Entry) error
-	}
+	Reader openAPIUsageReader
+	Writer openAPIUsageWriter
 }
 
-func NewOpenAPIUsageService() OpenAPIUsageService {
-	return OpenAPIUsageService{}
+type openAPIUsageReader interface {
+	Query(context.Context, openapiusage.Query) (openapiusage.QueryResult, error)
+}
+
+type openAPIUsageWriter interface {
+	Record(context.Context, openapiusage.Entry) error
+}
+
+func NewOpenAPIUsageService(repository openapiusage.Repository) OpenAPIUsageService {
+	return OpenAPIUsageService{Reader: repository, Writer: repository}
 }
 
 func (s *OpenAPIUsageService) Get(ctx context.Context, keyPrefix string, req *core_api.OpenApiGetUsageReq) (*core_api.OpenApiGetUsageResp, error) {
@@ -37,32 +40,22 @@ func (s *OpenAPIUsageService) Get(ctx context.Context, keyPrefix string, req *co
 	if err != nil {
 		return nil, err
 	}
-	reader := s.Reader
-	if reader == nil {
-		reader = openapiusage.Recorder
-	}
-	if reader == nil {
+	if s.Reader == nil {
 		return nil, fmt.Errorf("openapi usage recorder is unavailable")
 	}
-	result, err := reader.Query(ctx, query)
+	result, err := s.Reader.Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}
 	return usageQueryResponse(keyPrefix, query, result), nil
 }
 
-// Record persists one completed request through the injected usage service.
-// The startup-owned recorder remains the runtime default, while the service
-// field keeps callers independent from that package-level initialization.
+// Record 通过注入的用量仓储持久化一条已完成请求。
 func (s *OpenAPIUsageService) Record(ctx context.Context, entry openapiusage.Entry) error {
-	writer := s.Writer
-	if writer == nil {
-		writer = openapiusage.Recorder
-	}
-	if writer == nil {
+	if s.Writer == nil {
 		return fmt.Errorf("openapi usage recorder is unavailable")
 	}
-	return writer.Record(ctx, entry)
+	return s.Writer.Record(ctx, entry)
 }
 
 func newOpenAPIUsageQuery(keyPrefix string, req *core_api.OpenApiGetUsageReq) (openapiusage.Query, error) {

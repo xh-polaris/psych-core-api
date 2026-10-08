@@ -1,46 +1,33 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/bytedance/sonic"
 	core_api "github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
-	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
+	"github.com/xh-polaris/psych-core-api/biz/infra/psychpost"
 )
 
 const (
-	defaultOpenAPIReportTimeout = 90 * time.Second
-	minOpenAPIReportTokens      = 4096
-	maxOpenAPIReportTokens      = 4096
-	maxOpenAPIProfileNameRunes  = 128
+	minOpenAPIReportTokens     = 4096
+	maxOpenAPIReportTokens     = 4096
+	maxOpenAPIProfileNameRunes = 128
 )
 
-// internalUpstreamHeader 把平台密钥绑定的上游名透传给 psych-post
-// 由对端从自身配置解析出实际的模型密钥，避免明文凭据跨服务传递
-const internalUpstreamHeader = "X-Psych-Upstream"
-
-var ErrOpenAPIReportTimeout = errors.New("openapi report upstream timeout")
+var ErrOpenAPIReportTimeout = psychpost.ErrTimeout
 
 // OpenAPIReportService 调用 psych-post 私有报告接口，不接触平台会话和报告数据。
 type OpenAPIReportService struct {
-	Config *conf.Config
-	Doer   httpDoer
+	Client psychpost.Client
 }
 
-func NewOpenAPIReportService(config *conf.Config) OpenAPIReportService {
-	return OpenAPIReportService{Config: config}
-}
-
-type httpDoer interface {
-	Do(*http.Request) (*http.Response, error)
+func NewOpenAPIReportService(client psychpost.Client) OpenAPIReportService {
+	return OpenAPIReportService{Client: client}
 }
 
 type openAPIReportRequest struct {
@@ -108,30 +95,9 @@ func NewOpenAPIReportRequest(req *core_api.OpenApiGenerateReportReq) (openAPIRep
 	return openAPIReportRequest{Messages: req.Messages, SubjectProfile: req.SubjectProfile, MaxTokens: req.MaxTokens}, nil
 }
 
-// newInternalReportRequest 构造转发到 psych-post 的私有请求。
-// 调用方需保证 oa.ReportInternalURL 与 oa.ReportInternalToken 非空。
-// upstream 为平台密钥绑定的上游名，透传给 psych-post 由其选择模型密钥；
-// 为空时不写该 header，由对端使用自身默认配置。
-func newInternalReportRequest(ctx context.Context, oa *conf.OpenApi, body []byte, upstream string) (*http.Request, error) {
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, oa.ReportInternalURL, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	httpReq.Header.Set("Authorization", "Bearer "+oa.ReportInternalToken)
-	httpReq.Header.Set("Content-Type", "application/json")
-	if upstream != "" {
-		httpReq.Header.Set(internalUpstreamHeader, upstream)
-	}
-	return httpReq, nil
-}
-
 // Generate 将验证后的请求转发给 psych-post 并映射为对外冻结的 DTO。
 // upstream 为平台密钥绑定的上游名，由 psych-post 解析为实际的模型密钥。
 func (s *OpenAPIReportService) Generate(ctx context.Context, req openAPIReportRequest, requestID, upstream string) (*core_api.OpenApiGenerateReportResp, error) {
-	cfg := s.Config
-	if cfg == nil || cfg.OpenApi == nil || cfg.OpenApi.ReportInternalURL == "" || cfg.OpenApi.ReportInternalToken == "" {
-		return nil, fmt.Errorf("report internal service configuration is unavailable")
-	}
 	payload := internalReportRequest{RequestID: requestID, Messages: internalMessages(req.Messages), SubjectProfile: internalProfile(req.SubjectProfile)}
 	if req.MaxTokens != nil {
 		payload.MaxTokens = int(*req.MaxTokens)
@@ -140,35 +106,12 @@ func (s *OpenAPIReportService) Generate(ctx context.Context, req openAPIReportRe
 	if err != nil {
 		return nil, err
 	}
-	httpReq, err := newInternalReportRequest(ctx, cfg.OpenApi, body, upstream)
+	if s.Client == nil {
+		return nil, fmt.Errorf("psych-post report client is unavailable")
+	}
+	responseBody, err := s.Client.Generate(ctx, upstream, body)
 	if err != nil {
 		return nil, err
-	}
-	doer := s.Doer
-	if doer == nil {
-		timeout := defaultOpenAPIReportTimeout
-		if cfg.OpenApi.ReportTimeoutSeconds > 0 {
-			timeout = time.Duration(cfg.OpenApi.ReportTimeoutSeconds) * time.Second
-		}
-		doer = &http.Client{Timeout: timeout}
-	}
-	httpResp, err := doer.Do(httpReq)
-	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			return nil, ErrOpenAPIReportTimeout
-		}
-		return nil, err
-	}
-	defer httpResp.Body.Close()
-	responseBody, err := io.ReadAll(io.LimitReader(httpResp.Body, 4<<20))
-	if err != nil {
-		return nil, err
-	}
-	if httpResp.StatusCode == http.StatusGatewayTimeout {
-		return nil, ErrOpenAPIReportTimeout
-	}
-	if httpResp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("report internal service status %d", httpResp.StatusCode)
 	}
 	var result internalReportResponse
 	if err := sonic.Unmarshal(responseBody, &result); err != nil {
@@ -278,7 +221,7 @@ func nonNilSlice[T any](items []T) []T {
 	return items
 }
 
-// emotionItemsToDTO converts report analysis emotion items to DTO
+// emotionItemsToDTO 将报告分析中的情绪项转换为 DTO。
 func emotionItemsToDTO(items []report.AnalysisEmotion) []*core_api.AnalysisEmotion {
 	if len(items) == 0 {
 		return make([]*core_api.AnalysisEmotion, 0)
