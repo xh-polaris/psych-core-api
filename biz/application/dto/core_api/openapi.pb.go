@@ -682,6 +682,406 @@ func (x *OpenApiGenerateReportResp) GetUsageSource() string {
 	return ""
 }
 
+// 单个开放接口请求的用量流水。查询者只能看到自己 API Key 的流水。
+type OpenApiUsageLedgerItem struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	RequestId   string        `protobuf:"bytes,1,opt,name=request_id,proto3" form:"request_id" json:"request_id" query:"request_id"`
+	Endpoint    string        `protobuf:"bytes,2,opt,name=endpoint,proto3" form:"endpoint" json:"endpoint" query:"endpoint"`
+	Model       string        `protobuf:"bytes,3,opt,name=model,proto3" form:"model" json:"model" query:"model"`
+	Usage       *OpenApiUsage `protobuf:"bytes,4,opt,name=usage,proto3" form:"usage" json:"usage" query:"usage"`
+	UsageSource string        `protobuf:"bytes,5,opt,name=usage_source,proto3" form:"usage_source" json:"usage_source" query:"usage_source"`
+	Created     int64         `protobuf:"varint,6,opt,name=created,proto3" form:"created" json:"created" query:"created"`
+}
+
+func (x *OpenApiUsageLedgerItem) Reset() {
+	*x = OpenApiUsageLedgerItem{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_openapi_proto_msgTypes[9]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *OpenApiUsageLedgerItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OpenApiUsageLedgerItem) ProtoMessage() {}
+
+func (x *OpenApiUsageLedgerItem) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_openapi_proto_msgTypes[9]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OpenApiUsageLedgerItem.ProtoReflect.Descriptor instead.
+func (*OpenApiUsageLedgerItem) Descriptor() ([]byte, []int) {
+	return file_core_api_openapi_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *OpenApiUsageLedgerItem) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *OpenApiUsageLedgerItem) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+func (x *OpenApiUsageLedgerItem) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *OpenApiUsageLedgerItem) GetUsage() *OpenApiUsage {
+	if x != nil {
+		return x.Usage
+	}
+	return nil
+}
+
+func (x *OpenApiUsageLedgerItem) GetUsageSource() string {
+	if x != nil {
+		return x.UsageSource
+	}
+	return ""
+}
+
+func (x *OpenApiUsageLedgerItem) GetCreated() int64 {
+	if x != nil {
+		return x.Created
+	}
+	return 0
+}
+
+// 用量汇总。request_count 统计所有成功请求；当 usage_source 为
+// unavailable 时 token 为 0，但仍会反映在请求次数中。
+type OpenApiUsageSummary struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	RequestCount     int64 `protobuf:"varint,1,opt,name=request_count,proto3" form:"request_count" json:"request_count" query:"request_count"`
+	PromptTokens     int64 `protobuf:"varint,2,opt,name=prompt_tokens,proto3" form:"prompt_tokens" json:"prompt_tokens" query:"prompt_tokens"`
+	CompletionTokens int64 `protobuf:"varint,3,opt,name=completion_tokens,proto3" form:"completion_tokens" json:"completion_tokens" query:"completion_tokens"`
+	TotalTokens      int64 `protobuf:"varint,4,opt,name=total_tokens,proto3" form:"total_tokens" json:"total_tokens" query:"total_tokens"`
+}
+
+func (x *OpenApiUsageSummary) Reset() {
+	*x = OpenApiUsageSummary{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_openapi_proto_msgTypes[10]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *OpenApiUsageSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OpenApiUsageSummary) ProtoMessage() {}
+
+func (x *OpenApiUsageSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_openapi_proto_msgTypes[10]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OpenApiUsageSummary.ProtoReflect.Descriptor instead.
+func (*OpenApiUsageSummary) Descriptor() ([]byte, []int) {
+	return file_core_api_openapi_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *OpenApiUsageSummary) GetRequestCount() int64 {
+	if x != nil {
+		return x.RequestCount
+	}
+	return 0
+}
+
+func (x *OpenApiUsageSummary) GetPromptTokens() int64 {
+	if x != nil {
+		return x.PromptTokens
+	}
+	return 0
+}
+
+func (x *OpenApiUsageSummary) GetCompletionTokens() int64 {
+	if x != nil {
+		return x.CompletionTokens
+	}
+	return 0
+}
+
+func (x *OpenApiUsageSummary) GetTotalTokens() int64 {
+	if x != nil {
+		return x.TotalTokens
+	}
+	return 0
+}
+
+type OpenApiUsageDailySummary struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Date     string               `protobuf:"bytes,1,opt,name=date,proto3" form:"date" json:"date" query:"date"`
+	Endpoint string               `protobuf:"bytes,2,opt,name=endpoint,proto3" form:"endpoint" json:"endpoint" query:"endpoint"`
+	Usage    *OpenApiUsageSummary `protobuf:"bytes,3,opt,name=usage,proto3" form:"usage" json:"usage" query:"usage"`
+}
+
+func (x *OpenApiUsageDailySummary) Reset() {
+	*x = OpenApiUsageDailySummary{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_openapi_proto_msgTypes[11]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *OpenApiUsageDailySummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OpenApiUsageDailySummary) ProtoMessage() {}
+
+func (x *OpenApiUsageDailySummary) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_openapi_proto_msgTypes[11]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OpenApiUsageDailySummary.ProtoReflect.Descriptor instead.
+func (*OpenApiUsageDailySummary) Descriptor() ([]byte, []int) {
+	return file_core_api_openapi_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *OpenApiUsageDailySummary) GetDate() string {
+	if x != nil {
+		return x.Date
+	}
+	return ""
+}
+
+func (x *OpenApiUsageDailySummary) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+func (x *OpenApiUsageDailySummary) GetUsage() *OpenApiUsageSummary {
+	if x != nil {
+		return x.Usage
+	}
+	return nil
+}
+
+// 业务方用自己的 Platform API Key 查询自己的用量。date 不传时默认
+// 上海时区当天；page 从 1 开始，page_size 默认 20、最大 100。
+type OpenApiGetUsageReq struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Date     *string `protobuf:"bytes,1,opt,name=date,proto3,oneof" form:"date" json:"date" query:"date"`
+	Page     *int32  `protobuf:"varint,2,opt,name=page,proto3,oneof" form:"page" json:"page" query:"page"`
+	PageSize *int32  `protobuf:"varint,3,opt,name=page_size,proto3,oneof" form:"page_size" json:"page_size" query:"page_size"`
+}
+
+func (x *OpenApiGetUsageReq) Reset() {
+	*x = OpenApiGetUsageReq{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_openapi_proto_msgTypes[12]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *OpenApiGetUsageReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OpenApiGetUsageReq) ProtoMessage() {}
+
+func (x *OpenApiGetUsageReq) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_openapi_proto_msgTypes[12]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OpenApiGetUsageReq.ProtoReflect.Descriptor instead.
+func (*OpenApiGetUsageReq) Descriptor() ([]byte, []int) {
+	return file_core_api_openapi_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *OpenApiGetUsageReq) GetDate() string {
+	if x != nil && x.Date != nil {
+		return *x.Date
+	}
+	return ""
+}
+
+func (x *OpenApiGetUsageReq) GetPage() int32 {
+	if x != nil && x.Page != nil {
+		return *x.Page
+	}
+	return 0
+}
+
+func (x *OpenApiGetUsageReq) GetPageSize() int32 {
+	if x != nil && x.PageSize != nil {
+		return *x.PageSize
+	}
+	return 0
+}
+
+type OpenApiGetUsageResp struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Object    string                      `protobuf:"bytes,1,opt,name=object,proto3" form:"object" json:"object" query:"object"`
+	KeyPrefix string                      `protobuf:"bytes,2,opt,name=key_prefix,proto3" form:"key_prefix" json:"key_prefix" query:"key_prefix"`
+	Date      string                      `protobuf:"bytes,3,opt,name=date,proto3" form:"date" json:"date" query:"date"`
+	Daily     []*OpenApiUsageDailySummary `protobuf:"bytes,4,rep,name=daily,proto3" form:"daily" json:"daily" query:"daily"`
+	Total     *OpenApiUsageSummary        `protobuf:"bytes,5,opt,name=total,proto3" form:"total" json:"total" query:"total"`
+	Ledger    []*OpenApiUsageLedgerItem   `protobuf:"bytes,6,rep,name=ledger,proto3" form:"ledger" json:"ledger" query:"ledger"`
+	Page      int32                       `protobuf:"varint,7,opt,name=page,proto3" form:"page" json:"page" query:"page"`
+	PageSize  int32                       `protobuf:"varint,8,opt,name=page_size,proto3" form:"page_size" json:"page_size" query:"page_size"`
+	HasMore   bool                        `protobuf:"varint,9,opt,name=has_more,proto3" form:"has_more" json:"has_more" query:"has_more"`
+}
+
+func (x *OpenApiGetUsageResp) Reset() {
+	*x = OpenApiGetUsageResp{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_openapi_proto_msgTypes[13]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *OpenApiGetUsageResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OpenApiGetUsageResp) ProtoMessage() {}
+
+func (x *OpenApiGetUsageResp) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_openapi_proto_msgTypes[13]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OpenApiGetUsageResp.ProtoReflect.Descriptor instead.
+func (*OpenApiGetUsageResp) Descriptor() ([]byte, []int) {
+	return file_core_api_openapi_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *OpenApiGetUsageResp) GetObject() string {
+	if x != nil {
+		return x.Object
+	}
+	return ""
+}
+
+func (x *OpenApiGetUsageResp) GetKeyPrefix() string {
+	if x != nil {
+		return x.KeyPrefix
+	}
+	return ""
+}
+
+func (x *OpenApiGetUsageResp) GetDate() string {
+	if x != nil {
+		return x.Date
+	}
+	return ""
+}
+
+func (x *OpenApiGetUsageResp) GetDaily() []*OpenApiUsageDailySummary {
+	if x != nil {
+		return x.Daily
+	}
+	return nil
+}
+
+func (x *OpenApiGetUsageResp) GetTotal() *OpenApiUsageSummary {
+	if x != nil {
+		return x.Total
+	}
+	return nil
+}
+
+func (x *OpenApiGetUsageResp) GetLedger() []*OpenApiUsageLedgerItem {
+	if x != nil {
+		return x.Ledger
+	}
+	return nil
+}
+
+func (x *OpenApiGetUsageResp) GetPage() int32 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *OpenApiGetUsageResp) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *OpenApiGetUsageResp) GetHasMore() bool {
+	if x != nil {
+		return x.HasMore
+	}
+	return false
+}
+
 var File_core_api_openapi_proto protoreflect.FileDescriptor
 
 var file_core_api_openapi_proto_rawDesc = []byte{
@@ -789,12 +1189,75 @@ var file_core_api_openapi_proto_rawDesc = []byte{
 	0x6e, 0x41, 0x70, 0x69, 0x55, 0x73, 0x61, 0x67, 0x65, 0x52, 0x05, 0x75, 0x73, 0x61, 0x67, 0x65,
 	0x12, 0x22, 0x0a, 0x0c, 0x75, 0x73, 0x61, 0x67, 0x65, 0x5f, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65,
 	0x18, 0x08, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c, 0x75, 0x73, 0x61, 0x67, 0x65, 0x5f, 0x73, 0x6f,
-	0x75, 0x72, 0x63, 0x65, 0x42, 0x43, 0x5a, 0x41, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63,
-	0x6f, 0x6d, 0x2f, 0x78, 0x68, 0x2d, 0x70, 0x6f, 0x6c, 0x61, 0x72, 0x69, 0x73, 0x2f, 0x70, 0x73,
-	0x79, 0x63, 0x68, 0x2d, 0x63, 0x6f, 0x72, 0x65, 0x2d, 0x61, 0x70, 0x69, 0x2f, 0x62, 0x69, 0x7a,
-	0x2f, 0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x64, 0x74, 0x6f,
-	0x2f, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f,
-	0x33,
+	0x75, 0x72, 0x63, 0x65, 0x22, 0xd6, 0x01, 0x0a, 0x16, 0x4f, 0x70, 0x65, 0x6e, 0x41, 0x70, 0x69,
+	0x55, 0x73, 0x61, 0x67, 0x65, 0x4c, 0x65, 0x64, 0x67, 0x65, 0x72, 0x49, 0x74, 0x65, 0x6d, 0x12,
+	0x1e, 0x0a, 0x0a, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x0a, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x5f, 0x69, 0x64, 0x12,
+	0x1a, 0x0a, 0x08, 0x65, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x08, 0x65, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x12, 0x14, 0x0a, 0x05, 0x6d,
+	0x6f, 0x64, 0x65, 0x6c, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x6d, 0x6f, 0x64, 0x65,
+	0x6c, 0x12, 0x2c, 0x0a, 0x05, 0x75, 0x73, 0x61, 0x67, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0b,
+	0x32, 0x16, 0x2e, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x2e, 0x4f, 0x70, 0x65, 0x6e,
+	0x41, 0x70, 0x69, 0x55, 0x73, 0x61, 0x67, 0x65, 0x52, 0x05, 0x75, 0x73, 0x61, 0x67, 0x65, 0x12,
+	0x22, 0x0a, 0x0c, 0x75, 0x73, 0x61, 0x67, 0x65, 0x5f, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x18,
+	0x05, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c, 0x75, 0x73, 0x61, 0x67, 0x65, 0x5f, 0x73, 0x6f, 0x75,
+	0x72, 0x63, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x18, 0x06,
+	0x20, 0x01, 0x28, 0x03, 0x52, 0x07, 0x63, 0x72, 0x65, 0x61, 0x74, 0x65, 0x64, 0x22, 0xb3, 0x01,
+	0x0a, 0x13, 0x4f, 0x70, 0x65, 0x6e, 0x41, 0x70, 0x69, 0x55, 0x73, 0x61, 0x67, 0x65, 0x53, 0x75,
+	0x6d, 0x6d, 0x61, 0x72, 0x79, 0x12, 0x24, 0x0a, 0x0d, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
+	0x5f, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x03, 0x52, 0x0d, 0x72, 0x65,
+	0x71, 0x75, 0x65, 0x73, 0x74, 0x5f, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x12, 0x24, 0x0a, 0x0d, 0x70,
+	0x72, 0x6f, 0x6d, 0x70, 0x74, 0x5f, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x73, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x03, 0x52, 0x0d, 0x70, 0x72, 0x6f, 0x6d, 0x70, 0x74, 0x5f, 0x74, 0x6f, 0x6b, 0x65, 0x6e,
+	0x73, 0x12, 0x2c, 0x0a, 0x11, 0x63, 0x6f, 0x6d, 0x70, 0x6c, 0x65, 0x74, 0x69, 0x6f, 0x6e, 0x5f,
+	0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x73, 0x18, 0x03, 0x20, 0x01, 0x28, 0x03, 0x52, 0x11, 0x63, 0x6f,
+	0x6d, 0x70, 0x6c, 0x65, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x73, 0x12,
+	0x22, 0x0a, 0x0c, 0x74, 0x6f, 0x74, 0x61, 0x6c, 0x5f, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x73, 0x18,
+	0x04, 0x20, 0x01, 0x28, 0x03, 0x52, 0x0c, 0x74, 0x6f, 0x74, 0x61, 0x6c, 0x5f, 0x74, 0x6f, 0x6b,
+	0x65, 0x6e, 0x73, 0x22, 0x7f, 0x0a, 0x18, 0x4f, 0x70, 0x65, 0x6e, 0x41, 0x70, 0x69, 0x55, 0x73,
+	0x61, 0x67, 0x65, 0x44, 0x61, 0x69, 0x6c, 0x79, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x12,
+	0x12, 0x0a, 0x04, 0x64, 0x61, 0x74, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x64,
+	0x61, 0x74, 0x65, 0x12, 0x1a, 0x0a, 0x08, 0x65, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x65, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x12,
+	0x33, 0x0a, 0x05, 0x75, 0x73, 0x61, 0x67, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1d,
+	0x2e, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x2e, 0x4f, 0x70, 0x65, 0x6e, 0x41, 0x70,
+	0x69, 0x55, 0x73, 0x61, 0x67, 0x65, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x52, 0x05, 0x75,
+	0x73, 0x61, 0x67, 0x65, 0x22, 0x89, 0x01, 0x0a, 0x12, 0x4f, 0x70, 0x65, 0x6e, 0x41, 0x70, 0x69,
+	0x47, 0x65, 0x74, 0x55, 0x73, 0x61, 0x67, 0x65, 0x52, 0x65, 0x71, 0x12, 0x17, 0x0a, 0x04, 0x64,
+	0x61, 0x74, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x48, 0x00, 0x52, 0x04, 0x64, 0x61, 0x74,
+	0x65, 0x88, 0x01, 0x01, 0x12, 0x17, 0x0a, 0x04, 0x70, 0x61, 0x67, 0x65, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x05, 0x48, 0x01, 0x52, 0x04, 0x70, 0x61, 0x67, 0x65, 0x88, 0x01, 0x01, 0x12, 0x21, 0x0a,
+	0x09, 0x70, 0x61, 0x67, 0x65, 0x5f, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x05,
+	0x48, 0x02, 0x52, 0x09, 0x70, 0x61, 0x67, 0x65, 0x5f, 0x73, 0x69, 0x7a, 0x65, 0x88, 0x01, 0x01,
+	0x42, 0x07, 0x0a, 0x05, 0x5f, 0x64, 0x61, 0x74, 0x65, 0x42, 0x07, 0x0a, 0x05, 0x5f, 0x70, 0x61,
+	0x67, 0x65, 0x42, 0x0c, 0x0a, 0x0a, 0x5f, 0x70, 0x61, 0x67, 0x65, 0x5f, 0x73, 0x69, 0x7a, 0x65,
+	0x22, 0xd8, 0x02, 0x0a, 0x13, 0x4f, 0x70, 0x65, 0x6e, 0x41, 0x70, 0x69, 0x47, 0x65, 0x74, 0x55,
+	0x73, 0x61, 0x67, 0x65, 0x52, 0x65, 0x73, 0x70, 0x12, 0x16, 0x0a, 0x06, 0x6f, 0x62, 0x6a, 0x65,
+	0x63, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x6f, 0x62, 0x6a, 0x65, 0x63, 0x74,
+	0x12, 0x1e, 0x0a, 0x0a, 0x6b, 0x65, 0x79, 0x5f, 0x70, 0x72, 0x65, 0x66, 0x69, 0x78, 0x18, 0x02,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x0a, 0x6b, 0x65, 0x79, 0x5f, 0x70, 0x72, 0x65, 0x66, 0x69, 0x78,
+	0x12, 0x12, 0x0a, 0x04, 0x64, 0x61, 0x74, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04,
+	0x64, 0x61, 0x74, 0x65, 0x12, 0x38, 0x0a, 0x05, 0x64, 0x61, 0x69, 0x6c, 0x79, 0x18, 0x04, 0x20,
+	0x03, 0x28, 0x0b, 0x32, 0x22, 0x2e, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x2e, 0x4f,
+	0x70, 0x65, 0x6e, 0x41, 0x70, 0x69, 0x55, 0x73, 0x61, 0x67, 0x65, 0x44, 0x61, 0x69, 0x6c, 0x79,
+	0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x52, 0x05, 0x64, 0x61, 0x69, 0x6c, 0x79, 0x12, 0x33,
+	0x0a, 0x05, 0x74, 0x6f, 0x74, 0x61, 0x6c, 0x18, 0x05, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1d, 0x2e,
+	0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x2e, 0x4f, 0x70, 0x65, 0x6e, 0x41, 0x70, 0x69,
+	0x55, 0x73, 0x61, 0x67, 0x65, 0x53, 0x75, 0x6d, 0x6d, 0x61, 0x72, 0x79, 0x52, 0x05, 0x74, 0x6f,
+	0x74, 0x61, 0x6c, 0x12, 0x38, 0x0a, 0x06, 0x6c, 0x65, 0x64, 0x67, 0x65, 0x72, 0x18, 0x06, 0x20,
+	0x03, 0x28, 0x0b, 0x32, 0x20, 0x2e, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x2e, 0x4f,
+	0x70, 0x65, 0x6e, 0x41, 0x70, 0x69, 0x55, 0x73, 0x61, 0x67, 0x65, 0x4c, 0x65, 0x64, 0x67, 0x65,
+	0x72, 0x49, 0x74, 0x65, 0x6d, 0x52, 0x06, 0x6c, 0x65, 0x64, 0x67, 0x65, 0x72, 0x12, 0x12, 0x0a,
+	0x04, 0x70, 0x61, 0x67, 0x65, 0x18, 0x07, 0x20, 0x01, 0x28, 0x05, 0x52, 0x04, 0x70, 0x61, 0x67,
+	0x65, 0x12, 0x1c, 0x0a, 0x09, 0x70, 0x61, 0x67, 0x65, 0x5f, 0x73, 0x69, 0x7a, 0x65, 0x18, 0x08,
+	0x20, 0x01, 0x28, 0x05, 0x52, 0x09, 0x70, 0x61, 0x67, 0x65, 0x5f, 0x73, 0x69, 0x7a, 0x65, 0x12,
+	0x1a, 0x0a, 0x08, 0x68, 0x61, 0x73, 0x5f, 0x6d, 0x6f, 0x72, 0x65, 0x18, 0x09, 0x20, 0x01, 0x28,
+	0x08, 0x52, 0x08, 0x68, 0x61, 0x73, 0x5f, 0x6d, 0x6f, 0x72, 0x65, 0x42, 0x43, 0x5a, 0x41, 0x67,
+	0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x78, 0x68, 0x2d, 0x70, 0x6f, 0x6c,
+	0x61, 0x72, 0x69, 0x73, 0x2f, 0x70, 0x73, 0x79, 0x63, 0x68, 0x2d, 0x63, 0x6f, 0x72, 0x65, 0x2d,
+	0x61, 0x70, 0x69, 0x2f, 0x62, 0x69, 0x7a, 0x2f, 0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74,
+	0x69, 0x6f, 0x6e, 0x2f, 0x64, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69,
+	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -809,7 +1272,7 @@ func file_core_api_openapi_proto_rawDescGZIP() []byte {
 	return file_core_api_openapi_proto_rawDescData
 }
 
-var file_core_api_openapi_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_core_api_openapi_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_core_api_openapi_proto_goTypes = []interface{}{
 	(*OpenApiChatMessage)(nil),        // 0: core_api.OpenApiChatMessage
 	(*OpenApiChatMetadata)(nil),       // 1: core_api.OpenApiChatMetadata
@@ -820,24 +1283,34 @@ var file_core_api_openapi_proto_goTypes = []interface{}{
 	(*OpenApiReport)(nil),             // 6: core_api.OpenApiReport
 	(*OpenApiGenerateReportReq)(nil),  // 7: core_api.OpenApiGenerateReportReq
 	(*OpenApiGenerateReportResp)(nil), // 8: core_api.OpenApiGenerateReportResp
-	(*ReportAnalysis)(nil),            // 9: core_api.ReportAnalysis
-	(*SimpleReportMsg)(nil),           // 10: core_api.SimpleReportMsg
+	(*OpenApiUsageLedgerItem)(nil),    // 9: core_api.OpenApiUsageLedgerItem
+	(*OpenApiUsageSummary)(nil),       // 10: core_api.OpenApiUsageSummary
+	(*OpenApiUsageDailySummary)(nil),  // 11: core_api.OpenApiUsageDailySummary
+	(*OpenApiGetUsageReq)(nil),        // 12: core_api.OpenApiGetUsageReq
+	(*OpenApiGetUsageResp)(nil),       // 13: core_api.OpenApiGetUsageResp
+	(*ReportAnalysis)(nil),            // 14: core_api.ReportAnalysis
+	(*SimpleReportMsg)(nil),           // 15: core_api.SimpleReportMsg
 }
 var file_core_api_openapi_proto_depIdxs = []int32{
 	0,  // 0: core_api.OpenApiChatCompletionReq.messages:type_name -> core_api.OpenApiChatMessage
 	1,  // 1: core_api.OpenApiChatCompletionReq.metadata:type_name -> core_api.OpenApiChatMetadata
-	9,  // 2: core_api.OpenApiReport.analysis:type_name -> core_api.ReportAnalysis
-	10, // 3: core_api.OpenApiReport.simple_report:type_name -> core_api.SimpleReportMsg
+	14, // 2: core_api.OpenApiReport.analysis:type_name -> core_api.ReportAnalysis
+	15, // 3: core_api.OpenApiReport.simple_report:type_name -> core_api.SimpleReportMsg
 	0,  // 4: core_api.OpenApiGenerateReportReq.messages:type_name -> core_api.OpenApiChatMessage
 	4,  // 5: core_api.OpenApiGenerateReportReq.subject_profile:type_name -> core_api.OpenApiSubjectProfile
 	1,  // 6: core_api.OpenApiGenerateReportReq.metadata:type_name -> core_api.OpenApiChatMetadata
 	6,  // 7: core_api.OpenApiGenerateReportResp.report:type_name -> core_api.OpenApiReport
 	5,  // 8: core_api.OpenApiGenerateReportResp.usage:type_name -> core_api.OpenApiUsage
-	9,  // [9:9] is the sub-list for method output_type
-	9,  // [9:9] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	5,  // 9: core_api.OpenApiUsageLedgerItem.usage:type_name -> core_api.OpenApiUsage
+	10, // 10: core_api.OpenApiUsageDailySummary.usage:type_name -> core_api.OpenApiUsageSummary
+	11, // 11: core_api.OpenApiGetUsageResp.daily:type_name -> core_api.OpenApiUsageDailySummary
+	10, // 12: core_api.OpenApiGetUsageResp.total:type_name -> core_api.OpenApiUsageSummary
+	9,  // 13: core_api.OpenApiGetUsageResp.ledger:type_name -> core_api.OpenApiUsageLedgerItem
+	14, // [14:14] is the sub-list for method output_type
+	14, // [14:14] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 
@@ -955,17 +1428,78 @@ func file_core_api_openapi_proto_init() {
 				return nil
 			}
 		}
+		file_core_api_openapi_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*OpenApiUsageLedgerItem); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_core_api_openapi_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*OpenApiUsageSummary); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_core_api_openapi_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*OpenApiUsageDailySummary); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_core_api_openapi_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*OpenApiGetUsageReq); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_core_api_openapi_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*OpenApiGetUsageResp); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	file_core_api_openapi_proto_msgTypes[2].OneofWrappers = []interface{}{}
 	file_core_api_openapi_proto_msgTypes[4].OneofWrappers = []interface{}{}
 	file_core_api_openapi_proto_msgTypes[7].OneofWrappers = []interface{}{}
+	file_core_api_openapi_proto_msgTypes[12].OneofWrappers = []interface{}{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_core_api_openapi_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

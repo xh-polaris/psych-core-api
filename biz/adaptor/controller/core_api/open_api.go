@@ -116,7 +116,7 @@ func writeJSONError(c *app.RequestContext, status int, code, msg, requestID stri
 		c.Response.Header.Set("X-Request-ID", requestID)
 	}
 	errType := "invalid_request_error"
-	if strings.HasPrefix(code, "upstream") {
+	if status >= consts.StatusInternalServerError || strings.HasPrefix(code, "upstream") {
 		errType = "api_error"
 	}
 	c.JSON(status, map[string]any{
@@ -531,4 +531,38 @@ func logOpenAPIReport(ctx context.Context, requestID, modelName, status, upstrea
 		usageValue = fmt.Sprintf("prompt=%d,completion=%d,total=%d", usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens)
 	}
 	logs.CtxInfof(ctx, "[openapi report] request_id=%s model=%s status=%s upstream=%s duration_ms=%d usage=%s", requestID, modelName, status, upstream, time.Since(startedAt).Milliseconds(), usageValue)
+}
+
+// OpenApiGetUsage returns usage belonging only to the authenticated Platform
+// API Key. It intentionally does not accept a key prefix as a request field.
+// @router /v1/usage [GET]
+func OpenApiGetUsage(ctx context.Context, c *app.RequestContext) {
+	requestID := "req_" + uuid.New().String()
+	var req core_api.OpenApiGetUsageReq
+	err := c.BindAndValidate(&req)
+	if err != nil {
+		writeJSONError(c, consts.StatusBadRequest, "invalid_request_error", err.Error(), requestID)
+		return
+	}
+	token := strings.TrimSpace(strings.TrimPrefix(string(c.GetHeader("Authorization")), "Bearer "))
+	pepper, keys := openAPIAuth()
+	key, authErr := openapiauth.VerifyAny(pepper, keys, token, openAPIScopeChat, openAPIScopeReport)
+	if authErr != nil {
+		status, code, message := authError(authErr)
+		writeJSONError(c, status, code, message, requestID)
+		return
+	}
+	result, err := (&applicationservice.OpenAPIUsageService{}).Get(ctx, key.Prefix, &req)
+	if err != nil {
+		if errors.Is(err, applicationservice.ErrInvalidOpenAPIUsageQuery) {
+			writeJSONError(c, consts.StatusBadRequest, "invalid_request_error", err.Error(), requestID)
+			return
+		}
+		logs.CtxErrorf(ctx, "[openapi usage] request_id=%s key_prefix=%s status=query_failed err=%v", requestID, key.Prefix, err)
+		writeJSONError(c, consts.StatusInternalServerError, "internal_error", "用量服务暂时不可用，请稍后重试", requestID)
+		return
+	}
+	logs.CtxInfof(ctx, "[openapi usage] request_id=%s key_prefix=%s date=%s page=%d page_size=%d status=completed", requestID, key.Prefix, result.Date, result.Page, result.PageSize)
+	c.Response.Header.Set("X-Request-ID", requestID)
+	c.JSON(consts.StatusOK, result)
 }

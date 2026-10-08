@@ -82,6 +82,53 @@ type MongoRecorder struct {
 	total  *mon.Model
 }
 
+// Query contains the already-normalized filters for one key owner's usage
+// view. Date uses YYYY-MM-DD in the Asia/Shanghai business timezone.
+type Query struct {
+	KeyPrefix string
+	Date      string
+	Page      int
+	PageSize  int
+}
+
+type Summary struct {
+	RequestCount     int64
+	PromptTokens     int64
+	CompletionTokens int64
+	TotalTokens      int64
+}
+
+type DailySummary struct {
+	Date     string
+	Endpoint string
+	Usage    Summary
+}
+
+type LedgerItem struct {
+	RequestID   string
+	Endpoint    string
+	Model       string
+	Usage       Tokens
+	UsageSource string
+	CreatedAt   time.Time
+}
+
+type QueryResult struct {
+	Daily   []DailySummary
+	Total   Summary
+	Ledger  []LedgerItem
+	HasMore bool
+}
+
+type summaryRecord struct {
+	RequestCount     int64  `bson:"request_count"`
+	PromptTokens     int64  `bson:"prompt_tokens"`
+	CompletionTokens int64  `bson:"completion_tokens"`
+	TotalTokens      int64  `bson:"total_tokens"`
+	Date             string `bson:"date"`
+	Endpoint         string `bson:"endpoint"`
+}
+
 // Init creates the collections' indexes. A request ID is globally unique in
 // core-api, so its unique index is the idempotency boundary for all summaries.
 func Init(cfg *conf.Config) error {
@@ -204,6 +251,75 @@ func (r *MongoRecorder) Record(ctx context.Context, entry Entry) error {
 		return fmt.Errorf("openapi usage: record transaction: %w", err)
 	}
 	return nil
+}
+
+// Query returns only data belonging to query.KeyPrefix. The handler obtains
+// this prefix from the verified API key; it is never accepted from a client
+// request, preventing one business party from querying another's usage.
+func (r *MongoRecorder) Query(ctx context.Context, query Query) (QueryResult, error) {
+	if r == nil || r.ledger == nil || r.daily == nil || r.total == nil {
+		return QueryResult{}, errors.New("openapi usage recorder is not initialized")
+	}
+	if query.KeyPrefix == "" {
+		return QueryResult{}, errors.New("openapi usage: key_prefix is required")
+	}
+	if query.Page < 1 || query.PageSize < 1 {
+		return QueryResult{}, errors.New("openapi usage: invalid pagination")
+	}
+	start, err := time.ParseInLocation("2006-01-02", query.Date, shanghaiLocation)
+	if err != nil {
+		return QueryResult{}, fmt.Errorf("openapi usage: invalid date %q", query.Date)
+	}
+	end := start.AddDate(0, 0, 1)
+	result := QueryResult{}
+
+	var daily []summaryRecord
+	if err := r.daily.Find(ctx, &daily, bson.M{"key_prefix": query.KeyPrefix, "date": query.Date},
+		options.Find().SetSort(bson.D{{Key: "endpoint", Value: 1}})); err != nil {
+		return QueryResult{}, fmt.Errorf("openapi usage: find daily summary: %w", err)
+	}
+	result.Daily = make([]DailySummary, 0, len(daily))
+	for _, item := range daily {
+		result.Daily = append(result.Daily, DailySummary{
+			Date: item.Date, Endpoint: item.Endpoint, Usage: summaryFromRecord(item),
+		})
+	}
+
+	var total summaryRecord
+	if err := r.total.FindOne(ctx, &total, bson.M{"key_prefix": query.KeyPrefix}); err != nil && !errors.Is(err, mon.ErrNotFound) {
+		return QueryResult{}, fmt.Errorf("openapi usage: find total summary: %w", err)
+	}
+	result.Total = summaryFromRecord(total)
+
+	limit := int64(query.PageSize + 1)
+	skip := int64(query.Page-1) * int64(query.PageSize)
+	var ledger []ledgerRecord
+	if err := r.ledger.Find(ctx, &ledger, bson.M{
+		"key_prefix": query.KeyPrefix,
+		"created_at": bson.M{"$gte": start.UTC(), "$lt": end.UTC()},
+	}, options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}, {Key: "request_id", Value: -1}}).SetSkip(skip).SetLimit(limit)); err != nil {
+		return QueryResult{}, fmt.Errorf("openapi usage: find ledger: %w", err)
+	}
+	result.HasMore = len(ledger) > query.PageSize
+	if result.HasMore {
+		ledger = ledger[:query.PageSize]
+	}
+	result.Ledger = make([]LedgerItem, 0, len(ledger))
+	for _, item := range ledger {
+		result.Ledger = append(result.Ledger, LedgerItem{
+			RequestID: item.RequestID, Endpoint: item.Endpoint, Model: item.Model,
+			Usage:       Tokens{PromptTokens: item.Usage.PromptTokens, CompletionTokens: item.Usage.CompletionTokens, TotalTokens: item.Usage.TotalTokens},
+			UsageSource: item.UsageSource, CreatedAt: item.CreatedAt,
+		})
+	}
+	return result, nil
+}
+
+func summaryFromRecord(record summaryRecord) Summary {
+	return Summary{
+		RequestCount: record.RequestCount, PromptTokens: record.PromptTokens,
+		CompletionTokens: record.CompletionTokens, TotalTokens: record.TotalTokens,
+	}
 }
 
 func validateEntry(entry Entry) error {

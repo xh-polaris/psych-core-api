@@ -39,6 +39,26 @@ type Key struct {
 }
 
 func Verify(pepper string, keys []conf.OpenApiKey, token, requiredScope string) (Key, error) {
+	return verify(pepper, keys, token, func(scopes []string) bool {
+		return hasScope(scopes, requiredScope)
+	})
+}
+
+func VerifyAny(pepper string, keys []conf.OpenApiKey, token string, requiredScopes ...string) (Key, error) {
+	if len(requiredScopes) == 0 {
+		return Key{}, ErrInsufficientScope
+	}
+	return verify(pepper, keys, token, func(scopes []string) bool {
+		for _, requiredScope := range requiredScopes {
+			if hasScope(scopes, requiredScope) {
+				return true
+			}
+		}
+		return false
+	})
+}
+
+func verify(pepper string, keys []conf.OpenApiKey, token string, hasRequiredScope func([]string) bool) (Key, error) {
 	prefix, secret, err := parseToken(token)
 	if err != nil {
 		return Key{}, ErrInvalid
@@ -56,7 +76,7 @@ func Verify(pepper string, keys []conf.OpenApiKey, token, requiredScope string) 
 	if !hmac.Equal([]byte(digest(secret, pepper)), []byte(strings.ToLower(candidate.Digest))) {
 		return Key{}, ErrInvalid
 	}
-	if !hasScope(candidate.Scopes, requiredScope) {
+	if !hasRequiredScope(candidate.Scopes) {
 		return Key{}, ErrInsufficientScope
 	}
 	return Key{Prefix: candidate.Prefix, Scopes: candidate.Scopes, Upstream: candidate.Upstream}, nil

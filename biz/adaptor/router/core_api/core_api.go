@@ -70,6 +70,7 @@ func Register(r *server.Hertz) {
 	}
 	{
 		_v1 := root.Group("/v1", _v1Mw()...)
+		_v1.GET("/usage", append(_openapigetusageMw(), core_api.OpenApiGetUsage)...)
 		{
 			_chat := _v1.Group("/chat", _chatMw()...)
 			_chat.POST("/completions", append(_openapichatcompletionMw(), core_api.OpenApiChatCompletion)...)
