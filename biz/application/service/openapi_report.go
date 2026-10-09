@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	minOpenAPIReportTokens     = 4096
-	maxOpenAPIReportTokens     = 4096
+	minOpenAPIReportTokens     = 8192
+	maxOpenAPIReportTokens     = 8192
 	maxOpenAPIProfileNameRunes = 128
 )
 

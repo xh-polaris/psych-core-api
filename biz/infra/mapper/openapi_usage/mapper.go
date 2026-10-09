@@ -80,33 +80,6 @@ func NewMongoMapper(cfg *conf.Config) *MongoMapper {
 	}
 }
 
-// EnsureIndexes 在带追踪的 Mongo 客户端初始化完成后调用。
-func (m *MongoMapper) EnsureIndexes(ctx context.Context) error {
-	if m == nil || m.ledger == nil || m.daily == nil || m.total == nil {
-		return errors.New("openapi usage mapper is not initialized")
-	}
-	if _, err := m.ledger.Indexes().CreateMany(ctx, []mongo.IndexModel{
-		{Keys: bson.D{{Key: "request_id", Value: 1}}, Options: options.Index().SetUnique(true)},
-		{Keys: bson.D{{Key: "key_prefix", Value: 1}, {Key: "created_at", Value: -1}}},
-		{Keys: bson.D{{Key: "upstream", Value: 1}, {Key: "created_at", Value: -1}}},
-	}); err != nil {
-		return fmt.Errorf("openapi usage: create ledger indexes: %w", err)
-	}
-	if _, err := m.daily.Indexes().CreateMany(ctx, []mongo.IndexModel{
-		{Keys: bson.D{{Key: "key_prefix", Value: 1}, {Key: "date", Value: 1}, {Key: "endpoint", Value: 1}}, Options: options.Index().SetUnique(true)},
-		{Keys: bson.D{{Key: "date", Value: 1}, {Key: "key_prefix", Value: 1}}},
-	}); err != nil {
-		return fmt.Errorf("openapi usage: create daily indexes: %w", err)
-	}
-	if _, err := m.total.Indexes().CreateMany(ctx, []mongo.IndexModel{
-		{Keys: bson.D{{Key: "key_prefix", Value: 1}}, Options: options.Index().SetUnique(true)},
-		{Keys: bson.D{{Key: "upstream", Value: 1}}},
-	}); err != nil {
-		return fmt.Errorf("openapi usage: create total indexes: %w", err)
-	}
-	return nil
-}
-
 // Record 原子写入一条流水及两类汇总；唯一请求 ID 保证重试幂等。
 func (m *MongoMapper) Record(ctx context.Context, entry domain.Entry) error {
 	if m == nil || m.ledger == nil || m.daily == nil || m.total == nil {
