@@ -33,13 +33,13 @@ func TestSimpleReportToDTOEncodesEmptyListsWithoutNull(t *testing.T) {
 func TestNewOpenAPIReportRequestRejectsTokenBudgetThatCanTruncateReport(t *testing.T) {
 	maxTokens := int32(512)
 	_, err := NewOpenAPIReportRequest(&core_api.OpenApiGenerateReportReq{MaxTokens: &maxTokens})
-	if err == nil || !strings.Contains(err.Error(), "max_tokens must be 4096") {
+	if err == nil || !strings.Contains(err.Error(), "max_tokens must be 8192") {
 		t.Fatalf("error = %v, want max_tokens validation error", err)
 	}
 }
 
 func TestNewOpenAPIReportRequestAllowsDocumentedTokenBudgetAndDefault(t *testing.T) {
-	maxTokens := int32(4096)
+	maxTokens := int32(8192)
 	for _, req := range []*core_api.OpenApiGenerateReportReq{{}, {MaxTokens: &maxTokens}} {
 		if _, err := NewOpenAPIReportRequest(req); err != nil {
 			t.Fatalf("request %+v: %v", req, err)
