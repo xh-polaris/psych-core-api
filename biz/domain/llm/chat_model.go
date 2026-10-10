@@ -12,13 +12,19 @@ import (
 )
 
 const (
-	ProviderCoze     = "coze"
-	ProviderDeepSeek = "deepseek"
+	ProviderCoze             = "coze"
+	ProviderDeepSeek         = "deepseek"
+	ProviderOpenAICompatible = "openai-compatible"
+	ProviderGLM              = "glm"
+	ProviderInnoSpark        = "innospark"
 )
 
 func init() {
 	app.ChatRegister(ProviderCoze, NewChatModel)
 	app.ChatRegister(ProviderDeepSeek, NewChatModel)
+	app.ChatRegister(ProviderOpenAICompatible, NewChatModel)
+	app.ChatRegister(ProviderGLM, NewChatModel)
+	app.ChatRegister(ProviderInnoSpark, NewChatModel)
 }
 
 // ChatModel 对话大模型
@@ -30,18 +36,20 @@ type ChatModel struct {
 // NewChatModel 根据provider创建对应的对话大模型
 func NewChatModel(ctx context.Context, uSession string, s *app.ChatSetting) (_ model.ToolCallingChatModel, err error) {
 	cm := &ChatModel{provider: s.Provider, model: s.Model, botId: s.BotId, uid: s.UserId}
-	if cm.cli, err = newCli(ctx, s.Provider, s.Url, s.AccessKey, s.Model, s.BotId, s.UserId); err != nil {
+	if cm.cli, err = newCli(ctx, s.Provider, s.Url, s.AccessKey, s.Model, s.BotId, s.UserId, s.ChatCompletionsPath); err != nil {
 		return
 	}
 	return cm, nil
 }
 
-func newCli(ctx context.Context, provider, url, sk, model, botId, uid string) (_ model.ToolCallingChatModel, err error) {
+func newCli(ctx context.Context, provider, url, sk, model, botId, uid, chatCompletionsPath string) (_ model.ToolCallingChatModel, err error) {
 	switch provider {
 	case impl.Coze:
 		return impl.NewCozeModel(ctx, url, sk, uid, botId)
 	case impl.DeepSeek:
-		return impl.NewDeepSeekModel(ctx, url, sk, model)
+		return impl.NewDeepSeekModel(ctx, url, sk, model, chatCompletionsPath)
+	case ProviderOpenAICompatible, ProviderGLM, ProviderInnoSpark:
+		return impl.NewOpenAICompatibleModel(ctx, url, sk, model, chatCompletionsPath)
 	default:
 		return nil, errorx.New(errno.UnImplementErr)
 	}

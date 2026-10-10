@@ -11,12 +11,14 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	"github.com/xh-polaris/psych-core-api/biz/domain/dashboard"
+	model_lab2 "github.com/xh-polaris/psych-core-api/biz/domain/model_lab"
 	"github.com/xh-polaris/psych-core-api/biz/domain/usr"
 	"github.com/xh-polaris/psych-core-api/biz/infra/cache/redis"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/model_lab"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/openapi_usage"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/prompt"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
@@ -119,6 +121,21 @@ func NewProvider() (*Provider, error) {
 		ReportService: openAPIReportService,
 		UsageService:  openAPIUsageService,
 	}
+	redisMapper := &model_lab.RedisMapper{
+		Cache: cmdable,
+	}
+	modelLabDomain := &model_lab2.ModelLabDomain{
+		Config: confConfig,
+		Mapper: redisMapper,
+	}
+	modelLabChatService := service.NewModelLabChatService(confConfig)
+	modelLabService := service.ModelLabService{
+		Config:         confConfig,
+		AuthDomain:     authDomain,
+		ModelLabDomain: modelLabDomain,
+		ChatService:    modelLabChatService,
+		ReportService:  openAPIReportService,
+	}
 	sms_alertIMongoMapper := sms_alert.NewSmsAlertMongoMapper(confConfig)
 	promptIMongoMapper := prompt.NewPromptMongoMapper(confConfig)
 	providerProvider := &Provider{
@@ -131,6 +148,7 @@ func NewProvider() (*Provider, error) {
 		FileService:         fileService,
 		ChatReportService:   chatReportService,
 		OpenAPIService:      openAPIService,
+		ModelLabService:     modelLabService,
 		MessageMapper:       messageIMongoMapper,
 		ConversationMapper:  conversationIMongoMapper,
 		ReportMapper:        reportIMongoMapper,

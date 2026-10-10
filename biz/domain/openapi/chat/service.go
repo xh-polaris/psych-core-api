@@ -30,6 +30,8 @@ type Result struct {
 	Stream        *schema.StreamReader[*schema.Message]
 	StrategyUsage *schema.TokenUsage
 	StrategyPlan  string
+	SkillText     string
+	SystemPrompt  string
 	StrategyError error
 }
 type Service struct {
@@ -46,7 +48,7 @@ func (s *Service) Stream(ctx context.Context, req Request) (*Result, error) {
 	}
 
 	plan, skills, strategyUsage, strategyErr := s.runStrategy(ctx, base)
-	dialogueMsgs := s.buildDialogueMessages(ctx, base, plan, skills)
+	dialogueMsgs, systemPrompt := s.buildDialogueMessages(ctx, base, plan, skills)
 
 	opts := make([]model.Option, 0, 2)
 	if req.MaxTokens > 0 {
@@ -59,7 +61,14 @@ func (s *Service) Stream(ctx context.Context, req Request) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Result{Stream: stream, StrategyUsage: strategyUsage, StrategyPlan: plan, StrategyError: strategyErr}, nil
+	return &Result{
+		Stream:        stream,
+		StrategyUsage: strategyUsage,
+		StrategyPlan:  plan,
+		SkillText:     skills,
+		SystemPrompt:  systemPrompt,
+		StrategyError: strategyErr,
+	}, nil
 }
 
 func ValidateMessages(in []*schema.Message) error {
@@ -121,13 +130,13 @@ func (s *Service) runStrategy(ctx context.Context, base []*schema.Message) (stri
 	return msg.Content, joinSkills(names, skills), usageOf(msg), nil
 }
 
-func (s *Service) buildDialogueMessages(ctx context.Context, base []*schema.Message, plan, skills string) []*schema.Message {
+func (s *Service) buildDialogueMessages(ctx context.Context, base []*schema.Message, plan, skills string) ([]*schema.Message, string) {
 	if s.Prompts == nil {
-		return base
+		return base, ""
 	}
 	tpl, err := s.Prompts.GetTemplate(ctx, "dialogue")
 	if err != nil || strings.TrimSpace(tpl) == "" {
-		return base
+		return base, ""
 	}
 	var b strings.Builder
 	b.WriteString(tpl)
@@ -139,7 +148,8 @@ func (s *Service) buildDialogueMessages(ctx context.Context, base []*schema.Mess
 		b.WriteString("\n\n## Micro Skill References\n")
 		b.WriteString(skills)
 	}
-	return append(copyMessages(base), schema.SystemMessage(b.String()))
+	systemPrompt := b.String()
+	return append(copyMessages(base), schema.SystemMessage(systemPrompt)), systemPrompt
 }
 
 func usageOf(msg *schema.Message) *schema.TokenUsage {
