@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	DeepSeek            = "deepseek"
-	chatCompletionsPath = "/chat/completions"
+	DeepSeek                   = "deepseek"
+	defaultChatCompletionsPath = "/chat/completions"
 )
 
 type deepseekChatReq struct {
@@ -69,19 +69,42 @@ type DeepSeekModel struct {
 	model  string
 	apiKey string
 	url    string
+	path   string
 	cli    *http.Client
 }
 
-func NewDeepSeekModel(ctx context.Context, url, apiKey, modelName string) (_ model.ToolCallingChatModel, err error) {
+// NewDeepSeekModel 使用 DeepSeek 默认请求路径，同时允许在运行时配置中覆盖。
+func NewDeepSeekModel(ctx context.Context, url, apiKey, modelName, chatCompletionsPath string) (_ model.ToolCallingChatModel, err error) {
+	return newChatCompletionsModel(url, apiKey, modelName, chatCompletionsPath), nil
+}
+
+// NewOpenAICompatibleModel 用于 GLM、InnoSpark 等 OpenAI Chat Completions 兼容上游。
+func NewOpenAICompatibleModel(ctx context.Context, url, apiKey, modelName, chatCompletionsPath string) (_ model.ToolCallingChatModel, err error) {
+	return newChatCompletionsModel(url, apiKey, modelName, chatCompletionsPath), nil
+}
+
+func newChatCompletionsModel(url, apiKey, modelName, chatCompletionsPath string) *DeepSeekModel {
 	return &DeepSeekModel{
 		model:  modelName,
 		apiKey: apiKey,
 		url:    strings.TrimRight(url, "/"),
+		path:   normalizeChatCompletionsPath(chatCompletionsPath),
 		cli: &http.Client{
 			Transport: util.NewDebugTransport(),
 			Timeout:   0,
 		},
-	}, nil
+	}
+}
+
+func normalizeChatCompletionsPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return defaultChatCompletionsPath
+	}
+	if !strings.HasPrefix(path, "/") {
+		return "/" + path
+	}
+	return path
 }
 
 func buildChatReq(modelName string, msgs []*deepseekMessage, stream bool, opts []model.Option) *deepseekChatReq {
@@ -110,7 +133,7 @@ func (d *DeepSeekModel) post(ctx context.Context, body *deepseekChatReq, accept 
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, d.url+chatCompletionsPath, bytes.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, d.url+d.path, bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}

@@ -22,6 +22,9 @@ type (
 		BotId     string `json:"botId"`
 		UserId    string `json:"userId"`
 		AccessKey string `json:"accessKey"`
+		// ChatCompletionsPath 是兼容 Chat Completions 上游的可选请求路径。
+		// 未设置时由 Provider 使用自己的默认路径。
+		ChatCompletionsPath string `json:"chatCompletionsPath"`
 	}
 
 	// ChatFrame 一次响应
