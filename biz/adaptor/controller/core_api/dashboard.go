@@ -13,6 +13,26 @@ import (
 	"github.com/xh-polaris/psych-core-api/provider"
 )
 
+type generateInterventionPlanReq struct {
+	ReportID string `json:"reportId"`
+}
+
+// GenerateInterventionPlan 根据已完成的心理评估报告生成 Markdown 干预方案。
+func GenerateInterventionPlan(ctx context.Context, c *app.RequestContext) {
+	var req generateInterventionPlanReq
+	if err := c.BindAndValidate(&req); err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+	middleware.StoreToken(ctx, c, &req)
+	if c.IsAborted() {
+		return
+	}
+	p := provider.Get()
+	resp, err := p.DashboardService.GenerateInterventionPlan(ctx, req.ReportID)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
 // DashboardGetDataOverview .
 // @router /dashboard/overview [POST]
 func DashboardGetDataOverview(ctx context.Context, c *app.RequestContext) {

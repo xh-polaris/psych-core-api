@@ -127,13 +127,13 @@ func pickCharacterByID(characters []*core_api.Character, characterID string) *co
 		if characterID != "" && ch.Id != characterID {
 			continue
 		}
-		return &core.CharacterInfo{Id: ch.Id, Name: ch.Name, Voice: ch.Voice, Image: ch.Image}
+		return &core.CharacterInfo{Id: ch.Id, Name: ch.Name, Voice: ch.Voice, Image: ch.Image, Identity: ch.Identity}
 	}
 	// 指定 ID 未匹配到启用角色时，允许回退到该 ID 本身（可能已停用但会话历史仍引用）
 	if characterID != "" {
 		for _, ch := range characters {
 			if ch.Id == characterID {
-				return &core.CharacterInfo{Id: ch.Id, Name: ch.Name, Voice: ch.Voice, Image: ch.Image}
+				return &core.CharacterInfo{Id: ch.Id, Name: ch.Name, Voice: ch.Voice, Image: ch.Image, Identity: ch.Identity}
 			}
 		}
 	}

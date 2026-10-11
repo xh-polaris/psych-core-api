@@ -44,6 +44,7 @@ func NewProvider() (*Provider, error) {
 	}
 	conversationIMongoMapper := conversation.NewConversationMongoMapper(confConfig)
 	reportIMongoMapper := report.NewReportMongoMapper(confConfig)
+	configIMongoMapper := config.NewConfigMongoMapper(confConfig)
 	alarmIMongoMapper := alarm.NewAlarmMongoMapper(confConfig)
 	messageIMongoMapper := message.NewMessageMongoMapper(confConfig)
 	dashboardDomain := &dashboard.DashboardDomain{
@@ -59,10 +60,10 @@ func NewProvider() (*Provider, error) {
 		UserMapper:         iMongoMapper,
 		ConversationMapper: conversationIMongoMapper,
 		ReportMapper:       reportIMongoMapper,
+		ConfigMapper:       configIMongoMapper,
 		AlarmMapper:        alarmIMongoMapper,
 		DashboardDomain:    dashboardDomain,
 	}
-	configIMongoMapper := config.NewConfigMongoMapper(confConfig)
 	voiceIMongoMapper := voice.NewVoiceMongoMapper(confConfig)
 	configService := service.ConfigService{
 		AuthDomain:   authDomain,

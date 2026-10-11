@@ -22,6 +22,8 @@ type (
 		Name  string `json:"name"`
 		Voice string `json:"voice"`
 		Image string `json:"image"`
+		// Identity 是由超管配置的对话人设，仅用于模型提示词，不作为学生输入。
+		Identity string `json:"identity,omitempty"`
 	}
 
 	Usage struct {

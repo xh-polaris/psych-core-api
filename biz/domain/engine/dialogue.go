@@ -171,7 +171,14 @@ func (e *Engine) buildContextMsgs(dayAsc []*message.Message, usrMsg *message.Mes
 // system 只承载静态模板; 每轮变化的 strategy/skills 独立成尾注消息,
 // 保证 [system, 历史...] 前缀跨轮字节稳定, 命中 DeepSeek 前缀缓存.
 func (e *Engine) buildDialogueMsgs(ctx context.Context, baseMsgs []*schema.Message, strategyJSON, skillsText string) []*schema.Message {
+	persona := ""
+	if e.Character != nil {
+		persona = strings.TrimSpace(e.Character.Identity)
+	}
 	if e.dialogue.provider != llm.ProviderDeepSeek {
+		if persona != "" {
+			return buildDialogueMsgsP(baseMsgs, "", "## 对话人设\n"+persona)
+		}
 		return baseMsgs
 	}
 
@@ -180,6 +187,9 @@ func (e *Engine) buildDialogueMsgs(ctx context.Context, baseMsgs []*schema.Messa
 	if err != nil || tpl == "" {
 		logs.Errorf("[engine] [dialogue] get dialogue template err: %v", err)
 		return baseMsgs
+	}
+	if persona != "" {
+		tpl += "\n\n## 对话人设\n" + persona
 	}
 	logs.Infof("[engine] [dialogue] get dialogue template in %dms", time.Since(tplStart).Milliseconds())
 
