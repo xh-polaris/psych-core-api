@@ -14,22 +14,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/provider"
 )
 
-// ModelLabAccess .
-// @router /api/model-lab/access [GET]
-func ModelLabAccess(ctx context.Context, c *app.RequestContext) {
-	var err error
-	var req core_api.ModelLabAccessReq
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		c.String(consts.StatusBadRequest, err.Error())
-		return
-	}
-
-	middleware.StoreToken(ctx, c, &req)
-	resp, err := provider.Get().ModelLabService.ModelLabAccess(ctx, &req)
-	httpx.PostProcess(ctx, c, &req, resp, err)
-}
-
 // ModelLabListModels .
 // @router /api/model-lab/models [GET]
 func ModelLabListModels(ctx context.Context, c *app.RequestContext) {

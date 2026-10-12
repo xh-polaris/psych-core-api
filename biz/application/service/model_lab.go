@@ -14,7 +14,6 @@ import (
 )
 
 type IModelLabService interface {
-	ModelLabAccess(context.Context, *core_api.ModelLabAccessReq) (*core_api.ModelLabAccessResp, error)
 	ModelLabListModels(context.Context, *core_api.ModelLabListModelsReq) (*core_api.ModelLabListModelsResp, error)
 	ModelLabCreateSession(context.Context, *core_api.ModelLabCreateSessionReq) (*core_api.ModelLabCreateSessionResp, error)
 	ModelLabGetBranch(context.Context, *core_api.ModelLabGetBranchReq) (*core_api.ModelLabGetBranchResp, error)
@@ -64,18 +63,6 @@ var ModelLabServiceSet = wire.NewSet(
 	wire.Struct(new(ModelLabService), "*"),
 	wire.Bind(new(IModelLabService), new(*ModelLabService)),
 )
-
-func (s *ModelLabService) ModelLabAccess(ctx context.Context, _ *core_api.ModelLabAccessReq) (*core_api.ModelLabAccessResp, error) {
-	if _, err := s.AuthDomain.ExtraUserMeta(ctx); err != nil {
-		return nil, err
-	}
-	allowed := s.isEnabled()
-	ttl := int32(0)
-	if allowed {
-		ttl = int32(s.Config.ModelLab.SessionTTLHours)
-	}
-	return &core_api.ModelLabAccessResp{Allowed: allowed, SessionTtlHours: ttl, Code: 0, Msg: "success"}, nil
-}
 
 func (s *ModelLabService) ModelLabListModels(ctx context.Context, _ *core_api.ModelLabListModelsReq) (*core_api.ModelLabListModelsResp, error) {
 	if _, err := s.authorize(ctx); err != nil {

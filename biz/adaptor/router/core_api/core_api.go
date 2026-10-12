@@ -21,7 +21,6 @@ func Register(r *server.Hertz) {
 		_api := root.Group("/api", _apiMw()...)
 		{
 			_model_lab := _api.Group("/model-lab", _model_labMw()...)
-			_model_lab.GET("/access", append(_modellabaccessMw(), core_api.ModelLabAccess)...)
 			_model_lab.GET("/models", append(_modellablistmodelsMw(), core_api.ModelLabListModels)...)
 			_model_lab.POST("/reports", append(_modellabgeneratereportMw(), core_api.ModelLabGenerateReport)...)
 			_model_lab.POST("/sessions", append(_modellabcreatesessionMw(), core_api.ModelLabCreateSession)...)
