@@ -3,16 +3,15 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
+	appdto "github.com/xh-polaris/psych-core-api/biz/application/dto"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	"github.com/xh-polaris/psych-core-api/biz/domain/usr"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
-	"github.com/xh-polaris/psych-core-api/biz/infra/synapse"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
@@ -21,7 +20,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/infra/util/convert"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/pkg/logs"
-	"github.com/xh-polaris/psych-core-api/types/enum"
 	"github.com/xh-polaris/psych-core-api/types/errno"
 	"go.mongodb.org/mongo-driver/v2/bson"
 
@@ -39,32 +37,10 @@ type IUserService interface {
 	SendVerifyCode(ctx context.Context, req *core_api.SendVerifyCodeReq) (*basic.Response, error)
 }
 
-// StudentProfile 是学生端自己的可见资料。独立于后台 UserVO，避免学生端
-// 的头像和个人资料编辑能力影响单位管理员、超级管理员的用户管理接口。
-type StudentProfile struct {
-	ID         string `json:"id"`
-	Code       string `json:"code"`
-	Name       string `json:"name"`
-	Avatar     string `json:"avatar"`
-	Birth      int64  `json:"birth"`
-	Gender     int    `json:"gender"`
-	EnrollYear int    `json:"enrollYear"`
-	Grade      int    `json:"grade"`
-	Class      int    `json:"class"`
-}
-
-type UpdateStudentProfileInput struct {
-	Name   string `json:"name"`
-	Avatar string `json:"avatar"`
-	Birth  int64  `json:"birth"`
-	Gender int    `json:"gender"`
-}
-
 type UserService struct {
 	UserDomain usr.IUserDomainSVC
 	UserMapper user.IMongoMapper
 	UnitMapper unit.IMongoMapper
-	Synp4bCli  synapse.Client
 	AuthDomain auth.IAuthDomain
 }
 
@@ -180,7 +156,7 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 	}, nil
 }
 
-func (u *UserService) GetStudentProfile(ctx context.Context) (*StudentProfile, error) {
+func (u *UserService) GetStudentProfile(ctx context.Context) (*appdto.StudentProfile, error) {
 	meta, err := u.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
@@ -205,7 +181,7 @@ func (u *UserService) GetStudentProfile(ctx context.Context) (*StudentProfile, e
 	if avatar != "" && !strings.HasPrefix(avatar, "http://") && !strings.HasPrefix(avatar, "https://") {
 		avatar = "https://" + strings.TrimLeft(avatar, "/")
 	}
-	return &StudentProfile{
+	return &appdto.StudentProfile{
 		ID: student.ID.Hex(), Code: student.Code, Name: student.Name,
 		Avatar: avatar, Birth: birth, Gender: student.Gender,
 		EnrollYear: student.EnrollYear, Grade: student.CalculateGrade(unitDAO.StartGrade),
@@ -213,7 +189,7 @@ func (u *UserService) GetStudentProfile(ctx context.Context) (*StudentProfile, e
 	}, nil
 }
 
-func (u *UserService) UpdateStudentProfile(ctx context.Context, input *UpdateStudentProfileInput) (*StudentProfile, error) {
+func (u *UserService) UpdateStudentProfile(ctx context.Context, input *appdto.UpdateStudentProfileInput) (*appdto.StudentProfile, error) {
 	meta, err := u.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
@@ -335,16 +311,8 @@ func (u *UserService) UserUpdatePassword(ctx context.Context, req *core_api.User
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "单位ID"))
 	}
 
-	// 校验unit存在
-	// synapse unit
-	su, err := u.Synp4bCli.GetUnit(ctx, req.UnitId)
-	if err != nil || su == nil {
-		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", fmt.Sprintf("指定单位[id=%s]", req.UnitId)))
-	}
-	// psych unit
-	pUnit, err := u.UnitMapper.FindOneById(ctx, oids[1])
-	if pUnit == nil || errors.Is(err, mongo.ErrNoDocuments) || pUnit.Status != enum.UnitStatusActive {
-		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", fmt.Sprintf("指定单位[id=%s]", req.UnitId)))
+	if err := u.UserDomain.ValidatePasswordResetTarget(ctx, oids[1].Hex()); err != nil {
+		return nil, err
 	}
 
 	// 调用user域更新密码
@@ -361,21 +329,24 @@ func (u *UserService) UserUpdatePassword(ctx context.Context, req *core_api.User
 }
 
 func (u *UserService) CreateUser(ctx context.Context, req *core_api.CreateUserReq) (*core_api.CreateUserResp, error) {
-	// basic user参数校验
-	if req.UnitId == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "单位ID"))
+	input := usr.CreateUserInput{
+		UnitID:     req.UnitId,
+		Password:   req.Password,
+		Email:      req.Email,
+		Phone:      req.Phone,
+		Code:       req.Code,
+		CodeType:   int(req.CodeType),
+		Name:       req.Name,
+		Birth:      req.Birth,
+		Gender:     int(req.Gender),
+		EnrollYear: int(req.EnrollYear),
+		Role:       int(req.Role),
+		Class:      int(req.Class),
+		CreateTime: req.CreateTime,
+		UpdateTime: req.UpdateTime,
 	}
-	unitOid, err := bson.ObjectIDFromHex(req.UnitId)
-	if err != nil {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "单位ID"))
-	}
-
-	if req.Code == nil && req.Phone == nil && req.Email == nil {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "验证码/手机号/邮箱不能全为空"))
-	}
-
-	if req.Phone == nil && req.Password == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "密码"))
+	if err := u.UserDomain.ValidateCreateUserInput(input); err != nil {
+		return nil, err
 	}
 
 	// 权限校验-需要超管权限
@@ -387,39 +358,14 @@ func (u *UserService) CreateUser(ctx context.Context, req *core_api.CreateUserRe
 		return nil, err
 	}
 
-	// 校验unit存在
-	// synapse unit
-	su, err := u.Synp4bCli.GetUnit(ctx, req.UnitId)
-	if err != nil || su == nil {
-		return nil, errorx.WrapByCode(err, errno.ErrCreateUser, errorx.KV("field", "单位不存在"))
-	}
-	// psych unit
-	pUnit, err := u.UnitMapper.FindOneById(ctx, unitOid)
-	if pUnit == nil || errors.Is(err, mongo.ErrNoDocuments) || pUnit.Status != enum.UnitStatusActive {
-		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", fmt.Sprintf("指定单位[id=%s]", req.UnitId)))
-	} else if err != nil {
-		logs.Errorf("find unit error: %s", errorx.ErrorWithoutStack(err))
-		return nil, errorx.New(errno.ErrInternalError)
-	}
-
-	// 校验psychUser字段
-	pu, err := tryBuildPsychUser(req, pUnit)
+	// 账号标识校验、单位双端一致性校验，以及中台账号与本地用户的创建，
+	// 都属于 UserDomain 的账号一致性规则。
+	puWithId, pUnit, err := u.UserDomain.CreateUser(ctx, input)
 	if err != nil {
 		return nil, err
 	}
 
-	// 调用domain层创建用户
-	puWithId, err := u.UserDomain.CreateUser(ctx, req.UnitId, req.GetEmail(), req.GetPhone(), req.GetCode(), req.Password, pu)
-	if err != nil {
-		return nil, err
-	}
-
-	unitDAO, err := u.UnitMapper.FindOneById(ctx, puWithId.UnitID)
-	if err != nil {
-		logs.Errorf("find unit error: %s", errorx.ErrorWithoutStack(err))
-		return nil, err
-	}
-	calculatedGrade := puWithId.CalculateGrade(unitDAO.StartGrade)
+	calculatedGrade := puWithId.CalculateGrade(pUnit.StartGrade)
 
 	// 构建响应
 	ru := &core_api.UserVO{
@@ -443,112 +389,9 @@ func (u *UserService) CreateUser(ctx context.Context, req *core_api.CreateUserRe
 	}, nil
 }
 
-func tryBuildPsychUser(req *core_api.CreateUserReq, pUnit *unit.Unit) (*user.User, error) {
-	// psychUser所需参数校验
-	if req.Name == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "姓名"))
-	}
-	if req.EnrollYear == 0 {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "入学年份"))
-	}
-	if req.Class == 0 {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "班级"))
-	}
-	if req.CodeType == 0 {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "code类型"))
-	}
-	if req.Role == 0 {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "角色"))
-	}
-	if req.Role > enum.UserRoleUnitAdmin {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "用户角色不合法"))
-	}
-
-	if req.Gender != enum.UserGenderMale && req.Gender != enum.UserGenderFemale {
-		req.Gender = enum.UserGenderOther
-	}
-
-	// 处理 UnitId
-	unitOid, _ := bson.ObjectIDFromHex(req.UnitId)
-
-	// 同时传入phone, email, code时，psych user存储优先级phone > email > studentID
-	var code string
-	var codeType int
-	if req.GetCode() != "" {
-		code = req.GetCode()
-		codeType = enum.UserCodeTypeStudentID
-	}
-	if req.GetEmail() != "" {
-		code = req.GetEmail()
-		codeType = enum.UserCodeTypeEmail
-	}
-	if req.GetPhone() != "" {
-		code = req.GetPhone()
-		codeType = enum.UserCodeTypePhone
-	}
-
-	// birth
-	var birth time.Time
-	if req.Birth != 0 {
-		birth = time.Unix(req.Birth, 0)
-	}
-
-	now := time.Now()
-
-	// 角色
-	if req.Role == 0 {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "角色"))
-	}
-	if req.Role != enum.UserRoleStudent && req.Role != enum.UserRoleTeacher && req.Role != enum.UserRoleClassTeacher && req.Role != enum.UserRoleUnitAdmin {
-		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "用户角色不合法"))
-	}
-
-	// 时间字段: CreateTime, UpdateTime
-	var createTime time.Time
-	var updateTime time.Time
-	if req.CreateTime != 0 {
-		createTime = time.Unix(req.CreateTime, 0)
-	} else {
-		createTime = now
-	}
-	if req.UpdateTime != 0 {
-		updateTime = time.Unix(req.UpdateTime, 0)
-	} else {
-		updateTime = now
-	}
-
-	// 构造 user 对象
-	u := &user.User{
-		CodeType:   codeType,
-		Code:       code,
-		UnitID:     unitOid,
-		Name:       req.Name,
-		Birth:      birth,
-		Gender:     int(req.Gender),
-		RiskLevel:  enum.UserRiskLevelLow,
-		Status:     enum.UserStatusActive,
-		EnrollYear: int(req.EnrollYear),
-		Role:       int(req.Role),
-		Class:      int(req.Class),
-		CreateTime: createTime,
-		UpdateTime: updateTime,
-	}
-
-	return u, nil
-}
-
 func (u *UserService) SendVerifyCode(ctx context.Context, req *core_api.SendVerifyCodeReq) (*basic.Response, error) {
-	// 校验authId 确保是既有账号
-	ok, err := u.UserMapper.ExistsByCode(ctx, req.AuthId)
-	if !ok {
-		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", fmt.Sprintf("指定用户[code=%s]", req.AuthId)))
-	} else if err != nil {
-		return nil, errorx.WrapByCode(err, errno.ErrSendVerifyCode)
-	}
-
-	err = u.UserDomain.SendVerifyCode(ctx, req.AuthType, req.AuthId, "")
-	if err != nil {
-		return nil, errorx.WrapByCode(err, errno.ErrSendVerifyCode)
+	if err := u.UserDomain.SendVerifyCode(ctx, req.AuthType, req.AuthId, ""); err != nil {
+		return nil, err
 	}
 
 	return &basic.Response{

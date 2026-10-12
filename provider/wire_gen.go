@@ -81,7 +81,6 @@ func NewProvider() (*Provider, error) {
 		UserDomain: userDomainSVC,
 		UserMapper: iMongoMapper,
 		UnitMapper: unitIMongoMapper,
-		Synp4bCli:  client,
 		AuthDomain: authDomain,
 	}
 	unitService := service.UnitService{
