@@ -109,15 +109,15 @@ func modelLabDomainError(err error) error {
 	}
 }
 
-func (s *ModelLabService) authorize(ctx context.Context) (*auth.Meta, error) {
-	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
-	if err != nil {
-		return nil, err
-	}
+// modelLabAnonymousOwnerID 仅用于当前独立评测入口。评测会话存放在 Redis，且不写入
+// 学生正式会话；恢复账号鉴权时应改回由 AuthDomain 取得的真实用户 ID。
+const modelLabAnonymousOwnerID = "model-lab-anonymous"
+
+func (s *ModelLabService) authorize(_ context.Context) (*auth.Meta, error) {
 	if !s.isEnabled() {
-		return nil, errorx.New(errno.ErrInsufficientAuth)
+		return nil, errorx.New(errno.ErrModelLabNotReady)
 	}
-	return meta, nil
+	return &auth.Meta{UserId: modelLabAnonymousOwnerID}, nil
 }
 
 func (s *ModelLabService) isEnabled() bool {

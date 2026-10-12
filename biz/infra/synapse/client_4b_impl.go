@@ -13,7 +13,7 @@ import (
 
 // synapse4bClient 是面向 ToB 场景的 synapse4b 客户端。
 // 通过嵌入 synapseClient 复用所有公共方法，仅覆盖行为不同的接口：
-//   - Login：要求所有 authType 必须携带 unitId（extraAuthId）
+//   - Login：由中台根据账号返回所属单位，不要求客户端提供 unitId
 //   - Register：ToB 模式不支持自助注册，直接返回 ErrMethodNotSupported
 type synapse4bClient struct {
 	synapseClient
@@ -31,12 +31,10 @@ func New4b(config *conf.Config) Client {
 	}
 }
 
-// Login 在 ToB 模式下要求所有认证类型（手机、邮箱、code）均提供 unitId
-func (c *synapse4bClient) Login(ctx context.Context, authType, authId, extraAuthId, verify string) (*LoginResult, error) {
-	if extraAuthId == "" {
-		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("msg", "ToB 模式登录必须提供 unitId"))
-	}
-	return c.synapseClient.Login(ctx, authType, authId, extraAuthId, verify)
+// Login 不信任客户端传入的单位信息；登录成功后以中台返回的 BasicUser.UnitID
+// 作为用户所属单位，避免用户需要记忆或手输单位 ID。
+func (c *synapse4bClient) Login(ctx context.Context, authType, authId, _ string, verify string) (*LoginResult, error) {
+	return c.synapseClient.Login(ctx, authType, authId, "", verify)
 }
 
 // Register ToB 模式不支持自助注册，账号需由管理员在后台创建

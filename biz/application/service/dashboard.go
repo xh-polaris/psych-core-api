@@ -8,6 +8,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	"github.com/xh-polaris/psych-core-api/biz/domain/dashboard"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
@@ -39,6 +40,7 @@ type IDashboardService interface {
 	DashboardUnitConvRecords(ctx context.Context, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error)
 	DashboardGetConversationMessages(ctx context.Context, req *core_api.DashboardGetConversationMessagesReq) (*core_api.DashboardGetConversationMessagesResp, error)
 	DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error)
+	GenerateInterventionPlan(ctx context.Context, reportID string) (*InterventionPlanResp, error)
 
 	// 预警
 	DashboardGetAlarmOverview(ctx context.Context, req *core_api.DashboardGetAlarmOverviewReq) (*core_api.DashboardGetAlarmOverviewResp, error)
@@ -53,6 +55,7 @@ type DashboardService struct {
 	UserMapper         user.IMongoMapper
 	ConversationMapper conversation.IMongoMapper
 	ReportMapper       report.IMongoMapper
+	ConfigMapper       config.IMongoMapper
 	AlarmMapper        alarm.IMongoMapper
 	DashboardDomain    dashboard.IDashboardDomain
 }
