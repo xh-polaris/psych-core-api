@@ -63,6 +63,10 @@ var UserDomainSet = wire.NewSet(
 )
 
 func (u *UserDomainSVC) SignInByPhone(ctx context.Context, authType, phone, unitId, verify string) (*user.User, error) {
+	unitId, err := u.resolveLoginUnitID(ctx, phone, unitId)
+	if err != nil {
+		return nil, err
+	}
 	// 验证中台账号
 	synpResp, err := u.Synp4bCli.Login(ctx, authType, phone, unitId, verify)
 	if err != nil {
@@ -79,6 +83,10 @@ func (u *UserDomainSVC) SignInByPhone(ctx context.Context, authType, phone, unit
 }
 
 func (u *UserDomainSVC) SignInByEmail(ctx context.Context, authType, email, unitId, verify string) (*user.User, error) {
+	unitId, err := u.resolveLoginUnitID(ctx, email, unitId)
+	if err != nil {
+		return nil, err
+	}
 	// 验证中台账号
 	synpResp, err := u.Synp4bCli.Login(ctx, authType, email, unitId, verify)
 	if err != nil {
@@ -95,6 +103,10 @@ func (u *UserDomainSVC) SignInByEmail(ctx context.Context, authType, email, unit
 }
 
 func (u *UserDomainSVC) SignInByCode(ctx context.Context, authType, studentID, unitId, verify string) (*user.User, error) {
+	unitId, err := u.resolveLoginUnitID(ctx, studentID, unitId)
+	if err != nil {
+		return nil, err
+	}
 	synpResp, err := u.Synp4bCli.Login(ctx, authType, studentID, unitId, verify)
 	if err != nil {
 		return nil, err
@@ -107,6 +119,28 @@ func (u *UserDomainSVC) SignInByCode(ctx context.Context, authType, studentID, u
 	}
 
 	return pu, nil
+}
+
+// resolveLoginUnitID 兼容不再由前端提交单位 ID 的管理端登录。
+// 管理员账号在本地用户表中已绑定单位，因此可以先按账号反查单位，再将单位
+// ID 作为 Synapse ToB 登录的内部参数传递；客户端无需感知或填写该字段。
+func (u *UserDomainSVC) resolveLoginUnitID(ctx context.Context, authID, unitID string) (string, error) {
+	if unitID != "" {
+		return unitID, nil
+	}
+
+	localUser, err := u.UsrMapper.FindAdminByCode(ctx, authID, nil)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			// 继续让 Synapse 校验账号，保持历史错误语义。
+			return "", nil
+		}
+		return "", err
+	}
+	if localUser == nil || localUser.UnitID.IsZero() {
+		return "", nil
+	}
+	return localUser.UnitID.Hex(), nil
 }
 
 func (u *UserDomainSVC) CreateUser(ctx context.Context, input CreateUserInput) (*user.User, *unit.Unit, error) {
