@@ -8,32 +8,38 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/xh-polaris/psych-core-api/biz/adaptor/middleware"
+	appdto "github.com/xh-polaris/psych-core-api/biz/application/dto"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
-	"github.com/xh-polaris/psych-core-api/biz/application/service"
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/pkg/httpx"
 	"github.com/xh-polaris/psych-core-api/provider"
 )
 
 type studentProfileResp struct {
-	Profile *service.StudentProfile `json:"profile"`
-	Code    int32                   `json:"code"`
-	Msg     string                  `json:"msg"`
+	Profile *appdto.StudentProfile `json:"profile"`
+	Code    int32                  `json:"code"`
+	Msg     string                 `json:"msg"`
 }
 
 func GetStudentProfile(ctx context.Context, c *app.RequestContext) {
 	middleware.StoreToken(ctx, c, nil)
+	if c.IsAborted() {
+		return
+	}
 	profile, err := provider.Get().UserService.GetStudentProfile(ctx)
 	httpx.PostProcess(ctx, c, nil, &studentProfileResp{Profile: profile, Code: 0, Msg: "success"}, err)
 }
 
 func UpdateStudentProfile(ctx context.Context, c *app.RequestContext) {
-	var req service.UpdateStudentProfileInput
+	var req appdto.UpdateStudentProfileInput
 	if err := c.BindAndValidate(&req); err != nil {
 		c.String(consts.StatusBadRequest, err.Error())
 		return
 	}
 	middleware.StoreToken(ctx, c, &req)
+	if c.IsAborted() {
+		return
+	}
 	profile, err := provider.Get().UserService.UpdateStudentProfile(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, &studentProfileResp{Profile: profile, Code: 0, Msg: "success"}, err)
 }
