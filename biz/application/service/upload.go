@@ -21,6 +21,7 @@ var _ IFileService = (*FileService)(nil)
 
 type IFileService interface {
 	UploadImage(ctx context.Context, fileHeader *multipart.FileHeader, file multipart.File) (*UploadImageResp, error)
+	UploadImageDirect(ctx context.Context, fileHeader *multipart.FileHeader, file multipart.File) (*UploadImageResp, error)
 	UploadAvatar(ctx context.Context, fileHeader *multipart.FileHeader, file multipart.File) (*UploadImageResp, error)
 }
 
@@ -53,7 +54,7 @@ func (s *FileService) UploadImage(ctx context.Context, fileHeader *multipart.Fil
 		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
-	ext := filepath.Ext(fileHeader.Filename)
+	ext := strings.ToLower(filepath.Ext(fileHeader.Filename))
 	if !allowedImageExts[ext] {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "不支持的图片格式，仅支持 jpg/png/gif/webp/bmp"))
 	}
@@ -69,6 +70,31 @@ func (s *FileService) UploadImage(ctx context.Context, fileHeader *multipart.Fil
 		Msg:  "success",
 		URL:  presignedURL,
 	}, nil
+}
+
+// UploadImageDirect 由后端代传图片，避免浏览器直接 PUT COS 时受到存储桶
+// CORS 预检限制。UploadImage 保留预签名上传契约供学生端兼容使用。
+func (s *FileService) UploadImageDirect(ctx context.Context, fileHeader *multipart.FileHeader, file multipart.File) (*UploadImageResp, error) {
+	meta, err := s.AuthDomain.ExtraUserMeta(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if meta.Role < enum.UserRoleUnitAdmin {
+		return nil, errorx.New(errno.ErrInsufficientAuth)
+	}
+
+	ext := strings.ToLower(filepath.Ext(fileHeader.Filename))
+	if !allowedImageExts[ext] {
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "不支持的图片格式，仅支持 jpg/png/gif/webp/bmp"))
+	}
+
+	key := fmt.Sprintf("images/%s/%s%s", time.Now().Format("2006/01/02"), uuid.New().String(), ext)
+	accessURL, err := s.StoragePvd.Upload(ctx, key, file, fileHeader.Size)
+	if err != nil {
+		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "图片上传失败"))
+	}
+
+	return &UploadImageResp{Code: 0, Msg: "success", URL: accessURL}, nil
 }
 
 // UploadAvatar 由后端代传头像，避免学生浏览器直接 PUT COS 时受到存储桶

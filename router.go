@@ -13,6 +13,7 @@ func customizedRegister(r *server.Hertz) {
 	r.GET("/ping", handler.Ping)
 	r.GET("/chat", handler.Chat)
 	r.POST("/file/upload", handler.UploadImage)
+	r.POST("/file/upload_direct", handler.UploadImageDirect)
 	r.POST("/student/avatar/upload", handler.UploadAvatar)
 	r.POST("/conversation/archive", coreAPIHandler.ArchiveConversation)
 	r.POST("/dashboard/generate_intervention_plan", coreAPIHandler.GenerateInterventionPlan)
