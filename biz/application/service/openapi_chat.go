@@ -36,7 +36,7 @@ func (s *OpenAPIChatService) Stream(ctx context.Context, req openapichat.Request
 	workflow := &openapichat.Service{
 		Strategy: strategy,
 		Dialogue: dialogue,
-		Prompts:  openAPIPromptSource{},
+		Prompts:  PromptManagerSource{},
 	}
 	return workflow.Stream(ctx, req)
 }
@@ -64,16 +64,18 @@ func (s *OpenAPIChatService) openAPIChatSetting(upstream string) (*app.ChatSetti
 	}, nil
 }
 
-type openAPIPromptSource struct{}
+// PromptManagerSource 从运行时提示词管理器读取策略模板、对话模板和微技能。
+// 它不绑定任何 HTTP 协议，可由开放接口和模型评测端共同复用。
+type PromptManagerSource struct{}
 
-func (openAPIPromptSource) GetTemplate(ctx context.Context, name string) (string, error) {
+func (PromptManagerSource) GetTemplate(ctx context.Context, name string) (string, error) {
 	if prompt.Mgr == nil {
 		return "", fmt.Errorf("prompt manager is unavailable")
 	}
 	return prompt.Mgr.GetTemplate(ctx, name, nil)
 }
 
-func (openAPIPromptSource) GetSkills(ctx context.Context, names ...string) (map[string]string, error) {
+func (PromptManagerSource) GetSkills(ctx context.Context, names ...string) (map[string]string, error) {
 	if prompt.Mgr == nil {
 		return nil, fmt.Errorf("prompt manager is unavailable")
 	}

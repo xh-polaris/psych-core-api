@@ -6,12 +6,14 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/conf"
 	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	"github.com/xh-polaris/psych-core-api/biz/domain/dashboard"
+	modellabdomain "github.com/xh-polaris/psych-core-api/biz/domain/model_lab"
 	"github.com/xh-polaris/psych-core-api/biz/domain/usr"
 	"github.com/xh-polaris/psych-core-api/biz/infra/cache/redis"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/config"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/conversation"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
+	modellabmapper "github.com/xh-polaris/psych-core-api/biz/infra/mapper/model_lab"
 	openapiusagemapper "github.com/xh-polaris/psych-core-api/biz/infra/mapper/openapi_usage"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/prompt"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
@@ -45,6 +47,7 @@ type Provider struct {
 	FileService         service.FileService
 	ChatReportService   service.ChatReportService
 	OpenAPIService      service.OpenAPIService
+	ModelLabService     service.ModelLabService
 	MessageMapper       message.IMongoMapper
 	ConversationMapper  conversation.IMongoMapper
 	ReportMapper        report.IMongoMapper
@@ -72,12 +75,14 @@ var ApplicationSet = wire.NewSet(
 	service.FileServiceSet,
 	service.ChatReportServiceSet,
 	service.OpenAPIServiceSet,
+	service.ModelLabServiceSet,
 )
 
 var DomainSet = wire.NewSet(
 	usr.UserDomainSet,
 	auth.AuthDomainSet,
 	dashboard.DashboardDomainSet,
+	modellabdomain.ModelLabDomainSet,
 )
 
 var InfrastructureSet = wire.NewSet(
@@ -94,6 +99,7 @@ var InfrastructureSet = wire.NewSet(
 	prompt.NewPromptMongoMapper,
 	voice.NewVoiceMongoMapper,
 	openapiusagemapper.Set,
+	modellabmapper.Set,
 	RpcSet,
 	synapse.New4b,
 	psychpost.NewClient,

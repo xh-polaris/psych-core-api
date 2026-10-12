@@ -18,6 +18,20 @@ func Register(r *server.Hertz) {
 
 	root := r.Group("/", rootMw()...)
 	{
+		_api := root.Group("/api", _apiMw()...)
+		{
+			_model_lab := _api.Group("/model-lab", _model_labMw()...)
+			_model_lab.GET("/models", append(_modellablistmodelsMw(), core_api.ModelLabListModels)...)
+			_model_lab.POST("/reports", append(_modellabgeneratereportMw(), core_api.ModelLabGenerateReport)...)
+			_model_lab.POST("/sessions", append(_modellabcreatesessionMw(), core_api.ModelLabCreateSession)...)
+			_model_lab.POST("/turns", append(_modellabsendturnMw(), core_api.ModelLabSendTurn)...)
+			{
+				_branches := _model_lab.Group("/branches", _branchesMw()...)
+				_branches.POST("/get", append(_modellabgetbranchMw(), core_api.ModelLabGetBranch)...)
+			}
+		}
+	}
+	{
 		_config := root.Group("/config", _configMw()...)
 		_config.POST("/add_character", append(_configaddcharacterMw(), core_api.ConfigAddCharacter)...)
 		_config.POST("/create", append(_configcreateMw(), core_api.ConfigCreate)...)

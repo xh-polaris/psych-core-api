@@ -65,6 +65,29 @@ type UpstreamKey struct {
 	AccessKey string
 }
 
+// ModelLabModel 是模型评测端可选模型的运行时配置。模型名称、地址、密钥和
+// 是否启用均由 Rancher 配置决定，代码只按 Provider 选择协议适配器。
+type ModelLabModel struct {
+	ID                  string
+	Name                string
+	Enabled             bool
+	Provider            string
+	URL                 string
+	Model               string
+	AccessKey           string
+	ChatCompletionsPath string `json:",optional"`
+	ReportUpstream      string `json:",optional"`
+}
+
+// ModelLab 是模型评测端运行时配置。etc/config.yaml 仅记录同结构模板，
+// 运行环境以 Rancher 挂载的 CONFIG_PATH 为准。
+type ModelLab struct {
+	Enabled         bool
+	SessionTTLHours int `json:",optional"`
+	StrategyModelID string
+	Models          []ModelLabModel
+}
+
 type OpenApi struct {
 	Pepper               string
 	Keys                 []OpenApiKey
@@ -95,7 +118,8 @@ type Config struct {
 	Synapse     *Synapse
 	SMS         *SMS
 	COS         *COS
-	OpenApi     *OpenApi `json:",optional"`
+	OpenApi     *OpenApi  `json:",optional"`
+	ModelLab    *ModelLab `json:",optional"`
 }
 
 func (c *Config) PostProcessEnabled() bool {
@@ -129,6 +153,42 @@ func (c *Config) validateOpenAPIUpstreams() error {
 			return fmt.Errorf("openapi: keys %s and %s share upstream %q", boundBy, key.Prefix, key.Upstream)
 		}
 		boundUpstreams[key.Upstream] = key.Prefix
+	}
+	return nil
+}
+
+// validateModelLab 在启动期拦截无效评测配置。关闭评测功能时不要求配置，
+// 避免未部署测试端的环境受到影响。
+func (c *Config) validateModelLab() error {
+	if c.ModelLab == nil || !c.ModelLab.Enabled {
+		return nil
+	}
+	if c.ModelLab.SessionTTLHours <= 0 {
+		return fmt.Errorf("model_lab: SessionTTLHours must be positive")
+	}
+	models := make(map[string]ModelLabModel, len(c.ModelLab.Models))
+	enabledCount := 0
+	for _, model := range c.ModelLab.Models {
+		if model.ID == "" || model.Name == "" || model.Provider == "" || model.URL == "" || model.Model == "" || model.AccessKey == "" {
+			return fmt.Errorf("model_lab: model configuration is incomplete")
+		}
+		if _, exists := models[model.ID]; exists {
+			return fmt.Errorf("model_lab: duplicate model ID %q", model.ID)
+		}
+		models[model.ID] = model
+		if model.Enabled {
+			enabledCount++
+		}
+	}
+	if enabledCount < 3 {
+		return fmt.Errorf("model_lab: at least three enabled models are required when enabled")
+	}
+	strategy, ok := models[c.ModelLab.StrategyModelID]
+	if c.ModelLab.StrategyModelID == "" || !ok || !strategy.Enabled {
+		return fmt.Errorf("model_lab: StrategyModelID must reference an enabled model")
+	}
+	if strategy.Provider != "deepseek" {
+		return fmt.Errorf("model_lab: strategy model provider must be deepseek")
 	}
 	return nil
 }
@@ -171,6 +231,9 @@ func NewConfig() (*Config, error) {
 	// 在 SetUp 之前校验：SetUp 会拉起 logx/prometheus/trace 等 agent，
 	// 配置错误时应尽早返回，避免留下半初始化的运行时。
 	if err = c.validateOpenAPIUpstreams(); err != nil {
+		return nil, err
+	}
+	if err = c.validateModelLab(); err != nil {
 		return nil, err
 	}
 	err = c.SetUp()

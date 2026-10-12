@@ -357,3 +357,48 @@ func _openapigetusageMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _apiMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _model_labMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _modellabaccessMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _modellablistmodelsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _modellabcreatesessionMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _branchesMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _modellabgetbranchMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _modellabsendturnMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _modellabgeneratereportMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
