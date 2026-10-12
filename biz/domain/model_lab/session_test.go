@@ -62,7 +62,9 @@ func TestTurnBranchesAreIndependentAndPersistTrace(t *testing.T) {
 		Config: &conf.Config{ModelLab: &conf.ModelLab{
 			SessionTTLHours: 24,
 			Models: []conf.ModelLabModel{
-				{ID: "deepseek", Enabled: true}, {ID: "glm", Enabled: true}, {ID: "innospark", Enabled: true},
+				{ID: "deepseek", Enabled: true, ReportUpstream: "model-lab-deepseek"},
+				{ID: "glm", Enabled: true},
+				{ID: "innospark", Enabled: true},
 			},
 		}},
 		Mapper: mapper,
@@ -106,5 +108,24 @@ func TestTurnBranchesAreIndependentAndPersistTrace(t *testing.T) {
 	}
 	if _, err = domain.GetBranch(ctx, "expert-2", session.ID, "deepseek"); !errors.Is(err, ErrNotOwner) {
 		t.Fatalf("owner validation error = %v, want ErrNotOwner", err)
+	}
+}
+
+func TestCreateSessionRejectsReportModelWithoutUpstream(t *testing.T) {
+	domain := &ModelLabDomain{
+		Config: &conf.Config{ModelLab: &conf.ModelLab{
+			SessionTTLHours: 24,
+			Models: []conf.ModelLabModel{
+				{ID: "deepseek", Enabled: true, ReportUpstream: "model-lab-deepseek"},
+				{ID: "glm", Enabled: true},
+				{ID: "innospark", Enabled: true},
+			},
+		}},
+		Mapper: newMemoryMapper(),
+	}
+
+	_, err := domain.CreateSession(context.Background(), "model-lab-anonymous", []string{"deepseek", "glm", "innospark"}, []string{"glm"})
+	if !errors.Is(err, ErrModelUnavailable) {
+		t.Fatalf("未配置报告上游的模型应返回 ErrModelUnavailable，实际为 %v", err)
 	}
 }

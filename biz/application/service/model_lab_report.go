@@ -16,11 +16,11 @@ func (s *ModelLabService) ModelLabGenerateReport(ctx context.Context, req *core_
 	if req == nil || req.GetSessionId() == "" || req.GetChatModelId() == "" || req.GetReportModelId() == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "评测会话、对话模型和报告模型"))
 	}
-	meta, err := s.authorize(ctx)
+	ownerUserID, err := s.anonymousOwner()
 	if err != nil {
 		return nil, err
 	}
-	branch, err := s.ModelLabDomain.GetReportBranch(ctx, meta.UserId, req.GetSessionId(), req.GetChatModelId(), req.GetReportModelId())
+	branch, err := s.ModelLabDomain.GetReportBranch(ctx, ownerUserID, req.GetSessionId(), req.GetChatModelId(), req.GetReportModelId())
 	if err != nil {
 		return nil, modelLabDomainError(err)
 	}

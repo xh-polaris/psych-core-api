@@ -131,7 +131,6 @@ func NewProvider() (*Provider, error) {
 	modelLabChatService := service.NewModelLabChatService(confConfig)
 	modelLabService := service.ModelLabService{
 		Config:         confConfig,
-		AuthDomain:     authDomain,
 		ModelLabDomain: modelLabDomain,
 		ChatService:    modelLabChatService,
 		ReportService:  openAPIReportService,
