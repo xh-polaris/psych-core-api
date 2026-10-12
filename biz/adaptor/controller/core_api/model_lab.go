@@ -8,7 +8,6 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/protocol/http1/resp"
-	"github.com/xh-polaris/psych-core-api/biz/adaptor/middleware"
 	core_api "github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/pkg/httpx"
 	"github.com/xh-polaris/psych-core-api/provider"
@@ -25,7 +24,6 @@ func ModelLabListModels(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	middleware.StoreToken(ctx, c, &req)
 	resp, err := provider.Get().ModelLabService.ModelLabListModels(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
@@ -41,7 +39,6 @@ func ModelLabCreateSession(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	middleware.StoreToken(ctx, c, &req)
 	resp, err := provider.Get().ModelLabService.ModelLabCreateSession(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
@@ -57,7 +54,6 @@ func ModelLabGetBranch(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	middleware.StoreToken(ctx, c, &req)
 	resp, err := provider.Get().ModelLabService.ModelLabGetBranch(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
@@ -73,7 +69,6 @@ func ModelLabSendTurn(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	session, err := p.ModelLabService.ModelLabStartTurn(ctx, &req)
 	if err != nil {
@@ -102,7 +97,6 @@ func ModelLabGenerateReport(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	result, err := p.ModelLabService.ModelLabGenerateReport(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, result, err)
