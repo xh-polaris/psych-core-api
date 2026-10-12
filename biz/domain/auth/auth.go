@@ -26,7 +26,7 @@ type IAuthDomain interface {
 
 	// IdentifyRole 根据请求上下文确定操作者角色，返回 enum.UserRole 值
 	// - unitId 为空：要求超管（JWT + DB 双重校验）
-	// - unitId 非空：返回 UserRoleUnitAdmin 或 UserRoleClassTeacher
+	// - unitId 非空：超管可跨单位查询；单位管理员与班主任仅可查询本单位
 	IdentifyRole(ctx context.Context, unitId string) (*Meta, int, error)
 
 	// VerifySuperAdmin 校验超管权限（JWT role + DB role 双重校验）
@@ -82,7 +82,7 @@ func (a *AuthDomain) IdentifyRole(ctx context.Context, unitId string) (*Meta, in
 		}
 		return usrMeta, enum.UserRoleSuperAdmin, nil
 	}
-	// 有unitId：单位管理员或班主任
+	// 有 unitId：先校验目标单位存在，再根据操作者角色授权。
 	// 校验unit存在
 	IDs, err := util.ObjectIDsFromHex(usrMeta.UserId, unitId)
 	if err != nil {
@@ -94,7 +94,15 @@ func (a *AuthDomain) IdentifyRole(ctx context.Context, unitId string) (*Meta, in
 		return nil, 0, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "鉴权时UnitID"))
 	}
 
-	// 判断用户权限
+	// 超管查看指定单位时仍需通过 JWT + DB 双重校验，不能只信任 JWT 中的 role。
+	if usrMeta.HasSuperAdminAuth() {
+		if err = a.VerifySuperAdmin(ctx, usrMeta); err != nil {
+			return nil, 0, err
+		}
+		return usrMeta, enum.UserRoleSuperAdmin, nil
+	}
+
+	// 单位管理员和班主任只能访问自己所属单位。
 	if usrMeta.IsUnitAdmin(unitId) {
 		return usrMeta, enum.UserRoleUnitAdmin, nil
 	}
