@@ -7,7 +7,6 @@ import (
 	"github.com/google/wire"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/conf"
-	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
 	modellab "github.com/xh-polaris/psych-core-api/biz/domain/model_lab"
 	"github.com/xh-polaris/psych-core-api/pkg/errorx"
 	"github.com/xh-polaris/psych-core-api/types/errno"
@@ -23,11 +22,11 @@ type IModelLabService interface {
 }
 
 func (s *ModelLabService) ModelLabGetBranch(ctx context.Context, req *core_api.ModelLabGetBranchReq) (*core_api.ModelLabGetBranchResp, error) {
-	meta, err := s.authorize(ctx)
+	ownerUserID, err := s.anonymousOwner()
 	if err != nil {
 		return nil, err
 	}
-	branch, err := s.ModelLabDomain.GetBranch(ctx, meta.UserId, req.GetSessionId(), req.GetChatModelId())
+	branch, err := s.ModelLabDomain.GetBranch(ctx, ownerUserID, req.GetSessionId(), req.GetChatModelId())
 	if err != nil {
 		return nil, modelLabDomainError(err)
 	}
@@ -52,7 +51,6 @@ func (s *ModelLabService) ModelLabGetBranch(ctx context.Context, req *core_api.M
 
 type ModelLabService struct {
 	Config         *conf.Config
-	AuthDomain     auth.IAuthDomain
 	ModelLabDomain modellab.IModelLabDomain
 	ChatService    ModelLabChatService
 	ReportService  OpenAPIReportService
@@ -65,7 +63,7 @@ var ModelLabServiceSet = wire.NewSet(
 )
 
 func (s *ModelLabService) ModelLabListModels(ctx context.Context, _ *core_api.ModelLabListModelsReq) (*core_api.ModelLabListModelsResp, error) {
-	if _, err := s.authorize(ctx); err != nil {
+	if _, err := s.anonymousOwner(); err != nil {
 		return nil, err
 	}
 	resp := &core_api.ModelLabListModelsResp{Code: 0, Msg: "success", StrategyModelId: s.Config.ModelLab.StrategyModelID}
@@ -82,11 +80,11 @@ func (s *ModelLabService) ModelLabListModels(ctx context.Context, _ *core_api.Mo
 }
 
 func (s *ModelLabService) ModelLabCreateSession(ctx context.Context, req *core_api.ModelLabCreateSessionReq) (*core_api.ModelLabCreateSessionResp, error) {
-	meta, err := s.authorize(ctx)
+	ownerUserID, err := s.anonymousOwner()
 	if err != nil {
 		return nil, err
 	}
-	session, err := s.ModelLabDomain.CreateSession(ctx, meta.UserId, req.GetChatModelIds(), req.GetReportModelIds())
+	session, err := s.ModelLabDomain.CreateSession(ctx, ownerUserID, req.GetChatModelIds(), req.GetReportModelIds())
 	if err != nil {
 		return nil, modelLabDomainError(err)
 	}
@@ -102,7 +100,7 @@ func modelLabDomainError(err error) error {
 		return errorx.New(errno.ErrInsufficientAuth)
 	case errors.Is(err, modellab.ErrSessionNotFound), errors.Is(err, modellab.ErrBranchNotFound):
 		return errorx.New(errno.ErrNotFound, errorx.KV("field", "评测会话"))
-	case errors.Is(err, modellab.ErrModelNotInScope), errors.Is(err, modellab.ErrTurnInProgress):
+	case errors.Is(err, modellab.ErrModelNotInScope), errors.Is(err, modellab.ErrModelUnavailable), errors.Is(err, modellab.ErrTurnInProgress):
 		return errorx.New(errno.ErrInvalidParams, errorx.KV("field", "评测模型"))
 	default:
 		return err
@@ -110,14 +108,15 @@ func modelLabDomainError(err error) error {
 }
 
 // modelLabAnonymousOwnerID 仅用于当前独立评测入口。评测会话存放在 Redis，且不写入
-// 学生正式会话；恢复账号鉴权时应改回由 AuthDomain 取得的真实用户 ID。
+// 学生正式会话；恢复账号鉴权时应将该固定标识替换为真实用户 ID。
 const modelLabAnonymousOwnerID = "model-lab-anonymous"
 
-func (s *ModelLabService) authorize(_ context.Context) (*auth.Meta, error) {
+// anonymousOwner 统一处理评测功能开关，并返回匿名评测会话的固定归属标识。
+func (s *ModelLabService) anonymousOwner() (string, error) {
 	if !s.isEnabled() {
-		return nil, errorx.New(errno.ErrModelLabNotReady)
+		return "", errorx.New(errno.ErrModelLabNotReady)
 	}
-	return &auth.Meta{UserId: modelLabAnonymousOwnerID}, nil
+	return modelLabAnonymousOwnerID, nil
 }
 
 func (s *ModelLabService) isEnabled() bool {

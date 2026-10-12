@@ -14,11 +14,12 @@ import (
 )
 
 var (
-	ErrSessionNotFound = errors.New("model_lab: session not found")
-	ErrBranchNotFound  = errors.New("model_lab: branch not found")
-	ErrNotOwner        = errors.New("model_lab: session does not belong to current user")
-	ErrModelNotInScope = errors.New("model_lab: model is not part of session")
-	ErrTurnInProgress  = errors.New("model_lab: turn is already in progress")
+	ErrSessionNotFound  = errors.New("model_lab: session not found")
+	ErrBranchNotFound   = errors.New("model_lab: branch not found")
+	ErrNotOwner         = errors.New("model_lab: session does not belong to current user")
+	ErrModelNotInScope  = errors.New("model_lab: model is not part of session")
+	ErrModelUnavailable = errors.New("model_lab: model is unavailable")
+	ErrTurnInProgress   = errors.New("model_lab: turn is already in progress")
 )
 
 const turnLockTTL = 5 * time.Minute
@@ -257,7 +258,10 @@ func (d *ModelLabDomain) validateModels(ids []string, requireThree bool) error {
 	for _, id := range ids {
 		model, ok := known[id]
 		if !ok || !model.Enabled {
-			return fmt.Errorf("model_lab: model %q is unavailable", id)
+			return fmt.Errorf("%w: model %q", ErrModelUnavailable, id)
+		}
+		if !requireThree && model.ReportUpstream == "" {
+			return fmt.Errorf("%w: report model %q has no report upstream", ErrModelUnavailable, id)
 		}
 		if _, duplicate := seen[id]; duplicate {
 			return fmt.Errorf("model_lab: duplicate model %q", id)
