@@ -173,6 +173,10 @@ func (m *mockUserMapper) ListUsers(ctx context.Context, opts *user.ListUserOptio
 func (m *mockUserMapper) FindClassTeacherOfStudent(ctx context.Context, unitId bson.ObjectID, enrollYear, class int) (*user.User, error) {
 	return m.findClassTeacherResult, m.findClassTeacherErr
 }
+func (m *mockUserMapper) FindAdminsByCode(ctx context.Context, code string) ([]*user.User, error) {
+	m.fatal("FindAdminsByCode")
+	return nil, nil
+}
 
 var _ user.IMongoMapper = (*mockUserMapper)(nil)
 

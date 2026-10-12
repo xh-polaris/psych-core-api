@@ -63,10 +63,11 @@ var UserDomainSet = wire.NewSet(
 )
 
 func (u *UserDomainSVC) SignInByPhone(ctx context.Context, authType, phone, unitId, verify string) (*user.User, error) {
-	unitId, err := u.resolveLoginUnitID(ctx, phone, unitId)
-	if err != nil {
-		return nil, err
+	// 中台拒绝空单位登录；管理端不再传单位，按手机号反查本地管理侧账号补齐
+	if unitId == "" {
+		unitId = u.resolveAdminUnitId(ctx, phone)
 	}
+
 	// 验证中台账号
 	synpResp, err := u.Synp4bCli.Login(ctx, authType, phone, unitId, verify)
 	if err != nil {
@@ -83,10 +84,11 @@ func (u *UserDomainSVC) SignInByPhone(ctx context.Context, authType, phone, unit
 }
 
 func (u *UserDomainSVC) SignInByEmail(ctx context.Context, authType, email, unitId, verify string) (*user.User, error) {
-	unitId, err := u.resolveLoginUnitID(ctx, email, unitId)
-	if err != nil {
-		return nil, err
+	// 中台拒绝空单位登录；管理端不再传单位，按邮箱反查本地管理侧账号补齐
+	if unitId == "" {
+		unitId = u.resolveAdminUnitId(ctx, email)
 	}
+
 	// 验证中台账号
 	synpResp, err := u.Synp4bCli.Login(ctx, authType, email, unitId, verify)
 	if err != nil {
@@ -103,10 +105,6 @@ func (u *UserDomainSVC) SignInByEmail(ctx context.Context, authType, email, unit
 }
 
 func (u *UserDomainSVC) SignInByCode(ctx context.Context, authType, studentID, unitId, verify string) (*user.User, error) {
-	unitId, err := u.resolveLoginUnitID(ctx, studentID, unitId)
-	if err != nil {
-		return nil, err
-	}
 	synpResp, err := u.Synp4bCli.Login(ctx, authType, studentID, unitId, verify)
 	if err != nil {
 		return nil, err
@@ -121,26 +119,28 @@ func (u *UserDomainSVC) SignInByCode(ctx context.Context, authType, studentID, u
 	return pu, nil
 }
 
-// resolveLoginUnitID 兼容不再由前端提交单位 ID 的管理端登录。
-// 管理员账号在本地用户表中已绑定单位，因此可以先按账号反查单位，再将单位
-// ID 作为 Synapse ToB 登录的内部参数传递；客户端无需感知或填写该字段。
-func (u *UserDomainSVC) resolveLoginUnitID(ctx context.Context, authID, unitID string) (string, error) {
-	if unitID != "" {
-		return unitID, nil
-	}
-
-	localUser, err := u.UsrMapper.FindAdminByCode(ctx, authID, nil)
+// resolveAdminUnitId 按手机号/邮箱反查本地管理侧账号所属单位。
+// 业务约定管理员手机号、邮箱与单位一对一绑定；查无账号（含超管本地无绑定）、
+// 命中多条或查询出错时降级为空串，由中台按原有逻辑处理。
+func (u *UserDomainSVC) resolveAdminUnitId(ctx context.Context, code string) string {
+	admins, err := u.UsrMapper.FindAdminsByCode(ctx, code)
 	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			// 继续让 Synapse 校验账号，保持历史错误语义。
-			return "", nil
+		logs.Errorf("[user domain] resolve admin unit failed: %s", errorx.ErrorWithoutStack(err))
+		return ""
+	}
+	switch len(admins) {
+	case 0:
+		logs.Infof("[user domain] no admin user matched code [%s], skip unit resolve", code)
+	case 1:
+		if admins[0].UnitID.IsZero() {
+			logs.Warnf("[user domain] admin user [id=%s] has no unit bound, skip unit resolve", admins[0].ID.Hex())
+			return ""
 		}
-		return "", err
+		return admins[0].UnitID.Hex()
+	default:
+		logs.Warnf("[user domain] code [%s] matched %d admin users, skip unit resolve", code, len(admins))
 	}
-	if localUser == nil || localUser.UnitID.IsZero() {
-		return "", nil
-	}
-	return localUser.UnitID.Hex(), nil
+	return ""
 }
 
 func (u *UserDomainSVC) CreateUser(ctx context.Context, input CreateUserInput) (*user.User, *unit.Unit, error) {

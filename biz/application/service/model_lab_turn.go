@@ -37,11 +37,11 @@ func (s *ModelLabService) ModelLabStartTurn(ctx context.Context, req *core_api.M
 	if len([]rune(req.GetContent())) > modelLabMaxMessageChars {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "对话内容"))
 	}
-	meta, err := s.authorize(ctx)
+	ownerUserID, err := s.anonymousOwner()
 	if err != nil {
 		return nil, err
 	}
-	lease, err := s.ModelLabDomain.BeginTurn(ctx, meta.UserId, req.GetSessionId(), req.GetChatModelId())
+	lease, err := s.ModelLabDomain.BeginTurn(ctx, ownerUserID, req.GetSessionId(), req.GetChatModelId())
 	if err != nil {
 		return nil, modelLabDomainError(err)
 	}
