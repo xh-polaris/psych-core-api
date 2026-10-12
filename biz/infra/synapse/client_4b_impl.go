@@ -31,10 +31,10 @@ func New4b(config *conf.Config) Client {
 	}
 }
 
-// Login 不信任客户端传入的单位信息；登录成功后以中台返回的 BasicUser.UnitID
-// 作为用户所属单位，避免用户需要记忆或手输单位 ID。
-func (c *synapse4bClient) Login(ctx context.Context, authType, authId, _ string, verify string) (*LoginResult, error) {
-	return c.synapseClient.Login(ctx, authType, authId, "", verify)
+// Login 优先使用中台返回的 BasicUser.UnitID；若调用方仍提供单位 ID，则透传给
+// Synapse，兼容仍要求单位 ID 的旧测试环境和历史前端。
+func (c *synapse4bClient) Login(ctx context.Context, authType, authId, unitId string, verify string) (*LoginResult, error) {
+	return c.synapseClient.Login(ctx, authType, authId, unitId, verify)
 }
 
 // Register ToB 模式不支持自助注册，账号需由管理员在后台创建
