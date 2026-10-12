@@ -115,7 +115,7 @@ const modelLabAnonymousOwnerID = "model-lab-anonymous"
 
 func (s *ModelLabService) authorize(_ context.Context) (*auth.Meta, error) {
 	if !s.isEnabled() {
-		return nil, errorx.New(errno.ErrInsufficientAuth)
+		return nil, errorx.New(errno.ErrModelLabNotReady)
 	}
 	return &auth.Meta{UserId: modelLabAnonymousOwnerID}, nil
 }
