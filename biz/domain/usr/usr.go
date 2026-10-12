@@ -63,6 +63,11 @@ var UserDomainSet = wire.NewSet(
 )
 
 func (u *UserDomainSVC) SignInByPhone(ctx context.Context, authType, phone, unitId, verify string) (*user.User, error) {
+	// 中台拒绝空单位登录；管理端不再传单位，按手机号反查本地管理侧账号补齐
+	if unitId == "" {
+		unitId = u.resolveAdminUnitId(ctx, phone)
+	}
+
 	// 验证中台账号
 	synpResp, err := u.Synp4bCli.Login(ctx, authType, phone, unitId, verify)
 	if err != nil {
@@ -79,6 +84,11 @@ func (u *UserDomainSVC) SignInByPhone(ctx context.Context, authType, phone, unit
 }
 
 func (u *UserDomainSVC) SignInByEmail(ctx context.Context, authType, email, unitId, verify string) (*user.User, error) {
+	// 中台拒绝空单位登录；管理端不再传单位，按邮箱反查本地管理侧账号补齐
+	if unitId == "" {
+		unitId = u.resolveAdminUnitId(ctx, email)
+	}
+
 	// 验证中台账号
 	synpResp, err := u.Synp4bCli.Login(ctx, authType, email, unitId, verify)
 	if err != nil {
@@ -107,6 +117,30 @@ func (u *UserDomainSVC) SignInByCode(ctx context.Context, authType, studentID, u
 	}
 
 	return pu, nil
+}
+
+// resolveAdminUnitId 按手机号/邮箱反查本地管理侧账号所属单位。
+// 业务约定管理员手机号、邮箱与单位一对一绑定；查无账号（含超管本地无绑定）、
+// 命中多条或查询出错时降级为空串，由中台按原有逻辑处理。
+func (u *UserDomainSVC) resolveAdminUnitId(ctx context.Context, code string) string {
+	admins, err := u.UsrMapper.FindAdminsByCode(ctx, code)
+	if err != nil {
+		logs.Errorf("[user domain] resolve admin unit failed: %s", errorx.ErrorWithoutStack(err))
+		return ""
+	}
+	switch len(admins) {
+	case 0:
+		logs.Infof("[user domain] no admin user matched code [%s], skip unit resolve", code)
+	case 1:
+		if admins[0].UnitID.IsZero() {
+			logs.Warnf("[user domain] admin user [id=%s] has no unit bound, skip unit resolve", admins[0].ID.Hex())
+			return ""
+		}
+		return admins[0].UnitID.Hex()
+	default:
+		logs.Warnf("[user domain] code [%s] matched %d admin users, skip unit resolve", code, len(admins))
+	}
+	return ""
 }
 
 func (u *UserDomainSVC) CreateUser(ctx context.Context, input CreateUserInput) (*user.User, *unit.Unit, error) {

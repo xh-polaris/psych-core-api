@@ -29,6 +29,7 @@ type IMongoMapper interface {
 
 	FindStudentByCode(ctx context.Context, code string, unitId bson.ObjectID) (*User, error)
 	FindAdminByCode(ctx context.Context, code string, unitId *bson.ObjectID) (*User, error)
+	FindAdminsByCode(ctx context.Context, code string) ([]*User, error)
 
 	CountStudents(ctx context.Context, unitId bson.ObjectID) (int32, error)
 	CountStudentsByPeriod(ctx context.Context, unitId *bson.ObjectID, start, end time.Time) (int32, error)
@@ -105,9 +106,9 @@ func (m *mongoMapper) FindStudentByCode(ctx context.Context, code string, unitId
 	})
 }
 
-// FindAdminByCode 查找管理人员
-func (m *mongoMapper) FindAdminByCode(ctx context.Context, code string, unitId *bson.ObjectID) (*User, error) {
-	filter := bson.M{
+// adminCodeFilter 构建按账号查询管理侧账号（教师/班主任/单位管理员/超管）的过滤条件
+func adminCodeFilter(code string) bson.M {
+	return bson.M{
 		cst.Code: code,
 		cst.Role: bson.M{"$in": []int{
 			enum.UserRoleTeacher,
@@ -117,10 +118,20 @@ func (m *mongoMapper) FindAdminByCode(ctx context.Context, code string, unitId *
 		}},
 		cst.Status: bson.M{cst.NE: enum.UserStatusDeleted},
 	}
+}
+
+// FindAdminByCode 查找管理人员
+func (m *mongoMapper) FindAdminByCode(ctx context.Context, code string, unitId *bson.ObjectID) (*User, error) {
+	filter := adminCodeFilter(code)
 	if unitId != nil {
 		filter[cst.UnitID] = *unitId
 	}
 	return m.FindOneByFields(ctx, filter)
+}
+
+// FindAdminsByCode 按账号查找全部管理侧账号，用于登录时反查账号所属单位
+func (m *mongoMapper) FindAdminsByCode(ctx context.Context, code string) ([]*User, error) {
+	return m.FindAllByFields(ctx, adminCodeFilter(code))
 }
 
 // CountStudents 统计单位下的学生总数
