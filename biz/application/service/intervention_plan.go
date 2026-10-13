@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"io"
 	"strings"
 
 	"github.com/cloudwego/eino/schema"
@@ -63,17 +64,36 @@ func (s *DashboardService) GenerateInterventionPlan(ctx context.Context, reportI
 		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "干预方案模型初始化"))
 	}
 
-	result, err := chat.Generate(ctx, []*schema.Message{
+	// 使用与教师对话相同的流式调用链。DeepSeek 的 Generate 会强制打开
+	// json_object 输出格式，而干预方案要求 Markdown，使用 Generate 会导致
+	// 供应商返回空内容或解析失败（前端表现为 1008）。
+	stream, err := chat.Stream(ctx, []*schema.Message{
 		{Role: schema.System, Content: interventionPlanPrompt},
 		{Role: schema.User, Content: formatReport(rpt)},
 	})
-	if err != nil || result == nil || strings.TrimSpace(result.Content) == "" {
+	if err != nil || stream == nil {
+		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "干预方案生成"))
+	}
+	var content strings.Builder
+	for {
+		chunk, recvErr := stream.Recv()
+		if recvErr == io.EOF {
+			break
+		}
+		if recvErr != nil {
+			return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "干预方案生成"))
+		}
+		if chunk != nil {
+			content.WriteString(chunk.Content)
+		}
+	}
+	if strings.TrimSpace(content.String()) == "" {
 		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "干预方案生成"))
 	}
 	return &InterventionPlanResp{
 		Code:     0,
 		Msg:      "success",
 		ReportID: rpt.ID.Hex(),
-		Content:  strings.TrimSpace(result.Content),
+		Content:  strings.TrimSpace(content.String()),
 	}, nil
 }
