@@ -105,6 +105,12 @@ func (u *UserDomainSVC) SignInByEmail(ctx context.Context, authType, email, unit
 }
 
 func (u *UserDomainSVC) SignInByCode(ctx context.Context, authType, studentID, unitId, verify string) (*user.User, error) {
+	// 管理端的“学号”登录实际使用管理员 code；单位 ID 为空时按 code
+	// 反查本地管理员所属单位，再补给中台。超管账号无单位时保留空值，
+	// 由中台按全局账号匹配处理。
+	if unitId == "" {
+		unitId = u.resolveAdminUnitId(ctx, studentID)
+	}
 	synpResp, err := u.Synp4bCli.Login(ctx, authType, studentID, unitId, verify)
 	if err != nil {
 		return nil, err
