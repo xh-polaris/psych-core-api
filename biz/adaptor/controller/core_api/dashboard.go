@@ -4,9 +4,12 @@ package core_api
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/cloudwego/hertz/pkg/protocol/http1/resp"
 	"github.com/xh-polaris/psych-core-api/biz/adaptor/middleware"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/pkg/httpx"
@@ -31,6 +34,30 @@ func GenerateInterventionPlan(ctx context.Context, c *app.RequestContext) {
 	p := provider.Get()
 	resp, err := p.DashboardService.GenerateInterventionPlan(ctx, req.ReportID)
 	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// GenerateInterventionPlanStream 以 SSE 增量返回干预方案，避免长时间生成期间被代理或浏览器超时断开。
+func GenerateInterventionPlanStream(ctx context.Context, c *app.RequestContext) {
+	var req generateInterventionPlanReq
+	if err := c.BindAndValidate(&req); err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+	middleware.StoreToken(ctx, c, &req)
+	if c.IsAborted() {
+		return
+	}
+	p := provider.Get()
+	c.Response.Header.SetContentType("text/event-stream; charset=utf-8")
+	c.Response.Header.Set("Cache-Control", "no-cache")
+	c.Response.Header.Set("X-Accel-Buffering", "no")
+	writer := resp.NewChunkedBodyWriter(&c.Response, c.GetWriter())
+	c.Response.HijackWriter(writer)
+	if err := p.DashboardService.GenerateInterventionPlanStream(ctx, writer, req.ReportID); err != nil {
+		data, _ := json.Marshal(map[string]string{"message": err.Error()})
+		_, _ = fmt.Fprintf(writer, "event: error\ndata: %s\n\n", data)
+		_ = writer.Flush()
+	}
 }
 
 // DashboardGetDataOverview .

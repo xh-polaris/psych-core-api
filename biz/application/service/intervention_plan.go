@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 
@@ -37,31 +39,59 @@ const interventionPlanPrompt = `你是一名学校心理健康工作督导。请
 
 // GenerateInterventionPlan 在既有“读取此报告”的授权范围内生成干预方案。
 func (s *DashboardService) GenerateInterventionPlan(ctx context.Context, reportID string) (*InterventionPlanResp, error) {
-	rpt, _, _, err := s.loadReportScope(ctx, reportID)
+	content, reportID, err := s.generateInterventionPlanContent(ctx, reportID)
 	if err != nil {
 		return nil, err
 	}
+	return &InterventionPlanResp{Code: 0, Msg: "success", ReportID: reportID, Content: content}, nil
+}
+
+// GenerateInterventionPlanStream 将模型增量直接转发给 HTTP SSE 客户端。
+func (s *DashboardService) GenerateInterventionPlanStream(ctx context.Context, writer SSEWriter, reportID string) error {
+	content, resolvedReportID, err := s.generateInterventionPlanContentStream(ctx, writer, reportID)
+	if err != nil {
+		return err
+	}
+	if err := writeInterventionPlanEvent(writer, "completed", map[string]string{"reportId": resolvedReportID, "content": content}); err != nil {
+		return err
+	}
+	_, err = fmt.Fprint(writer, "data: [DONE]\n\n")
+	if err == nil {
+		err = writer.Flush()
+	}
+	return err
+}
+
+func (s *DashboardService) generateInterventionPlanContent(ctx context.Context, reportID string) (string, string, error) {
+	return s.generateInterventionPlanContentStream(ctx, nil, reportID)
+}
+
+func (s *DashboardService) generateInterventionPlanContentStream(ctx context.Context, writer SSEWriter, reportID string) (string, string, error) {
+	rpt, _, _, err := s.loadReportScope(ctx, reportID)
+	if err != nil {
+		return "", "", err
+	}
 	if rpt.Status != enum.ReportStatusSuccess {
-		return nil, errorx.New(errno.ErrReportNotReady)
+		return "", "", errorx.New(errno.ErrReportNotReady)
 	}
 	if s.ConfigMapper == nil {
-		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "单位模型配置"))
+		return "", "", errorx.New(errno.ErrInternalError, errorx.KV("field", "单位模型配置"))
 	}
 
 	unitConfig, err := s.ConfigMapper.FindOneByUnitID(ctx, rpt.UnitID)
 	if err != nil || unitConfig == nil || unitConfig.Chat == nil {
-		return nil, errorx.New(errno.ErrNotFound, errorx.KV("field", "单位对话模型配置"))
+		return "", "", errorx.New(errno.ErrNotFound, errorx.KV("field", "单位对话模型配置"))
 	}
 	chatConfig, err := conf.GetConfig().ChatConf(&core_api.ChatApp{
 		Provider: unitConfig.Chat.Provider,
 		AppId:    unitConfig.Chat.AppID,
 	})
 	if err != nil {
-		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "干预方案模型配置"))
+		return "", "", errorx.New(errno.ErrInternalError, errorx.KV("field", "干预方案模型配置"))
 	}
 	chat, err := app.NewChatApp(ctx, uuid.NewString(), chatConfig)
 	if err != nil {
-		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "干预方案模型初始化"))
+		return "", "", errorx.New(errno.ErrInternalError, errorx.KV("field", "干预方案模型初始化"))
 	}
 
 	// 使用与教师对话相同的流式调用链。DeepSeek 的 Generate 会强制打开
@@ -72,7 +102,7 @@ func (s *DashboardService) GenerateInterventionPlan(ctx context.Context, reportI
 		{Role: schema.User, Content: formatReport(rpt)},
 	})
 	if err != nil || stream == nil {
-		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "干预方案生成"))
+		return "", "", errorx.New(errno.ErrInternalError, errorx.KV("field", "干预方案生成"))
 	}
 	var content strings.Builder
 	for {
@@ -81,19 +111,30 @@ func (s *DashboardService) GenerateInterventionPlan(ctx context.Context, reportI
 			break
 		}
 		if recvErr != nil {
-			return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "干预方案生成"))
+			return "", "", errorx.New(errno.ErrInternalError, errorx.KV("field", "干预方案生成"))
 		}
 		if chunk != nil {
 			content.WriteString(chunk.Content)
+			if writer != nil && chunk.Content != "" {
+				if err := writeInterventionPlanEvent(writer, "delta", map[string]string{"content": chunk.Content}); err != nil {
+					return "", "", err
+				}
+			}
 		}
 	}
 	if strings.TrimSpace(content.String()) == "" {
-		return nil, errorx.New(errno.ErrInternalError, errorx.KV("field", "干预方案生成"))
+		return "", "", errorx.New(errno.ErrInternalError, errorx.KV("field", "干预方案生成"))
 	}
-	return &InterventionPlanResp{
-		Code:     0,
-		Msg:      "success",
-		ReportID: rpt.ID.Hex(),
-		Content:  strings.TrimSpace(content.String()),
-	}, nil
+	return strings.TrimSpace(content.String()), rpt.ID.Hex(), nil
+}
+
+func writeInterventionPlanEvent(writer SSEWriter, event string, payload any) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	if _, err = fmt.Fprintf(writer, "event: %s\ndata: %s\n\n", event, data); err != nil {
+		return err
+	}
+	return writer.Flush()
 }
