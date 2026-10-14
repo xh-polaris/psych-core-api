@@ -402,3 +402,23 @@ func _modellabgeneratereportMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _conversationarchiveconversationMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _dashboardgenerateinterventionplanMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _usergetstudentprofileMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _userupdatestudentprofileMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

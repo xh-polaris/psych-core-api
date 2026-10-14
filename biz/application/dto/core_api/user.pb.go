@@ -1031,6 +1031,353 @@ func (x *SendVerifyCodeReq) GetAuthId() string {
 	return ""
 }
 
+// 学生端当前登录用户的个人资料
+type StudentProfile struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Id         string `protobuf:"bytes,1,opt,name=id,proto3" form:"id" json:"id" query:"id"`
+	Code       string `protobuf:"bytes,2,opt,name=code,proto3" form:"code" json:"code" query:"code"`
+	Name       string `protobuf:"bytes,3,opt,name=name,proto3" form:"name" json:"name" query:"name"`
+	Avatar     string `protobuf:"bytes,4,opt,name=avatar,proto3" form:"avatar" json:"avatar" query:"avatar"`
+	Birth      int64  `protobuf:"varint,5,opt,name=birth,proto3" form:"birth" json:"birth" query:"birth"`
+	Gender     int32  `protobuf:"varint,6,opt,name=gender,proto3" form:"gender" json:"gender" query:"gender"`
+	EnrollYear int32  `protobuf:"varint,7,opt,name=enrollYear,proto3" form:"enrollYear" json:"enrollYear" query:"enrollYear"`
+	Grade      int32  `protobuf:"varint,8,opt,name=grade,proto3" form:"grade" json:"grade" query:"grade"`
+	Class      int32  `protobuf:"varint,9,opt,name=class,proto3" form:"class" json:"class" query:"class"`
+}
+
+func (x *StudentProfile) Reset() {
+	*x = StudentProfile{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_user_proto_msgTypes[12]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *StudentProfile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StudentProfile) ProtoMessage() {}
+
+func (x *StudentProfile) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_user_proto_msgTypes[12]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StudentProfile.ProtoReflect.Descriptor instead.
+func (*StudentProfile) Descriptor() ([]byte, []int) {
+	return file_core_api_user_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *StudentProfile) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *StudentProfile) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *StudentProfile) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *StudentProfile) GetAvatar() string {
+	if x != nil {
+		return x.Avatar
+	}
+	return ""
+}
+
+func (x *StudentProfile) GetBirth() int64 {
+	if x != nil {
+		return x.Birth
+	}
+	return 0
+}
+
+func (x *StudentProfile) GetGender() int32 {
+	if x != nil {
+		return x.Gender
+	}
+	return 0
+}
+
+func (x *StudentProfile) GetEnrollYear() int32 {
+	if x != nil {
+		return x.EnrollYear
+	}
+	return 0
+}
+
+func (x *StudentProfile) GetGrade() int32 {
+	if x != nil {
+		return x.Grade
+	}
+	return 0
+}
+
+func (x *StudentProfile) GetClass() int32 {
+	if x != nil {
+		return x.Class
+	}
+	return 0
+}
+
+type UserGetStudentProfileReq struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+}
+
+func (x *UserGetStudentProfileReq) Reset() {
+	*x = UserGetStudentProfileReq{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_user_proto_msgTypes[13]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *UserGetStudentProfileReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserGetStudentProfileReq) ProtoMessage() {}
+
+func (x *UserGetStudentProfileReq) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_user_proto_msgTypes[13]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserGetStudentProfileReq.ProtoReflect.Descriptor instead.
+func (*UserGetStudentProfileReq) Descriptor() ([]byte, []int) {
+	return file_core_api_user_proto_rawDescGZIP(), []int{13}
+}
+
+type UserGetStudentProfileResp struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Profile *StudentProfile `protobuf:"bytes,1,opt,name=profile,proto3" form:"profile" json:"profile" query:"profile"`
+	Code    int32           `protobuf:"varint,255,opt,name=code,proto3" form:"code" json:"code" query:"code"`
+	Msg     string          `protobuf:"bytes,256,opt,name=msg,proto3" form:"msg" json:"msg" query:"msg"`
+}
+
+func (x *UserGetStudentProfileResp) Reset() {
+	*x = UserGetStudentProfileResp{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_user_proto_msgTypes[14]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *UserGetStudentProfileResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserGetStudentProfileResp) ProtoMessage() {}
+
+func (x *UserGetStudentProfileResp) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_user_proto_msgTypes[14]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserGetStudentProfileResp.ProtoReflect.Descriptor instead.
+func (*UserGetStudentProfileResp) Descriptor() ([]byte, []int) {
+	return file_core_api_user_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *UserGetStudentProfileResp) GetProfile() *StudentProfile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+func (x *UserGetStudentProfileResp) GetCode() int32 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *UserGetStudentProfileResp) GetMsg() string {
+	if x != nil {
+		return x.Msg
+	}
+	return ""
+}
+
+type UserUpdateStudentProfileReq struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Name   string `protobuf:"bytes,1,opt,name=name,proto3" form:"name" json:"name" query:"name"`
+	Avatar string `protobuf:"bytes,2,opt,name=avatar,proto3" form:"avatar" json:"avatar" query:"avatar"`
+	Birth  int64  `protobuf:"varint,3,opt,name=birth,proto3" form:"birth" json:"birth" query:"birth"`
+	Gender int32  `protobuf:"varint,4,opt,name=gender,proto3" form:"gender" json:"gender" query:"gender"`
+}
+
+func (x *UserUpdateStudentProfileReq) Reset() {
+	*x = UserUpdateStudentProfileReq{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_user_proto_msgTypes[15]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *UserUpdateStudentProfileReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserUpdateStudentProfileReq) ProtoMessage() {}
+
+func (x *UserUpdateStudentProfileReq) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_user_proto_msgTypes[15]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserUpdateStudentProfileReq.ProtoReflect.Descriptor instead.
+func (*UserUpdateStudentProfileReq) Descriptor() ([]byte, []int) {
+	return file_core_api_user_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *UserUpdateStudentProfileReq) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *UserUpdateStudentProfileReq) GetAvatar() string {
+	if x != nil {
+		return x.Avatar
+	}
+	return ""
+}
+
+func (x *UserUpdateStudentProfileReq) GetBirth() int64 {
+	if x != nil {
+		return x.Birth
+	}
+	return 0
+}
+
+func (x *UserUpdateStudentProfileReq) GetGender() int32 {
+	if x != nil {
+		return x.Gender
+	}
+	return 0
+}
+
+type UserUpdateStudentProfileResp struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Profile *StudentProfile `protobuf:"bytes,1,opt,name=profile,proto3" form:"profile" json:"profile" query:"profile"`
+	Code    int32           `protobuf:"varint,255,opt,name=code,proto3" form:"code" json:"code" query:"code"`
+	Msg     string          `protobuf:"bytes,256,opt,name=msg,proto3" form:"msg" json:"msg" query:"msg"`
+}
+
+func (x *UserUpdateStudentProfileResp) Reset() {
+	*x = UserUpdateStudentProfileResp{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_user_proto_msgTypes[16]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *UserUpdateStudentProfileResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserUpdateStudentProfileResp) ProtoMessage() {}
+
+func (x *UserUpdateStudentProfileResp) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_user_proto_msgTypes[16]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserUpdateStudentProfileResp.ProtoReflect.Descriptor instead.
+func (*UserUpdateStudentProfileResp) Descriptor() ([]byte, []int) {
+	return file_core_api_user_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *UserUpdateStudentProfileResp) GetProfile() *StudentProfile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+func (x *UserUpdateStudentProfileResp) GetCode() int32 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *UserUpdateStudentProfileResp) GetMsg() string {
+	if x != nil {
+		return x.Msg
+	}
+	return ""
+}
+
 var File_core_api_user_proto protoreflect.FileDescriptor
 
 var file_core_api_user_proto_rawDesc = []byte{
@@ -1173,11 +1520,50 @@ var file_core_api_user_proto_rawDesc = []byte{
 	0x08, 0x61, 0x75, 0x74, 0x68, 0x54, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
 	0x08, 0x61, 0x75, 0x74, 0x68, 0x54, 0x79, 0x70, 0x65, 0x12, 0x16, 0x0a, 0x06, 0x61, 0x75, 0x74,
 	0x68, 0x49, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x61, 0x75, 0x74, 0x68, 0x49,
-	0x64, 0x42, 0x43, 0x5a, 0x41, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f,
-	0x78, 0x68, 0x2d, 0x70, 0x6f, 0x6c, 0x61, 0x72, 0x69, 0x73, 0x2f, 0x70, 0x73, 0x79, 0x63, 0x68,
-	0x2d, 0x63, 0x6f, 0x72, 0x65, 0x2d, 0x61, 0x70, 0x69, 0x2f, 0x62, 0x69, 0x7a, 0x2f, 0x61, 0x70,
-	0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x64, 0x74, 0x6f, 0x2f, 0x63, 0x6f,
-	0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x64, 0x22, 0xda, 0x01, 0x0a, 0x0e, 0x53, 0x74, 0x75, 0x64, 0x65, 0x6e, 0x74, 0x50, 0x72, 0x6f,
+	0x66, 0x69, 0x6c, 0x65, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x02, 0x69, 0x64, 0x12, 0x12, 0x0a, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65,
+	0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x16, 0x0a, 0x06,
+	0x61, 0x76, 0x61, 0x74, 0x61, 0x72, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x61, 0x76,
+	0x61, 0x74, 0x61, 0x72, 0x12, 0x14, 0x0a, 0x05, 0x62, 0x69, 0x72, 0x74, 0x68, 0x18, 0x05, 0x20,
+	0x01, 0x28, 0x03, 0x52, 0x05, 0x62, 0x69, 0x72, 0x74, 0x68, 0x12, 0x16, 0x0a, 0x06, 0x67, 0x65,
+	0x6e, 0x64, 0x65, 0x72, 0x18, 0x06, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x67, 0x65, 0x6e, 0x64,
+	0x65, 0x72, 0x12, 0x1e, 0x0a, 0x0a, 0x65, 0x6e, 0x72, 0x6f, 0x6c, 0x6c, 0x59, 0x65, 0x61, 0x72,
+	0x18, 0x07, 0x20, 0x01, 0x28, 0x05, 0x52, 0x0a, 0x65, 0x6e, 0x72, 0x6f, 0x6c, 0x6c, 0x59, 0x65,
+	0x61, 0x72, 0x12, 0x14, 0x0a, 0x05, 0x67, 0x72, 0x61, 0x64, 0x65, 0x18, 0x08, 0x20, 0x01, 0x28,
+	0x05, 0x52, 0x05, 0x67, 0x72, 0x61, 0x64, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x63, 0x6c, 0x61, 0x73,
+	0x73, 0x18, 0x09, 0x20, 0x01, 0x28, 0x05, 0x52, 0x05, 0x63, 0x6c, 0x61, 0x73, 0x73, 0x22, 0x1a,
+	0x0a, 0x18, 0x55, 0x73, 0x65, 0x72, 0x47, 0x65, 0x74, 0x53, 0x74, 0x75, 0x64, 0x65, 0x6e, 0x74,
+	0x50, 0x72, 0x6f, 0x66, 0x69, 0x6c, 0x65, 0x52, 0x65, 0x71, 0x22, 0x77, 0x0a, 0x19, 0x55, 0x73,
+	0x65, 0x72, 0x47, 0x65, 0x74, 0x53, 0x74, 0x75, 0x64, 0x65, 0x6e, 0x74, 0x50, 0x72, 0x6f, 0x66,
+	0x69, 0x6c, 0x65, 0x52, 0x65, 0x73, 0x70, 0x12, 0x32, 0x0a, 0x07, 0x70, 0x72, 0x6f, 0x66, 0x69,
+	0x6c, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x18, 0x2e, 0x63, 0x6f, 0x72, 0x65, 0x5f,
+	0x61, 0x70, 0x69, 0x2e, 0x53, 0x74, 0x75, 0x64, 0x65, 0x6e, 0x74, 0x50, 0x72, 0x6f, 0x66, 0x69,
+	0x6c, 0x65, 0x52, 0x07, 0x70, 0x72, 0x6f, 0x66, 0x69, 0x6c, 0x65, 0x12, 0x13, 0x0a, 0x04, 0x63,
+	0x6f, 0x64, 0x65, 0x18, 0xff, 0x01, 0x20, 0x01, 0x28, 0x05, 0x52, 0x04, 0x63, 0x6f, 0x64, 0x65,
+	0x12, 0x11, 0x0a, 0x03, 0x6d, 0x73, 0x67, 0x18, 0x80, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03,
+	0x6d, 0x73, 0x67, 0x22, 0x77, 0x0a, 0x1b, 0x55, 0x73, 0x65, 0x72, 0x55, 0x70, 0x64, 0x61, 0x74,
+	0x65, 0x53, 0x74, 0x75, 0x64, 0x65, 0x6e, 0x74, 0x50, 0x72, 0x6f, 0x66, 0x69, 0x6c, 0x65, 0x52,
+	0x65, 0x71, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x16, 0x0a, 0x06, 0x61, 0x76, 0x61, 0x74, 0x61, 0x72,
+	0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x61, 0x76, 0x61, 0x74, 0x61, 0x72, 0x12, 0x14,
+	0x0a, 0x05, 0x62, 0x69, 0x72, 0x74, 0x68, 0x18, 0x03, 0x20, 0x01, 0x28, 0x03, 0x52, 0x05, 0x62,
+	0x69, 0x72, 0x74, 0x68, 0x12, 0x16, 0x0a, 0x06, 0x67, 0x65, 0x6e, 0x64, 0x65, 0x72, 0x18, 0x04,
+	0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x67, 0x65, 0x6e, 0x64, 0x65, 0x72, 0x22, 0x7a, 0x0a, 0x1c,
+	0x55, 0x73, 0x65, 0x72, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x53, 0x74, 0x75, 0x64, 0x65, 0x6e,
+	0x74, 0x50, 0x72, 0x6f, 0x66, 0x69, 0x6c, 0x65, 0x52, 0x65, 0x73, 0x70, 0x12, 0x32, 0x0a, 0x07,
+	0x70, 0x72, 0x6f, 0x66, 0x69, 0x6c, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x18, 0x2e,
+	0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x2e, 0x53, 0x74, 0x75, 0x64, 0x65, 0x6e, 0x74,
+	0x50, 0x72, 0x6f, 0x66, 0x69, 0x6c, 0x65, 0x52, 0x07, 0x70, 0x72, 0x6f, 0x66, 0x69, 0x6c, 0x65,
+	0x12, 0x13, 0x0a, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x18, 0xff, 0x01, 0x20, 0x01, 0x28, 0x05, 0x52,
+	0x04, 0x63, 0x6f, 0x64, 0x65, 0x12, 0x11, 0x0a, 0x03, 0x6d, 0x73, 0x67, 0x18, 0x80, 0x02, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x03, 0x6d, 0x73, 0x67, 0x42, 0x43, 0x5a, 0x41, 0x67, 0x69, 0x74, 0x68,
+	0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x78, 0x68, 0x2d, 0x70, 0x6f, 0x6c, 0x61, 0x72, 0x69,
+	0x73, 0x2f, 0x70, 0x73, 0x79, 0x63, 0x68, 0x2d, 0x63, 0x6f, 0x72, 0x65, 0x2d, 0x61, 0x70, 0x69,
+	0x2f, 0x62, 0x69, 0x7a, 0x2f, 0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e,
+	0x2f, 0x64, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x62, 0x06, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1192,36 +1578,43 @@ func file_core_api_user_proto_rawDescGZIP() []byte {
 	return file_core_api_user_proto_rawDescData
 }
 
-var file_core_api_user_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_core_api_user_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_core_api_user_proto_goTypes = []interface{}{
-	(*TeacherClassBinding)(nil),   // 0: core_api.TeacherClassBinding
-	(*UserVO)(nil),                // 1: core_api.UserVO
-	(*Remark)(nil),                // 2: core_api.Remark
-	(*UserSignInReq)(nil),         // 3: core_api.UserSignInReq
-	(*UserSignInResp)(nil),        // 4: core_api.UserSignInResp
-	(*UserUpdateInfoReq)(nil),     // 5: core_api.UserUpdateInfoReq
-	(*UserUpdatePasswordReq)(nil), // 6: core_api.UserUpdatePasswordReq
-	(*UserGetInfoReq)(nil),        // 7: core_api.UserGetInfoReq
-	(*UserGetInfoResp)(nil),       // 8: core_api.UserGetInfoResp
-	(*CreateUserReq)(nil),         // 9: core_api.CreateUserReq
-	(*CreateUserResp)(nil),        // 10: core_api.CreateUserResp
-	(*SendVerifyCodeReq)(nil),     // 11: core_api.SendVerifyCodeReq
-	nil,                           // 12: core_api.UserVO.OptionsEntry
-	(*anypb.Any)(nil),             // 13: google.protobuf.Any
+	(*TeacherClassBinding)(nil),          // 0: core_api.TeacherClassBinding
+	(*UserVO)(nil),                       // 1: core_api.UserVO
+	(*Remark)(nil),                       // 2: core_api.Remark
+	(*UserSignInReq)(nil),                // 3: core_api.UserSignInReq
+	(*UserSignInResp)(nil),               // 4: core_api.UserSignInResp
+	(*UserUpdateInfoReq)(nil),            // 5: core_api.UserUpdateInfoReq
+	(*UserUpdatePasswordReq)(nil),        // 6: core_api.UserUpdatePasswordReq
+	(*UserGetInfoReq)(nil),               // 7: core_api.UserGetInfoReq
+	(*UserGetInfoResp)(nil),              // 8: core_api.UserGetInfoResp
+	(*CreateUserReq)(nil),                // 9: core_api.CreateUserReq
+	(*CreateUserResp)(nil),               // 10: core_api.CreateUserResp
+	(*SendVerifyCodeReq)(nil),            // 11: core_api.SendVerifyCodeReq
+	(*StudentProfile)(nil),               // 12: core_api.StudentProfile
+	(*UserGetStudentProfileReq)(nil),     // 13: core_api.UserGetStudentProfileReq
+	(*UserGetStudentProfileResp)(nil),    // 14: core_api.UserGetStudentProfileResp
+	(*UserUpdateStudentProfileReq)(nil),  // 15: core_api.UserUpdateStudentProfileReq
+	(*UserUpdateStudentProfileResp)(nil), // 16: core_api.UserUpdateStudentProfileResp
+	nil,                                  // 17: core_api.UserVO.OptionsEntry
+	(*anypb.Any)(nil),                    // 18: google.protobuf.Any
 }
 var file_core_api_user_proto_depIdxs = []int32{
 	2,  // 0: core_api.UserVO.remark:type_name -> core_api.Remark
-	12, // 1: core_api.UserVO.options:type_name -> core_api.UserVO.OptionsEntry
+	17, // 1: core_api.UserVO.options:type_name -> core_api.UserVO.OptionsEntry
 	0,  // 2: core_api.UserVO.bindClasses:type_name -> core_api.TeacherClassBinding
 	1,  // 3: core_api.UserUpdateInfoReq.user:type_name -> core_api.UserVO
 	1,  // 4: core_api.UserGetInfoResp.user:type_name -> core_api.UserVO
 	1,  // 5: core_api.CreateUserResp.user:type_name -> core_api.UserVO
-	13, // 6: core_api.UserVO.OptionsEntry.value:type_name -> google.protobuf.Any
-	7,  // [7:7] is the sub-list for method output_type
-	7,  // [7:7] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	12, // 6: core_api.UserGetStudentProfileResp.profile:type_name -> core_api.StudentProfile
+	12, // 7: core_api.UserUpdateStudentProfileResp.profile:type_name -> core_api.StudentProfile
+	18, // 8: core_api.UserVO.OptionsEntry.value:type_name -> google.protobuf.Any
+	9,  // [9:9] is the sub-list for method output_type
+	9,  // [9:9] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 
@@ -1374,6 +1767,66 @@ func file_core_api_user_proto_init() {
 				return nil
 			}
 		}
+		file_core_api_user_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*StudentProfile); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_core_api_user_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*UserGetStudentProfileReq); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_core_api_user_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*UserGetStudentProfileResp); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_core_api_user_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*UserUpdateStudentProfileReq); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_core_api_user_proto_msgTypes[16].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*UserUpdateStudentProfileResp); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	file_core_api_user_proto_msgTypes[9].OneofWrappers = []interface{}{}
 	type x struct{}
@@ -1382,7 +1835,7 @@ func file_core_api_user_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_core_api_user_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

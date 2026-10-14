@@ -17,15 +17,6 @@ import (
 	"github.com/xh-polaris/psych-core-api/types/errno"
 )
 
-// InterventionPlanResp 是管理端可直接预览或下载的 Markdown 干预方案。
-// 方案不写回正式报告，避免 AI 临时生成内容覆盖已归档的评估结论。
-type InterventionPlanResp struct {
-	Code     int32  `json:"code"`
-	Msg      string `json:"msg"`
-	ReportID string `json:"reportId"`
-	Content  string `json:"content"`
-}
-
 const interventionPlanPrompt = `你是一名学校心理健康工作督导。请基于下方学生心理评估报告，生成一份供学校心理老师使用的干预方案。
 
 要求：
@@ -37,18 +28,18 @@ const interventionPlanPrompt = `你是一名学校心理健康工作督导。请
 学生心理评估报告：
 `
 
-// GenerateInterventionPlan 在既有“读取此报告”的授权范围内生成干预方案。
-func (s *DashboardService) GenerateInterventionPlan(ctx context.Context, reportID string) (*InterventionPlanResp, error) {
-	content, reportID, err := s.generateInterventionPlanContent(ctx, reportID)
+// DashboardGenerateInterventionPlan 在既有“读取此报告”的授权范围内生成干预方案。
+func (s *DashboardService) DashboardGenerateInterventionPlan(ctx context.Context, req *core_api.DashboardGenerateInterventionPlanReq) (*core_api.DashboardGenerateInterventionPlanResp, error) {
+	content, reportID, err := s.generateInterventionPlanContent(ctx, req.GetReportId())
 	if err != nil {
 		return nil, err
 	}
-	return &InterventionPlanResp{Code: 0, Msg: "success", ReportID: reportID, Content: content}, nil
+	return &core_api.DashboardGenerateInterventionPlanResp{Code: 0, Msg: "success", ReportId: reportID, Content: content}, nil
 }
 
 // GenerateInterventionPlanStream 将模型增量直接转发给 HTTP SSE 客户端。
-func (s *DashboardService) GenerateInterventionPlanStream(ctx context.Context, writer SSEWriter, reportID string) error {
-	content, resolvedReportID, err := s.generateInterventionPlanContentStream(ctx, writer, reportID)
+func (s *DashboardService) GenerateInterventionPlanStream(ctx context.Context, writer SSEWriter, req *core_api.DashboardGenerateInterventionPlanReq) error {
+	content, resolvedReportID, err := s.generateInterventionPlanContentStream(ctx, writer, req.GetReportId())
 	if err != nil {
 		return err
 	}

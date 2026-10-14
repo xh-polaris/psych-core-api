@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	appdto "github.com/xh-polaris/psych-core-api/biz/application/dto"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/basic"
 	"github.com/xh-polaris/psych-core-api/biz/application/dto/core_api"
 	"github.com/xh-polaris/psych-core-api/biz/domain/auth"
@@ -35,6 +34,8 @@ type IUserService interface {
 	UserUpdatePassword(ctx context.Context, req *core_api.UserUpdatePasswordReq) (*basic.Response, error)
 	CreateUser(ctx context.Context, req *core_api.CreateUserReq) (*core_api.CreateUserResp, error)
 	SendVerifyCode(ctx context.Context, req *core_api.SendVerifyCodeReq) (*basic.Response, error)
+	UserGetStudentProfile(ctx context.Context, req *core_api.UserGetStudentProfileReq) (*core_api.UserGetStudentProfileResp, error)
+	UserUpdateStudentProfile(ctx context.Context, req *core_api.UserUpdateStudentProfileReq) (*core_api.UserUpdateStudentProfileResp, error)
 }
 
 type UserService struct {
@@ -156,7 +157,15 @@ func (u *UserService) UserGetInfo(ctx context.Context, req *core_api.UserGetInfo
 	}, nil
 }
 
-func (u *UserService) GetStudentProfile(ctx context.Context) (*appdto.StudentProfile, error) {
+func (u *UserService) UserGetStudentProfile(ctx context.Context, _ *core_api.UserGetStudentProfileReq) (*core_api.UserGetStudentProfileResp, error) {
+	profile, err := u.getStudentProfile(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &core_api.UserGetStudentProfileResp{Profile: profile, Code: 0, Msg: "success"}, nil
+}
+
+func (u *UserService) getStudentProfile(ctx context.Context) (*core_api.StudentProfile, error) {
 	meta, err := u.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
@@ -181,15 +190,15 @@ func (u *UserService) GetStudentProfile(ctx context.Context) (*appdto.StudentPro
 	if avatar != "" && !strings.HasPrefix(avatar, "http://") && !strings.HasPrefix(avatar, "https://") {
 		avatar = "https://" + strings.TrimLeft(avatar, "/")
 	}
-	return &appdto.StudentProfile{
-		ID: student.ID.Hex(), Code: student.Code, Name: student.Name,
-		Avatar: avatar, Birth: birth, Gender: student.Gender,
-		EnrollYear: student.EnrollYear, Grade: student.CalculateGrade(unitDAO.StartGrade),
-		Class: student.Class,
+	return &core_api.StudentProfile{
+		Id: student.ID.Hex(), Code: student.Code, Name: student.Name,
+		Avatar: avatar, Birth: birth, Gender: int32(student.Gender),
+		EnrollYear: int32(student.EnrollYear), Grade: int32(student.CalculateGrade(unitDAO.StartGrade)),
+		Class: int32(student.Class),
 	}, nil
 }
 
-func (u *UserService) UpdateStudentProfile(ctx context.Context, input *appdto.UpdateStudentProfileInput) (*appdto.StudentProfile, error) {
+func (u *UserService) UserUpdateStudentProfile(ctx context.Context, req *core_api.UserUpdateStudentProfileReq) (*core_api.UserUpdateStudentProfileResp, error) {
 	meta, err := u.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
 		return nil, err
@@ -198,24 +207,28 @@ func (u *UserService) UpdateStudentProfile(ctx context.Context, input *appdto.Up
 	if err != nil {
 		return nil, errorx.New(errno.ErrInvalidParams)
 	}
-	name := strings.TrimSpace(input.Name)
+	name := strings.TrimSpace(req.Name)
 	if name == "" {
 		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "姓名"))
 	}
-	if input.Gender < 0 || input.Gender > 3 {
+	if req.Gender < 0 || req.Gender > 3 {
 		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "性别"))
 	}
 	update := bson.M{
-		cst.Name: name, "avatar": strings.TrimSpace(input.Avatar),
-		cst.Gender: input.Gender, cst.UpdateTime: time.Now(),
+		cst.Name: name, "avatar": strings.TrimSpace(req.Avatar),
+		cst.Gender: int(req.Gender), cst.UpdateTime: time.Now(),
 	}
-	if input.Birth > 0 {
-		update[cst.Birth] = time.Unix(input.Birth, 0)
+	if req.Birth > 0 {
+		update[cst.Birth] = time.Unix(req.Birth, 0)
 	}
 	if err = u.UserMapper.UpdateFields(ctx, userID, update); err != nil {
 		return nil, err
 	}
-	return u.GetStudentProfile(ctx)
+	profile, err := u.getStudentProfile(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &core_api.UserUpdateStudentProfileResp{Profile: profile, Code: 0, Msg: "success"}, nil
 }
 
 func (u *UserService) UserUpdateInfo(ctx context.Context, req *core_api.UserUpdateInfoReq) (*basic.Response, error) {

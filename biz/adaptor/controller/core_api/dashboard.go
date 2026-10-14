@@ -16,29 +16,9 @@ import (
 	"github.com/xh-polaris/psych-core-api/provider"
 )
 
-type generateInterventionPlanReq struct {
-	ReportID string `json:"reportId"`
-}
-
-// GenerateInterventionPlan 根据已完成的心理评估报告生成 Markdown 干预方案。
-func GenerateInterventionPlan(ctx context.Context, c *app.RequestContext) {
-	var req generateInterventionPlanReq
-	if err := c.BindAndValidate(&req); err != nil {
-		c.String(consts.StatusBadRequest, err.Error())
-		return
-	}
-	middleware.StoreToken(ctx, c, &req)
-	if c.IsAborted() {
-		return
-	}
-	p := provider.Get()
-	resp, err := p.DashboardService.GenerateInterventionPlan(ctx, req.ReportID)
-	httpx.PostProcess(ctx, c, &req, resp, err)
-}
-
 // GenerateInterventionPlanStream 以 SSE 增量返回干预方案，避免长时间生成期间被代理或浏览器超时断开。
 func GenerateInterventionPlanStream(ctx context.Context, c *app.RequestContext) {
-	var req generateInterventionPlanReq
+	var req core_api.DashboardGenerateInterventionPlanReq
 	if err := c.BindAndValidate(&req); err != nil {
 		c.String(consts.StatusBadRequest, err.Error())
 		return
@@ -53,7 +33,7 @@ func GenerateInterventionPlanStream(ctx context.Context, c *app.RequestContext) 
 	c.Response.Header.Set("X-Accel-Buffering", "no")
 	writer := resp.NewChunkedBodyWriter(&c.Response, c.GetWriter())
 	c.Response.HijackWriter(writer)
-	if err := p.DashboardService.GenerateInterventionPlanStream(ctx, writer, req.ReportID); err != nil {
+	if err := p.DashboardService.GenerateInterventionPlanStream(ctx, writer, &req); err != nil {
 		data, _ := json.Marshal(map[string]string{"message": err.Error()})
 		_, _ = fmt.Fprintf(writer, "event: error\ndata: %s\n\n", data)
 		_ = writer.Flush()
@@ -295,5 +275,25 @@ func DashboardGetConversationMessages(ctx context.Context, c *app.RequestContext
 	middleware.StoreToken(ctx, c, &req)
 	p := provider.Get()
 	resp, err := p.DashboardService.DashboardGetConversationMessages(ctx, &req)
+	httpx.PostProcess(ctx, c, &req, resp, err)
+}
+
+// DashboardGenerateInterventionPlan .
+// @router /dashboard/generate_intervention_plan [POST]
+func DashboardGenerateInterventionPlan(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req core_api.DashboardGenerateInterventionPlanReq
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		c.String(consts.StatusBadRequest, err.Error())
+		return
+	}
+
+	middleware.StoreToken(ctx, c, &req)
+	if c.IsAborted() {
+		return
+	}
+	p := provider.Get()
+	resp, err := p.DashboardService.DashboardGenerateInterventionPlan(ctx, &req)
 	httpx.PostProcess(ctx, c, &req, resp, err)
 }
