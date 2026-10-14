@@ -44,6 +44,7 @@ func Register(r *server.Hertz) {
 	}
 	{
 		_conversation := root.Group("/conversation", _conversationMw()...)
+		_conversation.POST("/archive", append(_conversationarchiveconversationMw(), core_api.ConversationArchiveConversation)...)
 		_conversation.POST("/create", append(_createconversationMw(), core_api.CreateConversation)...)
 		_conversation.POST("/get_by_date", append(_getconvbydateMw(), core_api.GetConvByDate)...)
 		_conversation.POST("/get_single", append(_getsingleconvMw(), core_api.GetSingleConv)...)
@@ -56,6 +57,7 @@ func Register(r *server.Hertz) {
 		_dashboard.POST("/classes", append(_dashboardlistclassesMw(), core_api.DashboardListClasses)...)
 		_dashboard.POST("/conversation_messages", append(_dashboardgetconversationmessagesMw(), core_api.DashboardGetConversationMessages)...)
 		_dashboard.POST("/create_remark", append(_dashboardcreateremarkMw(), core_api.DashboardCreateRemark)...)
+		_dashboard.POST("/generate_intervention_plan", append(_dashboardgenerateinterventionplanMw(), core_api.DashboardGenerateInterventionPlan)...)
 		_dashboard.POST("/get_report", append(_dashboardgetreportMw(), core_api.DashboardGetReport)...)
 		_dashboard.POST("/overview", append(_dashboardgetdataoverviewMw(), core_api.DashboardGetDataOverview)...)
 		_dashboard.POST("/psych_trend", append(_dashboardgetpsychtrendMw(), core_api.DashboardGetPsychTrend)...)
@@ -65,6 +67,11 @@ func Register(r *server.Hertz) {
 		_dashboard.POST("/update_alarm", append(_dashboardupdatealarmMw(), core_api.DashboardUpdateAlarm)...)
 		_dashboard.POST("/user_conversation_records", append(_dashboarduserconvrecordsMw(), core_api.DashboardUserConvRecords)...)
 		_dashboard.POST("/users", append(_dashboardlistusersMw(), core_api.DashboardListUsers)...)
+	}
+	{
+		_student := root.Group("/student", _studentMw()...)
+		_student.GET("/profile", append(_usergetstudentprofileMw(), core_api.UserGetStudentProfile)...)
+		_student.POST("/profile", append(_userupdatestudentprofileMw(), core_api.UserUpdateStudentProfile)...)
 	}
 	{
 		_unit := root.Group("/unit", _unitMw()...)

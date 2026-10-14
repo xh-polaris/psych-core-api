@@ -40,8 +40,8 @@ type IDashboardService interface {
 	DashboardUnitConvRecords(ctx context.Context, req *core_api.DashboardUnitConvRecordsReq) (*core_api.DashboardUnitConvRecordsResp, error)
 	DashboardGetConversationMessages(ctx context.Context, req *core_api.DashboardGetConversationMessagesReq) (*core_api.DashboardGetConversationMessagesResp, error)
 	DashboardGetReport(ctx context.Context, req *core_api.DashboardGetReportReq) (*core_api.DashboardGetReportResp, error)
-	GenerateInterventionPlan(ctx context.Context, reportID string) (*InterventionPlanResp, error)
-	GenerateInterventionPlanStream(ctx context.Context, writer SSEWriter, reportID string) error
+	DashboardGenerateInterventionPlan(ctx context.Context, req *core_api.DashboardGenerateInterventionPlanReq) (*core_api.DashboardGenerateInterventionPlanResp, error)
+	GenerateInterventionPlanStream(ctx context.Context, writer SSEWriter, req *core_api.DashboardGenerateInterventionPlanReq) error
 
 	// 预警
 	DashboardGetAlarmOverview(ctx context.Context, req *core_api.DashboardGetAlarmOverviewReq) (*core_api.DashboardGetAlarmOverviewResp, error)

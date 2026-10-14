@@ -25,7 +25,7 @@ type IConversationService interface {
 	ListConversations(ctx context.Context, req *core_api.ListConversationsReq) (resp *core_api.ListConversationsResp, err error)
 	GetSingleConv(ctx context.Context, req *core_api.GetSingleConvReq) (resp *core_api.GetSingleConvResp, err error)
 	GetConvByDate(ctx context.Context, req *core_api.GetConvByDateReq) (resp *core_api.GetConvByDateResp, err error)
-	ArchiveConversation(ctx context.Context, conversationId string) error
+	ConversationArchiveConversation(ctx context.Context, req *core_api.ArchiveConversationReq) (*core_api.ArchiveConversationResp, error)
 }
 
 type ConversationService struct {
@@ -309,29 +309,33 @@ func (c *ConversationService) GetSingleConv(ctx context.Context, req *core_api.G
 	}, nil
 }
 
-func (c *ConversationService) ArchiveConversation(ctx context.Context, conversationId string) error {
+func (c *ConversationService) ConversationArchiveConversation(ctx context.Context, req *core_api.ArchiveConversationReq) (*core_api.ArchiveConversationResp, error) {
+	conversationID := req.GetConversationId()
+	if conversationID == "" {
+		return nil, errorx.New(errno.ErrMissingParams, errorx.KV("field", "conversationId"))
+	}
 	userMeta, err := c.AuthDomain.ExtraUserMeta(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	conversationOID, err := bson.ObjectIDFromHex(conversationId)
+	conversationOID, err := bson.ObjectIDFromHex(conversationID)
 	if err != nil {
-		return errorx.New(errno.ErrInvalidParams, errorx.KV("field", "conversationId"))
+		return nil, errorx.New(errno.ErrInvalidParams, errorx.KV("field", "conversationId"))
 	}
 	conv, err := c.ConversationMapper.FindOneById(ctx, conversationOID)
 	if err != nil || conv == nil {
-		return errorx.New(errno.ErrGetConversation)
+		return nil, errorx.New(errno.ErrGetConversation)
 	}
 	if conv.UserID.Hex() != userMeta.UserId {
-		return errorx.New(errno.ErrInsufficientAuth)
+		return nil, errorx.New(errno.ErrInsufficientAuth)
 	}
 
-	messages, err := his.Mgr.RetrieveMessage(ctx, conversationId, -1)
+	messages, err := his.Mgr.RetrieveMessage(ctx, conversationID, -1)
 	if err != nil {
-		return errorx.New(errno.ErrFetchMessages)
+		return nil, errorx.New(errno.ErrFetchMessages)
 	}
 	if len(messages) == 0 {
-		return nil
+		return &core_api.ArchiveConversationResp{Code: 0, Msg: "success"}, nil
 	}
 
 	brief := conv.Title
@@ -369,5 +373,8 @@ func (c *ConversationService) ArchiveConversation(ctx context.Context, conversat
 	if brief != "" {
 		update["title"] = brief
 	}
-	return c.ConversationMapper.UpdateFields(ctx, conversationOID, update)
+	if err := c.ConversationMapper.UpdateFields(ctx, conversationOID, update); err != nil {
+		return nil, err
+	}
+	return &core_api.ArchiveConversationResp{Code: 0, Msg: "success"}, nil
 }

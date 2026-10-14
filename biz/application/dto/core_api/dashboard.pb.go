@@ -4486,6 +4486,125 @@ func (x *DashboardCreateRemarkResp) GetMsg() string {
 	return ""
 }
 
+// 根据已完成的心理评估报告生成干预方案。
+type DashboardGenerateInterventionPlanReq struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	ReportId string `protobuf:"bytes,1,opt,name=reportId,proto3" form:"reportId" json:"reportId" query:"reportId"`
+}
+
+func (x *DashboardGenerateInterventionPlanReq) Reset() {
+	*x = DashboardGenerateInterventionPlanReq{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_dashboard_proto_msgTypes[58]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DashboardGenerateInterventionPlanReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DashboardGenerateInterventionPlanReq) ProtoMessage() {}
+
+func (x *DashboardGenerateInterventionPlanReq) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_dashboard_proto_msgTypes[58]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DashboardGenerateInterventionPlanReq.ProtoReflect.Descriptor instead.
+func (*DashboardGenerateInterventionPlanReq) Descriptor() ([]byte, []int) {
+	return file_core_api_dashboard_proto_rawDescGZIP(), []int{58}
+}
+
+func (x *DashboardGenerateInterventionPlanReq) GetReportId() string {
+	if x != nil {
+		return x.ReportId
+	}
+	return ""
+}
+
+type DashboardGenerateInterventionPlanResp struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	ReportId string `protobuf:"bytes,1,opt,name=reportId,proto3" form:"reportId" json:"reportId" query:"reportId"`
+	Content  string `protobuf:"bytes,2,opt,name=content,proto3" form:"content" json:"content" query:"content"`
+	Code     int32  `protobuf:"varint,255,opt,name=code,proto3" form:"code" json:"code" query:"code"`
+	Msg      string `protobuf:"bytes,256,opt,name=msg,proto3" form:"msg" json:"msg" query:"msg"`
+}
+
+func (x *DashboardGenerateInterventionPlanResp) Reset() {
+	*x = DashboardGenerateInterventionPlanResp{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_core_api_dashboard_proto_msgTypes[59]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DashboardGenerateInterventionPlanResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DashboardGenerateInterventionPlanResp) ProtoMessage() {}
+
+func (x *DashboardGenerateInterventionPlanResp) ProtoReflect() protoreflect.Message {
+	mi := &file_core_api_dashboard_proto_msgTypes[59]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DashboardGenerateInterventionPlanResp.ProtoReflect.Descriptor instead.
+func (*DashboardGenerateInterventionPlanResp) Descriptor() ([]byte, []int) {
+	return file_core_api_dashboard_proto_rawDescGZIP(), []int{59}
+}
+
+func (x *DashboardGenerateInterventionPlanResp) GetReportId() string {
+	if x != nil {
+		return x.ReportId
+	}
+	return ""
+}
+
+func (x *DashboardGenerateInterventionPlanResp) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *DashboardGenerateInterventionPlanResp) GetCode() int32 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *DashboardGenerateInterventionPlanResp) GetMsg() string {
+	if x != nil {
+		return x.Msg
+	}
+	return ""
+}
+
 type RiskProfile_CurrentSafety struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -4498,7 +4617,7 @@ type RiskProfile_CurrentSafety struct {
 func (x *RiskProfile_CurrentSafety) Reset() {
 	*x = RiskProfile_CurrentSafety{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_core_api_dashboard_proto_msgTypes[63]
+		mi := &file_core_api_dashboard_proto_msgTypes[65]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -4511,7 +4630,7 @@ func (x *RiskProfile_CurrentSafety) String() string {
 func (*RiskProfile_CurrentSafety) ProtoMessage() {}
 
 func (x *RiskProfile_CurrentSafety) ProtoReflect() protoreflect.Message {
-	mi := &file_core_api_dashboard_proto_msgTypes[63]
+	mi := &file_core_api_dashboard_proto_msgTypes[65]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5304,12 +5423,25 @@ var file_core_api_dashboard_proto_rawDesc = []byte{
 	0x6f, 0x61, 0x72, 0x64, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x52, 0x65, 0x6d, 0x61, 0x72, 0x6b,
 	0x52, 0x65, 0x73, 0x70, 0x12, 0x13, 0x0a, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x18, 0xff, 0x01, 0x20,
 	0x01, 0x28, 0x05, 0x52, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x12, 0x11, 0x0a, 0x03, 0x6d, 0x73, 0x67,
-	0x18, 0x80, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6d, 0x73, 0x67, 0x42, 0x43, 0x5a, 0x41,
-	0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x78, 0x68, 0x2d, 0x70, 0x6f,
-	0x6c, 0x61, 0x72, 0x69, 0x73, 0x2f, 0x70, 0x73, 0x79, 0x63, 0x68, 0x2d, 0x63, 0x6f, 0x72, 0x65,
-	0x2d, 0x61, 0x70, 0x69, 0x2f, 0x62, 0x69, 0x7a, 0x2f, 0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61,
-	0x74, 0x69, 0x6f, 0x6e, 0x2f, 0x64, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70,
-	0x69, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x18, 0x80, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x6d, 0x73, 0x67, 0x22, 0x42, 0x0a, 0x24,
+	0x44, 0x61, 0x73, 0x68, 0x62, 0x6f, 0x61, 0x72, 0x64, 0x47, 0x65, 0x6e, 0x65, 0x72, 0x61, 0x74,
+	0x65, 0x49, 0x6e, 0x74, 0x65, 0x72, 0x76, 0x65, 0x6e, 0x74, 0x69, 0x6f, 0x6e, 0x50, 0x6c, 0x61,
+	0x6e, 0x52, 0x65, 0x71, 0x12, 0x1a, 0x0a, 0x08, 0x72, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x49, 0x64,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x72, 0x65, 0x70, 0x6f, 0x72, 0x74, 0x49, 0x64,
+	0x22, 0x85, 0x01, 0x0a, 0x25, 0x44, 0x61, 0x73, 0x68, 0x62, 0x6f, 0x61, 0x72, 0x64, 0x47, 0x65,
+	0x6e, 0x65, 0x72, 0x61, 0x74, 0x65, 0x49, 0x6e, 0x74, 0x65, 0x72, 0x76, 0x65, 0x6e, 0x74, 0x69,
+	0x6f, 0x6e, 0x50, 0x6c, 0x61, 0x6e, 0x52, 0x65, 0x73, 0x70, 0x12, 0x1a, 0x0a, 0x08, 0x72, 0x65,
+	0x70, 0x6f, 0x72, 0x74, 0x49, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x72, 0x65,
+	0x70, 0x6f, 0x72, 0x74, 0x49, 0x64, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e,
+	0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74,
+	0x12, 0x13, 0x0a, 0x04, 0x63, 0x6f, 0x64, 0x65, 0x18, 0xff, 0x01, 0x20, 0x01, 0x28, 0x05, 0x52,
+	0x04, 0x63, 0x6f, 0x64, 0x65, 0x12, 0x11, 0x0a, 0x03, 0x6d, 0x73, 0x67, 0x18, 0x80, 0x02, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x03, 0x6d, 0x73, 0x67, 0x42, 0x43, 0x5a, 0x41, 0x67, 0x69, 0x74, 0x68,
+	0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x78, 0x68, 0x2d, 0x70, 0x6f, 0x6c, 0x61, 0x72, 0x69,
+	0x73, 0x2f, 0x70, 0x73, 0x79, 0x63, 0x68, 0x2d, 0x63, 0x6f, 0x72, 0x65, 0x2d, 0x61, 0x70, 0x69,
+	0x2f, 0x62, 0x69, 0x7a, 0x2f, 0x61, 0x70, 0x70, 0x6c, 0x69, 0x63, 0x61, 0x74, 0x69, 0x6f, 0x6e,
+	0x2f, 0x64, 0x74, 0x6f, 0x2f, 0x63, 0x6f, 0x72, 0x65, 0x5f, 0x61, 0x70, 0x69, 0x62, 0x06, 0x70,
+	0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -5324,113 +5456,115 @@ func file_core_api_dashboard_proto_rawDescGZIP() []byte {
 	return file_core_api_dashboard_proto_rawDescData
 }
 
-var file_core_api_dashboard_proto_msgTypes = make([]protoimpl.MessageInfo, 65)
+var file_core_api_dashboard_proto_msgTypes = make([]protoimpl.MessageInfo, 67)
 var file_core_api_dashboard_proto_goTypes = []interface{}{
-	(*DashboardGetDataOverviewReq)(nil),          // 0: core_api.DashboardGetDataOverviewReq
-	(*DashboardGetDataOverviewResp)(nil),         // 1: core_api.DashboardGetDataOverviewResp
-	(*DashboardGetDataTrendReq)(nil),             // 2: core_api.DashboardGetDataTrendReq
-	(*DashboardGetDataTrendResp)(nil),            // 3: core_api.DashboardGetDataTrendResp
-	(*TrendPoint)(nil),                           // 4: core_api.TrendPoint
-	(*ConversationDuration)(nil),                 // 5: core_api.conversationDuration
-	(*RiskDistributionByGrade)(nil),              // 6: core_api.RiskDistributionByGrade
-	(*DashboardListUnitsReq)(nil),                // 7: core_api.DashboardListUnitsReq
-	(*DashboardListUnitsResp)(nil),               // 8: core_api.DashboardListUnitsResp
-	(*DashboardUnit)(nil),                        // 9: core_api.DashboardUnit
-	(*DashboardGetPsychTrendReq)(nil),            // 10: core_api.DashboardGetPsychTrendReq
-	(*DashboardGetPsychTrendResp)(nil),           // 11: core_api.DashboardGetPsychTrendResp
-	(*LevelDashboard)(nil),                       // 12: core_api.LevelDashboard
-	(*RiskDistribution)(nil),                     // 13: core_api.RiskDistribution
-	(*Keywords)(nil),                             // 14: core_api.Keywords
-	(*EmotionRatio)(nil),                         // 15: core_api.EmotionRatio
-	(*DashboardGetAlarmOverviewReq)(nil),         // 16: core_api.DashboardGetAlarmOverviewReq
-	(*DashboardGetAlarmOverviewResp)(nil),        // 17: core_api.DashboardGetAlarmOverviewResp
-	(*DashboardListAlarmRecordsReq)(nil),         // 18: core_api.DashboardListAlarmRecordsReq
-	(*DashboardListAlarmRecordsResp)(nil),        // 19: core_api.DashboardListAlarmRecordsResp
-	(*DashboardUpdateAlarmReq)(nil),              // 20: core_api.DashboardUpdateAlarmReq
-	(*DashboardUpdateAlarmResp)(nil),             // 21: core_api.DashboardUpdateAlarmResp
-	(*AlarmRecord)(nil),                          // 22: core_api.AlarmRecord
-	(*ClassInfo)(nil),                            // 23: core_api.ClassInfo
-	(*GradeInfo)(nil),                            // 24: core_api.GradeInfo
-	(*DashboardListClassesReq)(nil),              // 25: core_api.DashboardListClassesReq
-	(*DashboardListClassesResp)(nil),             // 26: core_api.DashboardListClassesResp
-	(*RiskUser)(nil),                             // 27: core_api.RiskUser
-	(*DashboardListUsersReq)(nil),                // 28: core_api.DashboardListUsersReq
-	(*DashboardListUsersResp)(nil),               // 29: core_api.DashboardListUsersResp
-	(*DashboardUserConvRecordsReq)(nil),          // 30: core_api.DashboardUserConvRecordsReq
-	(*DashboardUserConvRecordsResp)(nil),         // 31: core_api.DashboardUserConvRecordsResp
-	(*UserConvTrend)(nil),                        // 32: core_api.UserConvTrend
-	(*ConvDetail)(nil),                           // 33: core_api.ConvDetail
-	(*DashboardGetConversationMessagesReq)(nil),  // 34: core_api.DashboardGetConversationMessagesReq
-	(*DashboardConversationMessage)(nil),         // 35: core_api.DashboardConversationMessage
-	(*DashboardGetConversationMessagesResp)(nil), // 36: core_api.DashboardGetConversationMessagesResp
-	(*DashboardGetReportReq)(nil),                // 37: core_api.DashboardGetReportReq
-	(*ProblemItem)(nil),                          // 38: core_api.ProblemItem
-	(*AnalysisProblem)(nil),                      // 39: core_api.AnalysisProblem
-	(*AnalysisEmotion)(nil),                      // 40: core_api.AnalysisEmotion
-	(*AnalysisSupport)(nil),                      // 41: core_api.AnalysisSupport
-	(*AnalysisFunction)(nil),                     // 42: core_api.AnalysisFunction
-	(*AnalysisDistress)(nil),                     // 43: core_api.AnalysisDistress
-	(*RiskScore)(nil),                            // 44: core_api.RiskScore
-	(*ProfileSection)(nil),                       // 45: core_api.ProfileSection
-	(*RiskProfile)(nil),                          // 46: core_api.RiskProfile
-	(*AnalysisRisk)(nil),                         // 47: core_api.AnalysisRisk
-	(*AnalysisConfidence)(nil),                   // 48: core_api.AnalysisConfidence
-	(*ReportAnalysis)(nil),                       // 49: core_api.ReportAnalysis
-	(*SimpleReportMsg)(nil),                      // 50: core_api.SimpleReportMsg
-	(*ReportSummary)(nil),                        // 51: core_api.ReportSummary
-	(*DashboardGetReportResp)(nil),               // 52: core_api.DashboardGetReportResp
-	(*DashboardUnitConvRecordsReq)(nil),          // 53: core_api.DashboardUnitConvRecordsReq
-	(*DashboardUnitConvRecordsResp)(nil),         // 54: core_api.DashboardUnitConvRecordsResp
-	(*ConvOverview)(nil),                         // 55: core_api.ConvOverview
-	(*DashboardCreateRemarkReq)(nil),             // 56: core_api.DashboardCreateRemarkReq
-	(*DashboardCreateRemarkResp)(nil),            // 57: core_api.DashboardCreateRemarkResp
-	nil,                                          // 58: core_api.RiskDistributionByGrade.RatioEntry
-	nil,                                          // 59: core_api.RiskDistributionByGrade.CountEntry
-	nil,                                          // 60: core_api.LevelDashboard.DistributionEntry
-	nil,                                          // 61: core_api.Keywords.KeywordMapEntry
-	nil,                                          // 62: core_api.EmotionRatio.RatioEntry
-	(*RiskProfile_CurrentSafety)(nil),            // 63: core_api.RiskProfile.CurrentSafety
-	nil,                                          // 64: core_api.DashboardGetReportResp.KeywordPercentEntry
-	(*basic.PaginationOptions)(nil),              // 65: basic.PaginationOptions
-	(*basic.Pagination)(nil),                     // 66: basic.Pagination
-	(*UserVO)(nil),                               // 67: core_api.UserVO
+	(*DashboardGetDataOverviewReq)(nil),           // 0: core_api.DashboardGetDataOverviewReq
+	(*DashboardGetDataOverviewResp)(nil),          // 1: core_api.DashboardGetDataOverviewResp
+	(*DashboardGetDataTrendReq)(nil),              // 2: core_api.DashboardGetDataTrendReq
+	(*DashboardGetDataTrendResp)(nil),             // 3: core_api.DashboardGetDataTrendResp
+	(*TrendPoint)(nil),                            // 4: core_api.TrendPoint
+	(*ConversationDuration)(nil),                  // 5: core_api.conversationDuration
+	(*RiskDistributionByGrade)(nil),               // 6: core_api.RiskDistributionByGrade
+	(*DashboardListUnitsReq)(nil),                 // 7: core_api.DashboardListUnitsReq
+	(*DashboardListUnitsResp)(nil),                // 8: core_api.DashboardListUnitsResp
+	(*DashboardUnit)(nil),                         // 9: core_api.DashboardUnit
+	(*DashboardGetPsychTrendReq)(nil),             // 10: core_api.DashboardGetPsychTrendReq
+	(*DashboardGetPsychTrendResp)(nil),            // 11: core_api.DashboardGetPsychTrendResp
+	(*LevelDashboard)(nil),                        // 12: core_api.LevelDashboard
+	(*RiskDistribution)(nil),                      // 13: core_api.RiskDistribution
+	(*Keywords)(nil),                              // 14: core_api.Keywords
+	(*EmotionRatio)(nil),                          // 15: core_api.EmotionRatio
+	(*DashboardGetAlarmOverviewReq)(nil),          // 16: core_api.DashboardGetAlarmOverviewReq
+	(*DashboardGetAlarmOverviewResp)(nil),         // 17: core_api.DashboardGetAlarmOverviewResp
+	(*DashboardListAlarmRecordsReq)(nil),          // 18: core_api.DashboardListAlarmRecordsReq
+	(*DashboardListAlarmRecordsResp)(nil),         // 19: core_api.DashboardListAlarmRecordsResp
+	(*DashboardUpdateAlarmReq)(nil),               // 20: core_api.DashboardUpdateAlarmReq
+	(*DashboardUpdateAlarmResp)(nil),              // 21: core_api.DashboardUpdateAlarmResp
+	(*AlarmRecord)(nil),                           // 22: core_api.AlarmRecord
+	(*ClassInfo)(nil),                             // 23: core_api.ClassInfo
+	(*GradeInfo)(nil),                             // 24: core_api.GradeInfo
+	(*DashboardListClassesReq)(nil),               // 25: core_api.DashboardListClassesReq
+	(*DashboardListClassesResp)(nil),              // 26: core_api.DashboardListClassesResp
+	(*RiskUser)(nil),                              // 27: core_api.RiskUser
+	(*DashboardListUsersReq)(nil),                 // 28: core_api.DashboardListUsersReq
+	(*DashboardListUsersResp)(nil),                // 29: core_api.DashboardListUsersResp
+	(*DashboardUserConvRecordsReq)(nil),           // 30: core_api.DashboardUserConvRecordsReq
+	(*DashboardUserConvRecordsResp)(nil),          // 31: core_api.DashboardUserConvRecordsResp
+	(*UserConvTrend)(nil),                         // 32: core_api.UserConvTrend
+	(*ConvDetail)(nil),                            // 33: core_api.ConvDetail
+	(*DashboardGetConversationMessagesReq)(nil),   // 34: core_api.DashboardGetConversationMessagesReq
+	(*DashboardConversationMessage)(nil),          // 35: core_api.DashboardConversationMessage
+	(*DashboardGetConversationMessagesResp)(nil),  // 36: core_api.DashboardGetConversationMessagesResp
+	(*DashboardGetReportReq)(nil),                 // 37: core_api.DashboardGetReportReq
+	(*ProblemItem)(nil),                           // 38: core_api.ProblemItem
+	(*AnalysisProblem)(nil),                       // 39: core_api.AnalysisProblem
+	(*AnalysisEmotion)(nil),                       // 40: core_api.AnalysisEmotion
+	(*AnalysisSupport)(nil),                       // 41: core_api.AnalysisSupport
+	(*AnalysisFunction)(nil),                      // 42: core_api.AnalysisFunction
+	(*AnalysisDistress)(nil),                      // 43: core_api.AnalysisDistress
+	(*RiskScore)(nil),                             // 44: core_api.RiskScore
+	(*ProfileSection)(nil),                        // 45: core_api.ProfileSection
+	(*RiskProfile)(nil),                           // 46: core_api.RiskProfile
+	(*AnalysisRisk)(nil),                          // 47: core_api.AnalysisRisk
+	(*AnalysisConfidence)(nil),                    // 48: core_api.AnalysisConfidence
+	(*ReportAnalysis)(nil),                        // 49: core_api.ReportAnalysis
+	(*SimpleReportMsg)(nil),                       // 50: core_api.SimpleReportMsg
+	(*ReportSummary)(nil),                         // 51: core_api.ReportSummary
+	(*DashboardGetReportResp)(nil),                // 52: core_api.DashboardGetReportResp
+	(*DashboardUnitConvRecordsReq)(nil),           // 53: core_api.DashboardUnitConvRecordsReq
+	(*DashboardUnitConvRecordsResp)(nil),          // 54: core_api.DashboardUnitConvRecordsResp
+	(*ConvOverview)(nil),                          // 55: core_api.ConvOverview
+	(*DashboardCreateRemarkReq)(nil),              // 56: core_api.DashboardCreateRemarkReq
+	(*DashboardCreateRemarkResp)(nil),             // 57: core_api.DashboardCreateRemarkResp
+	(*DashboardGenerateInterventionPlanReq)(nil),  // 58: core_api.DashboardGenerateInterventionPlanReq
+	(*DashboardGenerateInterventionPlanResp)(nil), // 59: core_api.DashboardGenerateInterventionPlanResp
+	nil,                               // 60: core_api.RiskDistributionByGrade.RatioEntry
+	nil,                               // 61: core_api.RiskDistributionByGrade.CountEntry
+	nil,                               // 62: core_api.LevelDashboard.DistributionEntry
+	nil,                               // 63: core_api.Keywords.KeywordMapEntry
+	nil,                               // 64: core_api.EmotionRatio.RatioEntry
+	(*RiskProfile_CurrentSafety)(nil), // 65: core_api.RiskProfile.CurrentSafety
+	nil,                               // 66: core_api.DashboardGetReportResp.KeywordPercentEntry
+	(*basic.PaginationOptions)(nil),   // 67: basic.PaginationOptions
+	(*basic.Pagination)(nil),          // 68: basic.Pagination
+	(*UserVO)(nil),                    // 69: core_api.UserVO
 }
 var file_core_api_dashboard_proto_depIdxs = []int32{
 	4,  // 0: core_api.DashboardGetDataTrendResp.activePoints:type_name -> core_api.TrendPoint
 	4,  // 1: core_api.DashboardGetDataTrendResp.conversationPoints:type_name -> core_api.TrendPoint
 	5,  // 2: core_api.DashboardGetDataTrendResp.conversationDurations:type_name -> core_api.conversationDuration
 	6,  // 3: core_api.DashboardGetDataTrendResp.riskDistribution:type_name -> core_api.RiskDistributionByGrade
-	58, // 4: core_api.RiskDistributionByGrade.ratio:type_name -> core_api.RiskDistributionByGrade.RatioEntry
-	59, // 5: core_api.RiskDistributionByGrade.count:type_name -> core_api.RiskDistributionByGrade.CountEntry
+	60, // 4: core_api.RiskDistributionByGrade.ratio:type_name -> core_api.RiskDistributionByGrade.RatioEntry
+	61, // 5: core_api.RiskDistributionByGrade.count:type_name -> core_api.RiskDistributionByGrade.CountEntry
 	9,  // 6: core_api.DashboardListUnitsResp.units:type_name -> core_api.DashboardUnit
 	15, // 7: core_api.DashboardGetPsychTrendResp.emotionRatio:type_name -> core_api.EmotionRatio
 	13, // 8: core_api.DashboardGetPsychTrendResp.risks:type_name -> core_api.RiskDistribution
 	14, // 9: core_api.DashboardGetPsychTrendResp.keywords:type_name -> core_api.Keywords
 	12, // 10: core_api.DashboardGetPsychTrendResp.riskDashboard:type_name -> core_api.LevelDashboard
 	12, // 11: core_api.DashboardGetPsychTrendResp.distressDashboard:type_name -> core_api.LevelDashboard
-	60, // 12: core_api.LevelDashboard.distribution:type_name -> core_api.LevelDashboard.DistributionEntry
-	61, // 13: core_api.Keywords.keywordMap:type_name -> core_api.Keywords.KeywordMapEntry
-	62, // 14: core_api.EmotionRatio.ratio:type_name -> core_api.EmotionRatio.RatioEntry
-	65, // 15: core_api.DashboardListAlarmRecordsReq.paginationOptions:type_name -> basic.PaginationOptions
+	62, // 12: core_api.LevelDashboard.distribution:type_name -> core_api.LevelDashboard.DistributionEntry
+	63, // 13: core_api.Keywords.keywordMap:type_name -> core_api.Keywords.KeywordMapEntry
+	64, // 14: core_api.EmotionRatio.ratio:type_name -> core_api.EmotionRatio.RatioEntry
+	67, // 15: core_api.DashboardListAlarmRecordsReq.paginationOptions:type_name -> basic.PaginationOptions
 	22, // 16: core_api.DashboardListAlarmRecordsResp.records:type_name -> core_api.AlarmRecord
-	66, // 17: core_api.DashboardListAlarmRecordsResp.pagination:type_name -> basic.Pagination
+	68, // 17: core_api.DashboardListAlarmRecordsResp.pagination:type_name -> basic.Pagination
 	22, // 18: core_api.DashboardUpdateAlarmReq.alarm:type_name -> core_api.AlarmRecord
-	67, // 19: core_api.AlarmRecord.user:type_name -> core_api.UserVO
+	69, // 19: core_api.AlarmRecord.user:type_name -> core_api.UserVO
 	23, // 20: core_api.GradeInfo.classes:type_name -> core_api.ClassInfo
 	24, // 21: core_api.DashboardListClassesResp.grades:type_name -> core_api.GradeInfo
-	67, // 22: core_api.RiskUser.user:type_name -> core_api.UserVO
-	65, // 23: core_api.DashboardListUsersReq.paginationOptions:type_name -> basic.PaginationOptions
+	69, // 22: core_api.RiskUser.user:type_name -> core_api.UserVO
+	67, // 23: core_api.DashboardListUsersReq.paginationOptions:type_name -> basic.PaginationOptions
 	27, // 24: core_api.DashboardListUsersResp.riskUsers:type_name -> core_api.RiskUser
-	66, // 25: core_api.DashboardListUsersResp.pagination:type_name -> basic.Pagination
-	65, // 26: core_api.DashboardUserConvRecordsReq.paginationOptions:type_name -> basic.PaginationOptions
-	67, // 27: core_api.DashboardUserConvRecordsResp.user:type_name -> core_api.UserVO
+	68, // 25: core_api.DashboardListUsersResp.pagination:type_name -> basic.Pagination
+	67, // 26: core_api.DashboardUserConvRecordsReq.paginationOptions:type_name -> basic.PaginationOptions
+	69, // 27: core_api.DashboardUserConvRecordsResp.user:type_name -> core_api.UserVO
 	32, // 28: core_api.DashboardUserConvRecordsResp.userConvTrend:type_name -> core_api.UserConvTrend
 	33, // 29: core_api.DashboardUserConvRecordsResp.convDetail:type_name -> core_api.ConvDetail
-	66, // 30: core_api.DashboardUserConvRecordsResp.pagination:type_name -> basic.Pagination
+	68, // 30: core_api.DashboardUserConvRecordsResp.pagination:type_name -> basic.Pagination
 	4,  // 31: core_api.UserConvTrend.trendPoints:type_name -> core_api.TrendPoint
 	14, // 32: core_api.ConvDetail.keywords:type_name -> core_api.Keywords
-	65, // 33: core_api.DashboardGetConversationMessagesReq.paginationOptions:type_name -> basic.PaginationOptions
-	66, // 34: core_api.DashboardGetConversationMessagesResp.pagination:type_name -> basic.Pagination
+	67, // 33: core_api.DashboardGetConversationMessagesReq.paginationOptions:type_name -> basic.PaginationOptions
+	68, // 34: core_api.DashboardGetConversationMessagesResp.pagination:type_name -> basic.Pagination
 	35, // 35: core_api.DashboardGetConversationMessagesResp.messageList:type_name -> core_api.DashboardConversationMessage
 	38, // 36: core_api.AnalysisProblem.primary:type_name -> core_api.ProblemItem
 	38, // 37: core_api.AnalysisProblem.secondary:type_name -> core_api.ProblemItem
@@ -5439,7 +5573,7 @@ var file_core_api_dashboard_proto_depIdxs = []int32{
 	45, // 40: core_api.RiskProfile.riskFactors:type_name -> core_api.ProfileSection
 	45, // 41: core_api.RiskProfile.protectiveFactors:type_name -> core_api.ProfileSection
 	45, // 42: core_api.RiskProfile.informationGap:type_name -> core_api.ProfileSection
-	63, // 43: core_api.RiskProfile.currentSafety:type_name -> core_api.RiskProfile.CurrentSafety
+	65, // 43: core_api.RiskProfile.currentSafety:type_name -> core_api.RiskProfile.CurrentSafety
 	44, // 44: core_api.AnalysisRisk.score:type_name -> core_api.RiskScore
 	46, // 45: core_api.AnalysisRisk.profile:type_name -> core_api.RiskProfile
 	39, // 46: core_api.ReportAnalysis.problem:type_name -> core_api.AnalysisProblem
@@ -5449,13 +5583,13 @@ var file_core_api_dashboard_proto_depIdxs = []int32{
 	43, // 50: core_api.ReportAnalysis.distress:type_name -> core_api.AnalysisDistress
 	47, // 51: core_api.ReportAnalysis.risk:type_name -> core_api.AnalysisRisk
 	48, // 52: core_api.ReportAnalysis.confidence:type_name -> core_api.AnalysisConfidence
-	64, // 53: core_api.DashboardGetReportResp.keywordPercent:type_name -> core_api.DashboardGetReportResp.KeywordPercentEntry
+	66, // 53: core_api.DashboardGetReportResp.keywordPercent:type_name -> core_api.DashboardGetReportResp.KeywordPercentEntry
 	49, // 54: core_api.DashboardGetReportResp.analysis:type_name -> core_api.ReportAnalysis
 	50, // 55: core_api.DashboardGetReportResp.simpleReport:type_name -> core_api.SimpleReportMsg
-	65, // 56: core_api.DashboardUnitConvRecordsReq.paginationOptions:type_name -> basic.PaginationOptions
+	67, // 56: core_api.DashboardUnitConvRecordsReq.paginationOptions:type_name -> basic.PaginationOptions
 	55, // 57: core_api.DashboardUnitConvRecordsResp.conversationList:type_name -> core_api.ConvOverview
-	66, // 58: core_api.DashboardUnitConvRecordsResp.pagination:type_name -> basic.Pagination
-	67, // 59: core_api.ConvOverview.user:type_name -> core_api.UserVO
+	68, // 58: core_api.DashboardUnitConvRecordsResp.pagination:type_name -> basic.Pagination
+	69, // 59: core_api.ConvOverview.user:type_name -> core_api.UserVO
 	51, // 60: core_api.ConvOverview.reportSummary:type_name -> core_api.ReportSummary
 	61, // [61:61] is the sub-list for method output_type
 	61, // [61:61] is the sub-list for method input_type
@@ -6167,7 +6301,31 @@ func file_core_api_dashboard_proto_init() {
 				return nil
 			}
 		}
-		file_core_api_dashboard_proto_msgTypes[63].Exporter = func(v interface{}, i int) interface{} {
+		file_core_api_dashboard_proto_msgTypes[58].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DashboardGenerateInterventionPlanReq); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_core_api_dashboard_proto_msgTypes[59].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DashboardGenerateInterventionPlanResp); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_core_api_dashboard_proto_msgTypes[65].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*RiskProfile_CurrentSafety); i {
 			case 0:
 				return &v.state
@@ -6196,7 +6354,7 @@ func file_core_api_dashboard_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_core_api_dashboard_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   65,
+			NumMessages:   67,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
