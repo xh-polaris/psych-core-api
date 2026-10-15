@@ -13,6 +13,7 @@ import (
 	"github.com/xh-polaris/psych-core-api/biz/cst"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/alarm"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/message"
+	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/report"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/unit"
 	"github.com/xh-polaris/psych-core-api/biz/infra/mapper/user"
 	"github.com/xh-polaris/psych-core-api/biz/infra/util"
@@ -209,14 +210,20 @@ func (d *DashboardDomain) UpdateAlarm(ctx context.Context, scope *Scope, req *co
 // completeAlarm 补全预警记录的用户信息（用户信息、对话统计、年级换算）
 func (d *DashboardDomain) completeAlarm(ctx context.Context, dbAlarms []*alarm.Alarm) ([]*core_api.AlarmRecord, error) {
 	userIds := make([]bson.ObjectID, len(dbAlarms))
+	reportIDs := make([]bson.ObjectID, 0, len(dbAlarms))
+	reportIDSet := make(map[bson.ObjectID]struct{}, len(dbAlarms))
 	for i, al := range dbAlarms {
 		userIds[i] = al.UserID
+		if _, ok := reportIDSet[al.ReportID]; !ok {
+			reportIDSet[al.ReportID] = struct{}{}
+			reportIDs = append(reportIDs, al.ReportID)
+		}
 	}
 
 	var userInfo map[bson.ObjectID]*user.User
 	var msgStats map[bson.ObjectID]*message.MsgStats
-	var reportRounds map[bson.ObjectID]int32
-	var userErr, msgErr, roundsErr error
+	var reportInfo map[bson.ObjectID]*report.Report
+	var userErr, msgErr, reportErr error
 
 	var wg sync.WaitGroup
 	wg.Add(3)
@@ -236,9 +243,9 @@ func (d *DashboardDomain) completeAlarm(ctx context.Context, dbAlarms []*alarm.A
 	}()
 	go func() {
 		defer wg.Done()
-		reportRounds, roundsErr = d.ReportMapper.BatchSumCompletedRoundsByUserIDs(ctx, userIds)
-		if roundsErr != nil {
-			logs.Errorf("查询已完成报告轮数失败: %v", errorx.ErrorWithoutStack(roundsErr))
+		reportInfo, reportErr = d.ReportMapper.BatchFindVisibleByIDs(ctx, reportIDs)
+		if reportErr != nil {
+			logs.Errorf("批量查询预警关联报表失败: %v", errorx.ErrorWithoutStack(reportErr))
 		}
 	}()
 	wg.Wait()
@@ -249,7 +256,7 @@ func (d *DashboardDomain) completeAlarm(ctx context.Context, dbAlarms []*alarm.A
 	if msgErr != nil {
 		return nil, errorx.New(errno.ErrDashboardConversationStat)
 	}
-	if roundsErr != nil {
+	if reportErr != nil {
 		return nil, errorx.New(errno.ErrDashboardConversationStat)
 	}
 
@@ -298,7 +305,10 @@ func (d *DashboardDomain) completeAlarm(ctx context.Context, dbAlarms []*alarm.A
 		if msgExists {
 			records[i].LastConversationTime = stats.LatestTime
 		}
-		records[i].TotalConversationRounds = reportRounds[al.UserID]
+		// 每条预警对应一份具体报告，轮数必须取该报告的 round，不能按用户累计。
+		if report, ok := reportInfo[al.ReportID]; ok {
+			records[i].TotalConversationRounds = int32(report.Round)
+		}
 	}
 
 	return records, nil
