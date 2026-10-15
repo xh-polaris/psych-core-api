@@ -300,11 +300,12 @@ func (d *DashboardDomain) listUserConvDetails(ctx context.Context, userOID bson.
 	tm := make(map[bson.ObjectID]int64)                // 对话时间戳
 	digests := make(map[bson.ObjectID]string)          // 摘要-取自ReportMapper
 	kwds := make(map[bson.ObjectID]*core_api.Keywords) // 关键词-取自词云域WordCloudExtractor
+	reportIDs := make(map[bson.ObjectID]string)        // 报表 ID：供前端查看报告详情
 
 	// To Optimize：初期用户对话数，即len(convs)较小，遍历时逐个查Report即可 后续可优化为批量查询Report
 	// 对每条对话记录：1.调用ReportMapper获得摘要 2.调用HisDomain获取历史消息 3.调用词云域生成词云
 	var wg sync.WaitGroup
-	var tmMu, dgstMu, kwdsMu sync.Mutex
+	var tmMu, dgstMu, kwdsMu, reportIDMu sync.Mutex
 	wg.Add(len(convs))
 
 	for _, conv := range convs {
@@ -335,6 +336,9 @@ func (d *DashboardDomain) listUserConvDetails(ctx context.Context, userOID bson.
 			dgstMu.Lock()
 			digests[c.ID] = DigestOf(rpt)
 			dgstMu.Unlock()
+			reportIDMu.Lock()
+			reportIDs[c.ID] = rpt.ID.Hex()
+			reportIDMu.Unlock()
 
 			kwMap := make(map[string]int32)
 			for _, kw := range KeywordsOf(rpt) {
@@ -363,6 +367,9 @@ func (d *DashboardDomain) listUserConvDetails(ctx context.Context, userOID bson.
 		}
 		if kwd, ok := kwds[convId]; ok {
 			convDetail.Keywords = kwd
+		}
+		if reportID, ok := reportIDs[convId]; ok {
+			convDetail.ReportId = reportID
 		}
 		convDetails = append(convDetails, convDetail)
 	}

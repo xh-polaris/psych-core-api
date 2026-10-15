@@ -39,6 +39,7 @@ type IMongoMapper interface {
 	FindByConversation(ctx context.Context, sessionId bson.ObjectID) (*Report, error)
 	FindByConversationPreferSuccess(ctx context.Context, sessionId bson.ObjectID) (*Report, error)
 	FindVisibleByID(ctx context.Context, reportID bson.ObjectID) (*Report, error)
+	BatchFindVisibleByIDs(ctx context.Context, reportIDs []bson.ObjectID) (map[bson.ObjectID]*Report, error)
 	BatchFindBySession(ctx context.Context, sessionIds []bson.ObjectID) (map[bson.ObjectID]*Report, error)
 	// 词云相关接口
 	// 关键词词云（v2 报表 simple_report.keywords 聚合）
@@ -256,6 +257,29 @@ func (m *mongoMapper) FindVisibleByID(ctx context.Context, reportID bson.ObjectI
 		return nil, err
 	}
 	return report, nil
+}
+
+// BatchFindVisibleByIDs 批量查询未删除的报表。
+func (m *mongoMapper) BatchFindVisibleByIDs(ctx context.Context, reportIDs []bson.ObjectID) (map[bson.ObjectID]*Report, error) {
+	result := make(map[bson.ObjectID]*Report, len(reportIDs))
+	if len(reportIDs) == 0 {
+		return result, nil
+	}
+
+	var reports []*Report
+	filter := bson.M{
+		cst.ID:     bson.M{cst.In: reportIDs},
+		cst.Status: bson.M{cst.NE: enum.ReportStatusDeleted},
+	}
+	if err := m.conn.Find(ctx, &reports, filter); err != nil {
+		return nil, err
+	}
+	for _, report := range reports {
+		if report != nil {
+			result[report.ID] = report
+		}
+	}
+	return result, nil
 }
 
 // GetUnitKWByClassList 按班级列表统计报表 simple_report.keywords 的词频
